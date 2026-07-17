@@ -1,0 +1,2822 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Kombi Store — Gestión Operativa</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --a50:#FFFBEB;--a100:#FEF3C7;--a200:#FDE68A;--a400:#FBBF24;--a500:#F59E0B;--a600:#D97706;--a700:#B45309;--a900:#78350F;
+  --g50:#F9FAFB;--g100:#F3F4F6;--g200:#E5E7EB;--g300:#D1D5DB;--g400:#9CA3AF;--g500:#6B7280;--g600:#4B5563;--g700:#374151;--g800:#1F2937;--g900:#111827;
+  --gr100:#DCFCE7;--gr500:#22C55E;--gr600:#16A34A;
+  --r100:#FEE2E2;--r500:#EF4444;--r600:#DC2626;
+  --b100:#DBEAFE;--b500:#3B82F6;--b600:#2563EB;
+  --mono:'JetBrains Mono',monospace;
+  --sw:240px;--rad:10px;
+  --sh:0 1px 3px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.06);
+  --shm:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -2px rgba(0,0,0,.1);
+  --shl:0 10px 15px -3px rgba(0,0,0,.1),0 4px 6px -4px rgba(0,0,0,.1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:'Inter',sans-serif;background:var(--g50);color:var(--g900)}
+button{cursor:pointer;font-family:inherit}
+input,select,textarea{font-family:inherit}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-thumb{background:var(--g300);border-radius:3px}
+
+/* UTIL */
+.hidden{display:none!important}
+.mono{font-family:var(--mono)}
+.text-amber{color:var(--a600)}.text-green{color:var(--gr600)}.text-red{color:var(--r600)}.text-gray{color:var(--g500)}
+.fw7{font-weight:700}.fw6{font-weight:600}
+.fs13{font-size:.8125rem}.fs14{font-size:.875rem}.fs15{font-size:.9375rem}.fs12{font-size:.75rem}
+.mt2{margin-top:.5rem}.mt4{margin-top:1rem}.mb2{margin-bottom:.5rem}.mb4{margin-bottom:1rem}
+.flex{display:flex}.aic{align-items:center}.jcb{justify-content:space-between}.gap2{gap:.5rem}.gap3{gap:.75rem}
+.w100{width:100%}
+.badge{display:inline-flex;align-items:center;padding:.125rem .5rem;border-radius:9999px;font-size:.75rem;font-weight:600}
+.ba{background:var(--a100);color:var(--a700)}
+.bg{background:var(--gr100);color:var(--gr600)}
+.br{background:var(--r100);color:var(--r600)}
+.bb{background:var(--b100);color:var(--b600)}
+
+/* LOGIN */
+#ls{display:flex;height:100vh}
+.ll{flex:1;background:linear-gradient(135deg,var(--a900),var(--a700),var(--a500));display:flex;flex-direction:column;justify-content:center;align-items:center;padding:3rem;position:relative;overflow:hidden}
+.ll::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/svg%3E")}
+.ll-logo{width:80px;height:80px;background:rgba(255,255,255,.15);border-radius:20px;display:flex;align-items:center;justify-content:center;margin-bottom:1.5rem;backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.2)}
+.ll-logo svg{width:44px;height:44px;color:#fff}
+.ll h1{font-size:2.25rem;font-weight:900;color:#fff;text-align:center;letter-spacing:-.02em}
+.ll p{color:rgba(255,255,255,.75);text-align:center;margin-top:.5rem}
+.ll-chips{display:flex;gap:.5rem;margin-top:1.5rem;flex-wrap:wrap;justify-content:center}
+.ll-chip{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:rgba(255,255,255,.9);padding:.375rem .75rem;border-radius:9999px;font-size:.8125rem;font-weight:500}
+.lr{width:420px;display:flex;flex-direction:column;justify-content:center;padding:3rem;background:#fff;overflow-y:auto}
+.lr h2{font-size:1.5rem;font-weight:800;margin-bottom:.375rem}
+.lr .sub{color:var(--g500);margin-bottom:1.25rem}
+.role-tabs{display:flex;background:var(--g100);border-radius:var(--rad);padding:.25rem;gap:.25rem;margin-bottom:1.25rem}
+.role-tab{flex:1;padding:.625rem;border:none;background:transparent;border-radius:8px;font-size:.875rem;font-weight:600;color:var(--g500);transition:all .2s}
+.role-tab.active{background:#fff;color:var(--g900);box-shadow:var(--sh)}
+.demo-box{background:var(--a50);border:1.5px solid var(--a200);border-radius:8px;padding:.75rem 1rem;margin-bottom:1.25rem;font-size:.8125rem}
+.demo-box .dt{font-weight:700;color:var(--a800);margin-bottom:.375rem}
+.demo-box .dr{color:var(--a700);margin-bottom:.2rem}
+.demo-box .dr span{font-family:var(--mono);cursor:pointer;text-decoration:underline dotted}
+.demo-box .hint{font-size:.75rem;color:var(--a600);margin-top:.375rem}
+.fg{margin-bottom:1rem}
+.fg label{display:block;font-size:.875rem;font-weight:600;color:var(--g700);margin-bottom:.375rem}
+.fg input{width:100%;padding:.75rem 1rem;border:1.5px solid var(--g200);border-radius:var(--rad);font-size:.9375rem;outline:none;transition:border-color .2s;background:var(--g50)}
+.fg input:focus{border-color:var(--a500);background:#fff}
+.btn-login{width:100%;padding:.875rem;background:var(--a500);border:none;border-radius:var(--rad);font-size:1rem;font-weight:700;color:#fff;transition:all .2s}
+.btn-login:hover{background:var(--a600);transform:translateY(-1px);box-shadow:var(--shm)}
+.login-err{background:var(--r100);color:var(--r600);padding:.75rem 1rem;border-radius:var(--rad);font-size:.875rem;font-weight:500;margin-top:.75rem;text-align:center}
+
+/* APP */
+#app{display:none;height:100vh;flex-direction:column}
+#app.v{display:flex}
+.topbar{height:56px;background:#fff;border-bottom:1px solid var(--g200);display:flex;align-items:center;padding:0 1rem;gap:1rem;flex-shrink:0;z-index:30}
+.tb-brand{display:flex;align-items:center;gap:.625rem;font-weight:800;font-size:1.0625rem}
+.tb-icon{width:32px;height:32px;background:var(--a500);border-radius:8px;display:flex;align-items:center;justify-content:center}
+.tb-icon svg{width:18px;height:18px;color:#fff}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:.75rem}
+.tb-user{font-size:.8125rem;color:var(--g500)}
+.tb-user strong{color:var(--a700)}
+.bti{width:36px;height:36px;border:1px solid var(--g200);background:#fff;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--g600);transition:all .15s}
+.bti:hover{background:var(--g100);color:var(--g900)}
+.bti svg{width:16px;height:16px}
+.stoggle{display:none}
+.app-body{display:flex;flex:1;overflow:hidden}
+
+/* SIDEBAR */
+.sidebar{width:var(--sw);background:#fff;border-right:1px solid var(--g200);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;transition:transform .25s;z-index:20}
+.ss{padding:.75rem .75rem .25rem}
+.ssl{font-size:.6875rem;font-weight:700;color:var(--g400);text-transform:uppercase;letter-spacing:.08em;padding:0 .375rem;margin-bottom:.375rem}
+.ni{display:flex;align-items:center;gap:.625rem;padding:.5625rem .75rem;border-radius:8px;font-size:.875rem;font-weight:500;color:var(--g600);cursor:pointer;transition:all .15s;margin-bottom:.125rem;border:none;background:none;width:100%;text-align:left}
+.ni svg{width:16px;height:16px;flex-shrink:0}
+.ni:hover{background:var(--g100);color:var(--g900)}
+.ni.active{background:var(--a50);color:var(--a700);font-weight:600}
+.sf{margin-top:auto;padding:.75rem;border-top:1px solid var(--g100)}
+.ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:19}
+.main{flex:1;overflow-y:auto;padding:1.5rem}
+
+/* CARDS */
+.card{background:#fff;border:1px solid var(--g200);border-radius:var(--rad);padding:1.25rem;box-shadow:var(--sh)}
+.ct{font-size:.9375rem;font-weight:700;margin-bottom:1rem}
+.sc{background:#fff;border:1px solid var(--g200);border-radius:var(--rad);padding:1.25rem;box-shadow:var(--sh)}
+.sc .lbl{font-size:.8125rem;font-weight:500;color:var(--g500);margin-bottom:.25rem}
+.sc .val{font-size:1.75rem;font-weight:800;font-family:var(--mono);letter-spacing:-.02em}
+.sc .sub{font-size:.8125rem;color:var(--g400);margin-top:.25rem}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}
+
+/* PAGE HEADER */
+.ph{margin-bottom:1.5rem}
+.ph h2{font-size:1.375rem;font-weight:800;letter-spacing:-.02em}
+.ph p{color:var(--g500);font-size:.9375rem;margin-top:.25rem}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:.375rem;padding:.5625rem 1rem;border:none;border-radius:8px;font-size:.875rem;font-weight:600;transition:all .15s;cursor:pointer}
+.btn svg{width:15px;height:15px}
+.btn-p{background:var(--a500);color:#fff}.btn-p:hover{background:var(--a600)}
+.btn-s{background:var(--g100);color:var(--g700);border:1px solid var(--g200)}.btn-s:hover{background:var(--g200)}
+.btn-d{background:var(--r500);color:#fff}.btn-d:hover{background:var(--r600)}
+.btn-g{background:transparent;color:var(--g600)}.btn-g:hover{background:var(--g100)}
+.sm{padding:.375rem .75rem;font-size:.8125rem}
+
+/* FORMS */
+.inp{padding:.5625rem .75rem;border:1.5px solid var(--g200);border-radius:8px;font-size:.875rem;outline:none;transition:border-color .2s;background:#fff;width:100%}
+.inp:focus{border-color:var(--a500)}
+.sel{padding:.5625rem .75rem;border:1.5px solid var(--g200);border-radius:8px;font-size:.875rem;outline:none;background:#fff;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .75rem center;padding-right:2rem}
+.sel:focus{border-color:var(--a500)}
+.lbl{display:block;font-size:.8125rem;font-weight:600;color:var(--g700);margin-bottom:.375rem}
+.fld{margin-bottom:1rem}
+
+/* TABLE */
+.tw{overflow-x:auto;border:1px solid var(--g200);border-radius:var(--rad)}
+table{width:100%;border-collapse:collapse;font-size:.875rem}
+thead{background:var(--g50)}
+th{padding:.625rem 1rem;text-align:left;font-size:.75rem;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--g200)}
+td{padding:.75rem 1rem;border-bottom:1px solid var(--g100);color:var(--g700)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--g50)}
+
+/* DIVIDER */
+.div{border:none;border-top:1px solid var(--g200);margin:1rem 0}
+
+/* PROGRESS */
+.pb{height:6px;background:var(--g200);border-radius:3px;overflow:hidden}
+.pf{height:100%;background:var(--a500);border-radius:3px;transition:width .4s}
+
+/* BILL GRID */
+.bg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.625rem}
+.bi{background:var(--g50);border:1.5px solid var(--g200);border-radius:10px;padding:.75rem;transition:border-color .2s}
+.bi:focus-within{border-color:var(--a400)}
+.bi-d{font-size:.75rem;font-weight:700;color:var(--g500);margin-bottom:.25rem;text-transform:uppercase}
+.bi-i{width:100%;padding:.4rem;border:none;background:transparent;font-size:.9375rem;font-weight:700;font-family:var(--mono);color:var(--g900);text-align:right;outline:none}
+.bi-s{font-size:.75rem;color:var(--g400);margin-top:.2rem;font-family:var(--mono)}
+
+/* MOV LIST */
+.ml{display:flex;flex-direction:column;gap:.5rem}
+.mi{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;background:var(--g50);border-radius:8px;border:1px solid var(--g200)}
+.mt-i{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.ma{font-family:var(--mono);font-weight:700}
+.c-in{color:var(--b600)}.c-ab{color:var(--gr600)}.c-re{color:var(--r600)}
+
+/* ARQUEO ROWS */
+.ar{display:flex;justify-content:space-between;align-items:center;padding:.625rem 1rem;border-bottom:1px solid var(--g100)}
+.ar:last-child{border-bottom:none}
+.ar.tot{background:var(--a50);font-weight:700;color:var(--a900);border-radius:8px;border:1.5px solid var(--a200);margin-top:.5rem}
+.ar.dp{background:var(--gr100);color:var(--gr600);font-weight:700;border-radius:8px;margin-top:.5rem}
+.ar.dn{background:var(--r100);color:var(--r600);font-weight:700;border-radius:8px;margin-top:.5rem}
+.ar-l{font-size:.875rem;color:var(--g600)}
+.ar-v{font-family:var(--mono);font-weight:700;font-size:.9375rem}
+
+/* CHECKLIST */
+.ci{display:flex;align-items:flex-start;gap:.75rem;padding:.75rem;border-radius:8px;transition:background .15s;cursor:pointer}
+.ci:hover{background:var(--g50)}
+.cb{width:20px;height:20px;border:2px solid var(--g300);border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .2s;margin-top:.125rem}
+.ci.done .cb{background:var(--a500);border-color:var(--a500)}
+.ci.done .cl{text-decoration:line-through;color:var(--g400)}
+.cl{font-size:.9375rem;font-weight:500;color:var(--g800)}
+
+/* PHOTO UPLOAD */
+.photo-slot{border:2px dashed var(--g300);border-radius:10px;padding:1rem;text-align:center;cursor:pointer;transition:all .2s;position:relative;min-height:100px}
+.photo-slot:hover{border-color:var(--a400);background:var(--a50)}
+.photo-slot.has-photo{border-style:solid;border-color:var(--gr500);background:var(--gr100)}
+.photo-slot img{max-width:100%;max-height:120px;border-radius:6px;object-fit:cover}
+.photo-slot input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+
+/* WIZARD */
+.wsteps{display:flex;align-items:center;margin-bottom:1.5rem;max-width:680px;overflow-x:auto;padding-bottom:.25rem;gap:0}
+.ws{display:flex;align-items:center;gap:.375rem;cursor:pointer;flex-shrink:0}
+.wsd{width:26px;height:26px;border-radius:50%;background:var(--g200);color:var(--g500);font-size:.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0}
+.ws span{font-size:.75rem;font-weight:500;color:var(--g400);white-space:nowrap;transition:color .2s}
+.ws.active .wsd{background:var(--a500);color:#fff}
+.ws.active span{color:var(--g900);font-weight:700}
+.ws.done .wsd{background:var(--gr500);color:#fff}
+.ws.done span{color:var(--g500)}
+.wl{flex:1;min-width:12px;height:2px;background:var(--g200);margin:0 .25rem}
+.wp{display:none}
+.wp.active{display:block}
+.wnav{display:flex;justify-content:space-between;align-items:center;margin-top:1rem;padding-top:.75rem}
+
+/* MODAL */
+.mb{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:500;backdrop-filter:blur(3px)}
+.modal{background:#fff;border-radius:14px;padding:1.75rem;width:min(480px,calc(100vw - 2rem));max-height:90vh;overflow-y:auto;box-shadow:0 25px 50px rgba(0,0,0,.25)}
+.mh{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem}
+.mt2-title{font-size:1.125rem;font-weight:800}
+.mf{display:flex;justify-content:flex-end;gap:.75rem;margin-top:1.5rem}
+
+/* PIN MODAL */
+.pin-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:600;backdrop-filter:blur(4px)}
+.pin-box{background:#fff;border-radius:16px;padding:2rem;width:min(360px,calc(100vw-2rem));text-align:center;box-shadow:0 25px 50px rgba(0,0,0,.3)}
+.pin-box h3{font-size:1.125rem;font-weight:800;margin-bottom:.375rem}
+.pin-box p{font-size:.875rem;color:var(--g500);margin-bottom:1.25rem}
+.pin-input{width:100%;padding:.875rem;border:2px solid var(--g200);border-radius:10px;font-size:1.5rem;font-family:var(--mono);text-align:center;outline:none;letter-spacing:.25em;margin-bottom:1rem}
+.pin-input:focus{border-color:var(--a500)}
+.pin-err{color:var(--r600);font-size:.875rem;margin-bottom:.75rem}
+
+/* TOAST */
+#toast{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--g900);color:#fff;padding:.75rem 1.25rem;border-radius:10px;font-size:.875rem;font-weight:500;box-shadow:var(--shl);transform:translateY(4rem);opacity:0;transition:all .3s;z-index:999;pointer-events:none}
+#toast.show{transform:translateY(0);opacity:1}
+
+/* CONFETTI */
+#cc{position:fixed;inset:0;pointer-events:none;z-index:998}
+
+/* CHART */
+.cbars{display:flex;align-items:flex-end;gap:4px;height:160px}
+.cbw{display:flex;flex-direction:column;align-items:center;flex:1;gap:4px}
+.cbar{width:100%;background:var(--a200);border-radius:4px 4px 0 0;min-height:4px;transition:height .5s;cursor:pointer}
+.cbar:hover,.cbar.today{background:var(--a500)}
+.cbl{font-size:.625rem;color:var(--g400);text-align:center}
+.cvl{font-size:.6875rem;font-family:var(--mono);color:var(--g500)}
+
+/* TIMELINE */
+.tl{display:flex;flex-direction:column;gap:.75rem}
+.tli{display:flex;gap:.875rem;align-items:flex-start}
+.tld{width:10px;height:10px;border-radius:50%;background:var(--a400);flex-shrink:0;margin-top:.3rem}
+.tld.g{background:var(--gr500)}.tld.r{background:var(--r500)}
+.tlt{font-size:.875rem;font-weight:600;color:var(--g800)}
+.tltime{font-size:.75rem;color:var(--g400)}
+
+/* SECTION */
+/* CIGARRO CATALOG */
+.cig-table{width:100%;border-collapse:collapse;font-size:.8125rem}
+.cig-table th{padding:.375rem .5rem;text-align:left;font-size:.7rem;font-weight:700;color:var(--g400);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--g200)}
+.cig-table td{padding:.375rem .5rem;border-bottom:1px solid var(--g100);vertical-align:middle}
+.cig-table tr:last-child td{border-bottom:none}
+.cig-table tr:hover td{background:var(--g50)}
+.cig-inp{padding:.25rem .375rem;border:1px solid var(--g200);border-radius:5px;font-size:.8125rem;background:#fff;width:100%;outline:none}
+.cig-inp:focus{border-color:var(--a400)}
+.marca-tag{padding:.25rem .625rem;border-radius:9999px;font-size:.75rem;font-weight:700;cursor:pointer;border:1.5px solid var(--g200);background:#fff;color:var(--g600);transition:all .15s}
+.marca-tag.active{background:var(--a500);border-color:var(--a500);color:#fff}
+.section{display:none}.section.active{display:block}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  .stoggle{display:flex}
+  .sidebar{position:fixed;top:56px;left:0;bottom:0;transform:translateX(-100%)}
+  .sidebar.open{transform:translateX(0)}
+  .ov{display:block}
+  .main{padding:1rem}
+  .g2,.g3,.g4{grid-template-columns:1fr}
+  .ll{display:none}
+  .lr{width:100%;padding:2rem 1.5rem}
+  .bg-grid{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+<div id="toast"></div>
+<canvas id="cc"></canvas>
+
+<!-- PIN MODAL -->
+<div class="pin-overlay hidden" id="pinOverlay">
+  <div class="pin-box">
+    <h3 id="pinTitle">Autorización Requerida</h3>
+    <p id="pinDesc">Ingresa la clave de operador o administrador</p>
+    <input class="pin-input" type="password" id="pinInput" maxlength="20" placeholder="••••••" onkeydown="if(event.key==='Enter')confirmPin()"/>
+    <div class="pin-err hidden" id="pinErr">Clave incorrecta</div>
+    <div style="display:flex;gap:.75rem">
+      <button class="btn btn-s w100" onclick="cancelPin()">Cancelar</button>
+      <button class="btn btn-p w100" onclick="confirmPin()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOGIN -->
+<div id="ls">
+  <div class="ll">
+    <div class="ll-logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg></div>
+    <h1>Kombi Store</h1>
+    <p>Gestión operativa de punto de venta</p>
+    <div class="ll-chips">
+      <span class="ll-chip">Arqueo</span>
+      <span class="ll-chip">Checklist</span>
+      <span class="ll-chip">Caja</span>
+      <span class="ll-chip">Ventas</span>
+    </div>
+  </div>
+  <div class="lr">
+    <h2>Iniciar Sesión</h2>
+    <p class="sub">Selecciona tu rol e ingresa tu clave</p>
+    <div class="demo-box">
+      <div class="dt">Credenciales demo</div>
+      <div class="dr">Operador: <span onclick="fillDemo('operador')">1234</span></div>
+      <div class="dr">Administrador: <span onclick="fillDemo('admin')">admin123</span></div>
+      <div class="hint">👆 Click en la clave para rellenar</div>
+    </div>
+    <div class="role-tabs">
+      <button class="role-tab active" id="tab-op" onclick="setRole('operador',this)">Operador</button>
+      <button class="role-tab" id="tab-adm" onclick="setRole('admin',this)">Administrador</button>
+    </div>
+    <div class="fg" id="sucursalField">
+      <label>Sucursal</label>
+      <select id="lSucursal" class="sel" style="width:100%;padding:.75rem 1rem"></select>
+    </div>
+    <div class="fg">
+      <label>Turno</label>
+      <div style="display:flex;gap:.5rem">
+        <button class="role-tab active" id="turno-man" onclick="setTurno('mañana',this)" style="flex:1">☀️ Mañana</button>
+        <button class="role-tab" id="turno-tar" onclick="setTurno('tarde',this)" style="flex:1">🌤 Tarde</button>
+        <button class="role-tab" id="turno-noc" onclick="setTurno('noche',this)" style="flex:1">🌙 Noche</button>
+      </div>
+    </div>
+    <div class="fg"><label>Tu nombre</label><input type="text" id="lNombre" placeholder="Ej: María González"/></div>
+    <div class="fg"><label>Clave de acceso</label><input type="password" id="lPin" placeholder="••••••••" onkeydown="if(event.key==='Enter')login()"/></div>
+    <button class="btn-login" onclick="login()">Ingresar al sistema</button>
+    <div class="login-err hidden" id="lErr">Clave incorrecta. Intenta nuevamente.</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <button class="bti stoggle" onclick="toggleSidebar()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+    <div class="tb-brand">
+      <div class="tb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg></div>
+      Kombi Store
+    </div>
+    <div class="tb-right">
+      <div class="tb-user">
+        <span id="sucursalLabel" style="color:var(--a600);font-weight:700;font-size:.8125rem"></span>
+        <span style="color:var(--g300);margin:0 .375rem">|</span>
+        <strong id="uLabel">—</strong>
+        <span style="color:var(--g400);margin:0 .25rem">·</span>
+        <span id="rLabel" style="color:var(--g500)">—</span>
+      </div>
+      <button class="bti" onclick="logout()" title="Cerrar sesión"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
+    </div>
+  </div>
+  <div class="app-body">
+    <div class="ov" id="ov" onclick="closeSidebar()"></div>
+    <nav class="sidebar" id="sb">
+      <div id="opNav">
+        <div class="ss">
+          <div class="ssl">Turno</div>
+          <button class="ni active" onclick="showSec('op-ap',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>Arqueo Apertura</button>
+          <button class="ni" onclick="showSec('op-ret',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 5 5 12"/></svg>Retiros / Abonos</button>
+          <button class="ni" onclick="showSec('op-ci',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>Arqueo Cierre</button>
+        </div>
+        <div class="sf">
+          <div class="fs12 text-gray">Turno activo</div>
+          <div class="fs13 fw7 mono" id="turnoFecha">—</div>
+        </div>
+      </div>
+      <div id="adNav" class="hidden">
+        <div class="ss">
+          <div class="ssl">Resumen</div>
+          <button class="ni" onclick="showSec('ad-dash',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Dashboard</button>
+          <button class="ni" onclick="showSec('ad-hist',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Historial Turnos</button>
+        </div>
+        <div class="ss">
+          <div class="ssl">Operaciones</div>
+          <button class="ni" onclick="showSec('ad-v',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>Ventas del Día</button>
+          <button class="ni" onclick="showSec('ad-rep',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>Reportes</button>
+          <button class="ni" onclick="showSec('ad-caja',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>Caja</button>
+          <button class="ni" onclick="showSec('ad-inv',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>Inventario</button>
+          <button class="ni" onclick="showSec('ad-ck',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>Checklists</button>
+        </div>
+        <div class="ss">
+          <div class="ssl">Sistema</div>
+          <button class="ni" onclick="showSec('ad-aj',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41M6.34 6.34L4.93 4.93M21 12h-2M5 12H3M12 21v-2M12 5V3"/></svg>Ajustes</button>
+        </div>
+      </div>
+    </nav>
+
+    <main class="main" id="mc">
+
+      <!-- ========== APERTURA (wizard 3 pasos) ========== -->
+      <div class="section active" id="op-ap">
+        <div class="ph"><h2>Arqueo de Apertura</h2><p>Completa cada paso para iniciar el turno</p></div>
+        <div class="wsteps">
+          <div class="ws active" id="apW1"><div class="wsd">1</div><span>Efectivo</span></div>
+          <div class="wl"></div>
+          <div class="ws" id="apW2"><div class="wsd">2</div><span>Cigarros</span></div>
+          <div class="wl"></div>
+          <div class="ws" id="apW3"><div class="wsd">3</div><span>Checklist</span></div>
+          <div class="wl"></div>
+          <div class="ws" id="apW4"><div class="wsd">4</div><span>Guardar</span></div>
+        </div>
+        <div style="max-width:680px">
+
+          <!-- P1: Efectivo -->
+          <div class="wp active" id="apP1">
+            <div class="card">
+              <div class="ct">💵 Conteo de Efectivo</div>
+              <div class="bg-grid" id="apBills"></div>
+              <div class="div"></div>
+              <div class="flex jcb aic">
+                <span class="fs14 fw6 text-gray">Total Efectivo</span>
+                <span style="font-size:1.25rem;font-weight:800;font-family:var(--mono);color:var(--a600)" id="apEfTotal">$0</span>
+              </div>
+            </div>
+            <div class="wnav"><div></div>
+              <button class="btn btn-p" onclick="apGoTo(2)">Siguiente →</button>
+            </div>
+          </div>
+
+          <!-- P2: Cigarros -->
+          <div class="wp" id="apP2">
+            <div class="card">
+              <div class="ct">🚬 Stock de Cigarro — Apertura</div>
+              <p class="fs13 text-gray mb4">Ingresa cuántas unidades hay de cada producto al inicio del turno.</p>
+              <div id="apCigCatalog"></div>
+              <div class="div"></div>
+              <div class="fld"><label class="lbl">Observaciones</label><input class="inp" type="text" id="apCigObs" placeholder="Notas opcionales"/></div>
+            </div>
+            <div class="wnav">
+              <button class="btn btn-s" onclick="apGoTo(1)">← Atrás</button>
+              <button class="btn btn-p" onclick="saveApCigs();apGoTo(3)">Siguiente →</button>
+            </div>
+          </div>
+
+          <!-- P3: Checklist -->
+          <div class="wp" id="apP3">
+            <div class="card">
+              <div class="flex jcb aic" style="margin-bottom:.75rem">
+                <div class="ct" style="margin-bottom:0">✅ Checklist de Apertura</div>
+                <span class="fs13 text-gray" id="apCkProg">0 de 0</span>
+              </div>
+              <div class="pb mb4"><div class="pf" id="apCkBar" style="width:0%"></div></div>
+              <div id="apCkItems"></div>
+            </div>
+            <div class="wnav">
+              <button class="btn btn-s" onclick="apGoTo(2)">← Atrás</button>
+              <button class="btn btn-p" onclick="apGoTo(4)">Siguiente →</button>
+            </div>
+          </div>
+
+          <!-- P4: Resumen + Guardar -->
+          <div class="wp" id="apP4">
+            <div class="card">
+              <div class="ct">📊 Resumen de Apertura</div>
+              <div id="apResumen"></div>
+            </div>
+            <div class="wnav">
+              <button class="btn btn-s" onclick="apGoTo(3)">← Atrás</button>
+              <div style="display:flex;gap:.75rem">
+                <button class="btn btn-s" onclick="resetApertura()">Limpiar</button>
+                <button class="btn btn-p" onclick="saveApertura()">✅ Guardar Apertura</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ========== RETIROS / ABONOS ========== -->
+      <div class="section" id="op-ret">
+        <div class="ph"><h2>Retiros y Abonos</h2><p>Requiere autorización con clave</p></div>
+        <div style="max-width:580px">
+          <div class="card">
+            <div class="ct">Nuevo Movimiento</div>
+            <div class="fld">
+              <label class="lbl">Tipo</label>
+              <select class="sel w100" id="retTipo">
+                <option value="retiro">Retiro de Caja</option>
+                <option value="abono">Abono a Caja</option>
+              </select>
+            </div>
+            <div class="fld">
+              <label class="lbl">Categoría</label>
+              <select class="sel w100" id="retCategoria">
+                <option value="Cambio">💰 Cambio</option>
+                <option value="Compra insumos">🛒 Compra insumos</option>
+                <option value="Traslado">🚗 Traslado</option>
+                <option value="Pago proveedor">📦 Pago proveedor</option>
+                <option value="Gasto operacional">🏪 Gasto operacional</option>
+                <option value="Otro">📝 Otro</option>
+              </select>
+            </div>
+            <div class="fld"><label class="lbl">Monto (CLP)</label><input class="inp" type="number" id="retMonto" placeholder="0" min="0"/></div>
+            <div class="fld"><label class="lbl">Detalle (opcional)</label><input class="inp" type="text" id="retMotivo" placeholder="Información adicional"/></div>
+            <div class="fld"><label class="lbl">Responsable</label><input class="inp" type="text" id="retResp" placeholder="Nombre"/></div>
+            <button class="btn btn-p w100" onclick="reqPinRetiro()">🔐 Autorizar y Registrar</button>
+          </div>
+          <div class="card mt4">
+            <div class="ct">Historial del Turno</div>
+            <div class="ml" id="retList"></div>
+            <div class="div"></div>
+            <div class="flex jcb">
+              <span class="fs14 fw6">Total Retirado</span><span class="fw7 mono text-red" id="retTotal">$0</span>
+            </div>
+            <div class="flex jcb mt2">
+              <span class="fs14 fw6">Total Abonado</span><span class="fw7 mono text-green" id="abonoTotal">$0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== OPERADOR CIGARROS ========== -->
+      <div class="section" id="op-cig">
+        <div class="ph"><h2>Cigarros</h2><p>Registra faltantes del turno actual</p></div>
+        <div style="max-width:700px">
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem" id="opCigMarcaTabs"></div>
+          <div class="card">
+            <div class="tw">
+              <table>
+                <thead><tr><th>Producto</th><th style="text-align:right">Precio</th><th style="text-align:center;width:110px">Faltantes</th></tr></thead>
+                <tbody id="opCigBody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card mt4">
+            <div class="ct">Faltantes del turno</div>
+            <div id="opCigResumen"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== CIERRE ========== -->
+      <div class="section" id="op-ci">
+        <div class="ph"><h2>Arqueo de Cierre</h2><p>Completa el cierre del turno</p></div>
+        <div class="wsteps">
+          <div class="ws active" id="ciW1"><div class="wsd">1</div><span>Sistema</span></div>
+          <div class="wl"></div>
+          <div class="ws" id="ciW2"><div class="wsd">2</div><span>Efectivo</span></div>
+          <div class="wl"></div>
+          <div class="ws" id="ciW3"><div class="wsd">3</div><span>POS/Transfer.</span></div>
+          <div class="wl"></div>
+          <div class="ws" id="ciW4"><div class="wsd">4</div><span>Movimientos</span></div>
+          <div class="wl"></div>
+          <div class="ws" id="ciW5"><div class="wsd">5</div><span>Cigarros</span></div>
+          <div class="wl"></div>
+          <div class="ws" id="ciW6"><div class="wsd">6</div><span>Resumen</span></div>
+          <div class="wl"></div>
+          <div class="ws" id="ciW7"><div class="wsd">7</div><span>Checklist</span></div>
+        </div>
+        <div style="max-width:680px">
+
+          <!-- P1: Sistema -->
+          <div class="wp active" id="ciP1">
+            <div class="card">
+              <div class="ct">🖥️ Ventas según Sistema</div>
+              <p class="fs13 text-gray mb4">Ingresa los totales que muestra el sistema de punto de venta al cierre.</p>
+              <div class="fld">
+                <label class="lbl" id="ciSisLblEf">Efectivo (sistema)</label>
+                <input class="inp" type="number" id="ciSisEf" placeholder="0" oninput="refreshCiSisTotal()"/>
+              </div>
+              <div class="fld">
+                <label class="lbl" id="ciSisLblTarj">Tarjetas / POS (sistema)</label>
+                <input class="inp" type="number" id="ciSisTarj" placeholder="0" oninput="refreshCiSisTotal()"/>
+              </div>
+              <div class="fld">
+                <label class="lbl" id="ciSisLblOtros">Otros — Amipass, Edenred, etc.</label>
+                <input class="inp" type="number" id="ciSisOtros" placeholder="0" oninput="refreshCiSisTotal()"/>
+              </div>
+              <div class="fld">
+                <label class="lbl">Detalle otros medios</label>
+                <input class="inp" type="text" id="ciSisOtrosDesc" placeholder="Ej: Amipass $5.000, Edenred $3.200"/>
+              </div>
+              <div class="div"></div>
+              <div class="flex jcb aic">
+                <span class="fs14 fw6 text-gray">Total Sistema</span>
+                <span style="font-size:1.25rem;font-weight:800;font-family:var(--mono);color:var(--a600)" id="ciSisTotal">$0</span>
+              </div>
+            </div>
+            <div class="wnav">
+              <div></div>
+              <button class="btn btn-p" onclick="saveCiSis();ciGoTo(2)">Siguiente →</button>
+            </div>
+          </div>
+
+          <!-- P2: Efectivo -->
+          <div class="wp" id="ciP2">
+            <div class="card">
+              <div class="ct">💵 Conteo Final de Efectivo</div>
+              <div class="bg-grid" id="ciBills"></div>
+              <div class="div"></div>
+              <div class="flex jcb aic">
+                <span class="fs14 fw6 text-gray">Total Efectivo Cierre</span>
+                <span style="font-size:1.25rem;font-weight:800;font-family:var(--mono);color:var(--a600)" id="ciEfTotal">$0</span>
+              </div>
+            </div>
+            <div class="wnav">
+              <button class="btn btn-s" onclick="ciGoTo(1)">← Atrás</button>
+              <button class="btn btn-p" onclick="ciGoTo(3)">Siguiente →</button>
+            </div>
+          </div>
+
+          <!-- P3: POS y Transferencias -->
+          <div class="wp" id="ciP3">
+            <div class="card">
+              <div class="ct">💳 POS y Transferencias</div>
+              <div id="ciPosInputs"></div>
+              <div class="div"></div>
+              <div class="fld">
+                <label class="lbl">Total Transferencias</label>
+                <input class="inp" type="number" id="ciTransf" placeholder="0" oninput="calcCierre()"/>
+              </div>
+            </div>
+            <div class="wnav">
+              <button class="btn btn-s" onclick="ciGoTo(2)">← Atrás</button>
+              <button class="btn btn-p" onclick="ciGoTo(4)">Siguiente →</button>
+            </div>
+          </div>
+
+          <!-- P4: Movimientos (solo lectura) -->
+          <div class="wp" id="ciP4">
+            <div class="card">
+              <div class="ct">📋 Movimientos del Turno</div>
+              <p class="fs13 text-gray mb4">Retiros y abonos autorizados durante el turno. Solo lectura.</p>
+              <div class="ml" id="ciMovFromRet"></div>
+            </div>
+            <div class="wnav">
+              <button class="btn btn-s" onclick="ciGoTo(3)">← Atrás</button>
+              <button class="btn btn-p" onclick="ciGoTo(5)">Siguiente →</button>
+            </div>
+          </div>
+
+          <!-- P5: Cigarros -->
+          <div class="wp" id="ciP5">
+            <div class="card">
+              <div class="ct">🚬 Stock de Cigarro — Cierre</div>
+              <p class="fs13 text-gray mb4">Ingresa cuántas unidades hay de cada producto al cierre del turno.</p>
+              <div id="ciCigCatalog"></div>
+              <div class="div"></div>
+              <div class="fld">
+                <label class="lbl">Observaciones</label>
+                <input class="inp" type="text" id="ciCigObs" placeholder="Notas opcionales"/>
+              </div>
+            </div>
+            <div class="wnav">
+              <button class="btn btn-s" onclick="ciGoTo(4)">← Atrás</button>
+              <button class="btn btn-p" onclick="saveCiCigs();ciGoTo(6)">Siguiente →</button>
+            </div>
+          </div>
+
+          <!-- P6: Resumen -->
+          <div class="wp" id="ciP6">
+            <div class="card">
+              <div class="ct" id="ciResumenTitle">📊 Resumen de Cierre</div>
+              <div id="ciResumen"></div>
+            </div>
+            <div class="wnav">
+              <button class="btn btn-s" onclick="ciGoTo(5)">← Atrás</button>
+              <button class="btn btn-p" onclick="ciGoTo(7)">Siguiente →</button>
+            </div>
+          </div>
+
+          <!-- P7: Checklist con fotos -->
+          <div class="wp" id="ciP7">
+            <div class="card">
+              <div class="ct">📸 Checklist de Cierre — Fotos Obligatorias</div>
+              <p class="fs14 text-gray mb4">Debes subir una foto de cada punto para poder enviar el cierre.</p>
+              <div id="ciCheckFotos"></div>
+            </div>
+            <div class="wnav">
+              <button class="btn btn-s" onclick="ciGoTo(6)">← Atrás</button>
+              <button class="btn btn-p" id="ciEnviarBtn" onclick="enviarCierre()" style="opacity:.4;pointer-events:none">📤 Enviar Cierre</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ========== ADMIN DASHBOARD ========== -->
+      <div class="section" id="ad-dash">
+        <div class="ph"><h2>Dashboard</h2><p>Análisis operativo del negocio</p></div>
+        <!-- KPIs -->
+        <div class="g4" id="dashStats"></div>
+        <!-- Period selector -->
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin:1rem 0;align-items:center">
+          <span class="fs13 fw6 text-gray">Ver por:</span>
+          <button class="marca-tag active" id="dPeriodDia" onclick="setDashPeriod('dia',this)">Día</button>
+          <button class="marca-tag" id="dPeriodSem" onclick="setDashPeriod('semana',this)">Semana</button>
+          <button class="marca-tag" id="dPeriodMes" onclick="setDashPeriod('mes',this)">Mes</button>
+          <button class="marca-tag" id="dPeriodAno" onclick="setDashPeriod('ano',this)">Año</button>
+          <span style="margin-left:auto;font-size:.8125rem;color:var(--g400)" id="dPeriodLabel"></span>
+        </div>
+        <!-- Charts row -->
+        <div class="g2">
+          <div class="card">
+            <div class="ct">📈 Ventas por período</div>
+            <div id="dashChart" style="min-height:180px"></div>
+          </div>
+          <div class="card">
+            <div class="ct">💰 Composición de ventas</div>
+            <div id="dashCompo" style="min-height:180px"></div>
+          </div>
+        </div>
+        <!-- Second row -->
+        <div class="g3 mt4">
+          <div class="card">
+            <div class="ct">🚬 Faltantes de Cigarro</div>
+            <div id="dashCigs"></div>
+          </div>
+          <div class="card">
+            <div class="ct">📦 Stock crítico</div>
+            <div id="dashStock"></div>
+          </div>
+          <div class="card">
+            <div class="ct">🕐 Actividad del turno</div>
+            <div class="tl" id="dashTL"></div>
+          </div>
+        </div>
+        <!-- Insights row -->
+        <div class="g2 mt4">
+          <div class="card">
+            <div class="ct">📊 Mejor día de la semana</div>
+            <div id="dashByDow"></div>
+          </div>
+          <div class="card">
+            <div class="ct">🔄 Retiros y Abonos del período</div>
+            <div id="dashMovs"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== VENTAS ========== -->
+      <div class="section" id="ad-v">
+        <div class="ph"><h2>Ventas del Día</h2><p>Registro diario de ventas</p></div>
+        <div class="g2">
+          <div class="card">
+            <div class="ct">Registrar Ventas</div>
+            <div class="fld"><label class="lbl">Fecha</label><input class="inp" type="date" id="vFecha"/></div>
+            <div class="fld"><label class="lbl">Total Efectivo</label><input class="inp" type="number" id="vEf" placeholder="0" oninput="calcVenta()"/></div>
+            <div class="fld"><label class="lbl">Total POS</label><input class="inp" type="number" id="vPos" placeholder="0" oninput="calcVenta()"/></div>
+            <div class="fld"><label class="lbl">Total Transferencias</label><input class="inp" type="number" id="vTr" placeholder="0" oninput="calcVenta()"/></div>
+            <div style="background:var(--a50);border:1.5px solid var(--a200);border-radius:8px;padding:.875rem;margin-bottom:1rem">
+              <div class="fs12 text-gray mb2">Total del Día</div>
+              <div style="font-size:1.5rem;font-weight:800;font-family:var(--mono);color:var(--a600)" id="vTotal">$0</div>
+            </div>
+            <div class="fld"><label class="lbl">Observaciones</label><input class="inp" type="text" id="vObs" placeholder="Opcional"/></div>
+            <button class="btn btn-p w100" onclick="saveVenta()">Guardar Ventas del Día</button>
+          </div>
+          <div>
+            <div class="card"><div class="ct">Tendencia</div><div id="vChart"></div></div>
+            <div class="card mt4">
+              <div class="ct">Filtros</div>
+              <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+                <select class="sel" id="vFiltroMes" onchange="renderVH()"></select>
+                <button class="btn btn-s sm" onclick="exportVentas()">⬇ CSV</button>
+              </div>
+            </div>
+            <div class="card mt4"><div class="ct">Historial</div><div id="vHist"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== CAJA ADMIN ========== -->
+      <div class="section" id="ad-caja">
+        <div class="ph"><h2>Caja</h2><p>Arqueo completo del turno</p></div>
+        <div style="max-width:560px"><div class="card"><div class="ct">Arqueo de Caja</div><div id="cajaContent"></div></div></div>
+      </div>
+
+      <!-- ========== INVENTARIO ========== -->
+      <div class="section" id="ad-inv">
+        <div class="ph"><h2>Inventario</h2><p>Control de stock por categoría</p></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-wrap:wrap;gap:.5rem">
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+            <input class="inp" type="search" placeholder="Buscar…" style="max-width:200px" oninput="filterInv(this.value)"/>
+            <div id="invCatTabs" style="display:flex;gap:.375rem;flex-wrap:wrap"></div>
+          </div>
+          <button class="btn btn-p" onclick="openPM()">+ Nuevo Producto</button>
+        </div>
+        <div class="tw"><table><thead><tr><th>Producto</th><th>Marca</th><th>SKU</th><th>Categoría</th><th>Stock</th><th>Mín.</th><th>Precio</th><th></th></tr></thead><tbody id="invBody"></tbody></table></div>
+      </div>
+
+      <!-- ========== HISTORIAL TURNOS ========== -->
+      <div class="section" id="ad-hist">
+        <div class="ph"><h2>Historial de Turnos</h2><p>Registro de todos los cierres guardados</p></div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
+          <select class="sel" id="histFiltroMes" onchange="renderHistorial()"></select>
+          <select class="sel" id="histFiltroSuc" onchange="renderHistorial()">
+            <option value="">Todas las sucursales</option>
+          </select>
+          <select class="sel" id="histFiltroTurno" onchange="renderHistorial()">
+            <option value="">Todos los turnos</option>
+            <option value="mañana">Mañana</option>
+            <option value="tarde">Tarde</option>
+            <option value="noche">Noche</option>
+          </select>
+          <button class="btn btn-s sm" onclick="exportHistorialCSV()">⬇ CSV</button>
+        </div>
+        <div id="histList"></div>
+      </div>
+
+      <!-- ========== REPORTES ========== -->
+      <div class="section" id="ad-rep">
+        <div class="ph"><h2>Reportes</h2><p>Genera y envía reportes por correo</p></div>
+        <div style="max-width:640px;display:flex;flex-direction:column;gap:1rem">
+
+          <!-- GAS config -->
+          <div class="card">
+            <div class="ct">🔗 Conexión con Google Apps Script</div>
+            <p class="fs13 text-gray mb4">Pega aquí la URL del Web App que desplegaste en script.google.com. Los correos se enviarán a <strong>appkombi@gmail.com</strong>.</p>
+            <div class="fld">
+              <label class="lbl">URL del Web App</label>
+              <input class="inp" type="url" id="gasUrlInput" placeholder="https://script.google.com/macros/s/…/exec"/>
+            </div>
+            <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+              <button class="btn btn-p" onclick="saveGasUrl()">Guardar URL</button>
+              <button class="btn btn-s" onclick="testGasUrl()">🧪 Probar conexión</button>
+            </div>
+            <div id="gasStatus" style="margin-top:.75rem;font-size:.8125rem"></div>
+          </div>
+
+          <!-- Reporte diario -->
+          <div class="card">
+            <div class="ct">📊 Reporte Diario</div>
+            <p class="fs13 text-gray mb4">Resumen del día: ventas por medio de pago, movimientos de caja, diferencias y stock crítico.</p>
+            <div class="fld"><label class="lbl">Fecha</label>
+              <input class="inp" type="date" id="repFecha"/>
+            </div>
+            <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+              <button class="btn btn-p" onclick="generarReporteDiario()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                Ver Reporte
+              </button>
+              <button class="btn btn-s" onclick="enviarReporteDiario()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                Enviar por Correo
+              </button>
+            </div>
+            <div id="repPreview" class="hidden" style="margin-top:1rem"></div>
+          </div>
+
+          <!-- Reporte inventario -->
+          <div class="card">
+            <div class="ct">📦 Reporte de Inventario</div>
+            <p class="fs13 text-gray mb4">Stock actual de todos los productos, destacando los que están bajo el mínimo.</p>
+            <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+              <button class="btn btn-p" onclick="generarReporteInv()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                Ver Reporte
+              </button>
+              <button class="btn btn-s" onclick="enviarReporteInv()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                Enviar por Correo
+              </button>
+            </div>
+            <div id="repInvPreview" class="hidden" style="margin-top:1rem"></div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ========== CHECKLISTS ADMIN ========== -->
+      <div class="section" id="ad-ck">
+        <div class="ph"><h2>Checklists</h2><p>Estado de los checklist del turno</p></div>
+        <div id="adCkSum"></div>
+      </div>
+
+      <!-- ========== AJUSTES ========== -->
+      <div class="section" id="ad-aj">
+        <div class="ph"><h2>Ajustes</h2><p>Configura todas las secciones del sistema</p></div>
+        <div style="max-width:640px;display:flex;flex-direction:column;gap:1rem">
+
+          <!-- TIENDA -->
+          <div class="card">
+            <div class="ct">🏪 Datos de la Tienda</div>
+            <div class="fld"><label class="lbl">Nombre del local</label><input class="inp" type="text" id="ajNombre"/></div>
+            <div class="fld"><label class="lbl">Dirección</label><input class="inp" type="text" id="ajDir" placeholder="Dirección"/></div>
+            <button class="btn btn-p" onclick="saveTienda()">Guardar</button>
+          </div>
+
+          <!-- SUCURSALES -->
+          <div class="card">
+            <div class="ct">🏬 Sucursales</div>
+            <p class="fs13 text-gray mb4">Gestiona las sucursales del negocio. El operador elige su sucursal al iniciar sesión.</p>
+            <div class="ml" id="ajSucList" style="margin-bottom:1rem"></div>
+            <div class="div"></div>
+            <div class="fs13 fw6 text-gray" style="margin-bottom:.5rem">Agregar sucursal</div>
+            <div class="g2">
+              <div class="fld"><label class="lbl">Nombre</label><input class="inp" type="text" id="ajSucNombre" placeholder="Ej: Sucursal Centro"/></div>
+              <div class="fld"><label class="lbl">Dirección</label><input class="inp" type="text" id="ajSucDir" placeholder="Dirección (opcional)"/></div>
+            </div>
+            <button class="btn btn-p w100" onclick="addSucursal()">+ Agregar Sucursal</button>
+          </div>
+
+          <!-- HISTORIAL PRECIOS -->
+          <div class="card">
+            <div class="ct">📈 Historial de Precios</div>
+            <p class="fs13 text-gray mb4">Registro automático de cambios de precio en el inventario.</p>
+            <div id="ajPrecioHist"></div>
+          </div>
+
+          <!-- CLAVES -->
+          <div class="card">
+            <div class="ct">🔑 Claves de Acceso</div>
+            <div class="g2">
+              <div class="fld"><label class="lbl">Clave Operador</label><input class="inp" type="password" id="ajOp" placeholder="Nueva clave"/></div>
+              <div class="fld"><label class="lbl">Clave Administrador</label><input class="inp" type="password" id="ajAdm" placeholder="Nueva clave"/></div>
+            </div>
+            <button class="btn btn-p" onclick="saveClaves()">Guardar Claves</button>
+          </div>
+
+          <!-- POS -->
+          <div class="card">
+            <div class="ct">💳 Terminales POS</div>
+            <div class="ml" id="posTermList" style="margin-bottom:1rem"></div>
+            <div style="display:flex;gap:.5rem">
+              <input class="inp" type="text" id="newTerm" placeholder="Nombre terminal (ej: GetNet 3)"/>
+              <button class="btn btn-p" onclick="addTerminal()">+</button>
+            </div>
+          </div>
+
+          <!-- MEDIOS DE PAGO SISTEMA -->
+          <div class="card">
+            <div class="ct">🖥️ Medios de Pago — Etiquetas Sistema</div>
+            <p class="fs13 text-gray mb4">Personaliza los nombres que aparecen en la sección "Sistema" del arqueo de cierre.</p>
+            <div class="fld"><label class="lbl">Etiqueta Efectivo</label><input class="inp" type="text" id="ajSisLblEf" placeholder="Efectivo"/></div>
+            <div class="fld"><label class="lbl">Etiqueta Tarjetas/POS</label><input class="inp" type="text" id="ajSisLblTarj" placeholder="Tarjetas / POS"/></div>
+            <div class="fld"><label class="lbl">Etiqueta Otros medios</label><input class="inp" type="text" id="ajSisLblOtros" placeholder="Amipass, Edenred, etc."/></div>
+            <button class="btn btn-p" onclick="saveSisLabels()">Guardar Etiquetas</button>
+          </div>
+
+          <!-- CHECKLIST APERTURA -->
+          <div class="card">
+            <div class="ct">✅ Checklist de Apertura</div>
+            <p class="fs13 text-gray mb4">Edita, agrega o elimina ítems del checklist de apertura.</p>
+            <div id="ajCkApList" style="margin-bottom:1rem"></div>
+            <div style="display:flex;gap:.5rem">
+              <input class="inp" type="text" id="ajCkApNew" placeholder="Nuevo ítem de apertura"/>
+              <button class="btn btn-p" onclick="addCkItem('apertura')">+</button>
+            </div>
+          </div>
+
+          <!-- CHECKLIST CIERRE -->
+          <div class="card">
+            <div class="ct">📸 Checklist de Cierre</div>
+            <p class="fs13 text-gray mb4">Edita, agrega o elimina ítems del checklist de cierre (requieren foto).</p>
+            <div id="ajCkCiList" style="margin-bottom:1rem"></div>
+            <div style="display:flex;gap:.5rem">
+              <input class="inp" type="text" id="ajCkCiNew" placeholder="Nuevo ítem de cierre"/>
+              <button class="btn btn-p" onclick="addCkItem('cierre')">+</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- HISTORIAL DETAIL MODAL -->
+<div class="mb hidden" id="histModal">
+  <div class="modal" style="width:min(620px,calc(100vw - 2rem));max-height:85vh">
+    <div class="mh">
+      <span class="mt2-title" id="histModalTitle">Detalle del Turno</span>
+      <button class="btn btn-g sm" onclick="document.getElementById('histModal').classList.add('hidden')">✕</button>
+    </div>
+    <div id="histModalBody"></div>
+    <div class="mf">
+      <button class="btn btn-s" onclick="document.getElementById('histModal').classList.add('hidden')">Cerrar</button>
+      <button class="btn btn-p" onclick="enviarTurnoDesdeModal()">📧 Enviar por Correo</button>
+    </div>
+  </div>
+</div>
+
+<!-- PRODUCT MODAL -->
+<div class="mb hidden" id="pm">
+  <div class="modal">
+    <div class="mh"><span class="mt2-title" id="pmTitle">Nuevo Producto</span><button class="btn btn-g sm" onclick="closePM()">✕</button></div>
+    <div class="fld"><label class="lbl">Nombre</label><input class="inp" id="pN" placeholder="Nombre del producto"/></div>
+    <div class="g2">
+      <div class="fld"><label class="lbl">SKU</label><input class="inp" id="pS" placeholder="SKU-001"/></div>
+      <div class="fld"><label class="lbl">Categoría</label>
+        <input class="inp" id="pC" placeholder="General / Cigarros / Premium" list="catList"/>
+        <datalist id="catList"></datalist>
+      </div>
+    </div>
+    <div class="g2">
+      <div class="fld"><label class="lbl">Marca</label><input class="inp" id="pMarca" placeholder="Marca (opcional)"/></div>
+      <div class="fld"><label class="lbl">Precio (CLP)</label><input class="inp" type="number" id="pPr" min="0"/></div>
+    </div>
+    <div class="g2">
+      <div class="fld"><label class="lbl">Stock Actual</label><input class="inp" type="number" id="pSt" min="0"/></div>
+      <div class="fld"><label class="lbl">Stock Mínimo</label><input class="inp" type="number" id="pMn" min="0"/></div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-s" onclick="closePM()">Cancelar</button>
+      <button class="btn btn-p" onclick="saveProduct()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============ STATE ============ */
+let S = {
+  role: null, userName: '',
+  claves: { op: '1234', adm: 'admin123' },
+  pos: [
+    {id:'gn1',name:'GetNet 1'},
+    {id:'gn2',name:'GetNet 2'},
+    {id:'tb', name:'Transbank'}
+  ],
+  ap: { bills:{}, pos:{}, transf:0, cigarros:[], obs:'', saved:false, hora:'' },
+  ci: { bills:{}, pos:{}, transf:0, movs:[], cigarros:[], obs:'', sis:{ef:0,tarj:0,otros:0,otrosDesc:''}, fotos:{}, saved:false, hora:'' },
+  retiros: [],
+  ck: {
+    apertura:[
+      {id:'a1',text:'Encender equipos y sistemas',done:false},
+      {id:'a2',text:'Verificar stock mínimo de caja',done:false},
+      {id:'a3',text:'Revisar mercadería del día',done:false},
+      {id:'a4',text:'Revisar correos y novedades',done:false},
+      {id:'a5',text:'Limpiar mesones y vitrinas',done:false},
+    ],
+    cierre:[
+      {id:'c1',text:'Apagar equipos y sistemas',photo:null},
+      {id:'c2',text:'Guardar efectivo en caja fuerte',photo:null},
+      {id:'c3',text:'Asegurar el local',photo:null},
+      {id:'c4',text:'Orden y limpieza del área de trabajo',photo:null},
+      {id:'c5',text:'Revisar stock de cigarros',photo:null},
+    ]
+  },
+  ventas: [],
+  inventario:[
+    {id:'p1',nombre:'Producto A',sku:'GEN-001',cat:'General',marca:'',stock:50,min:10,precio:2990},
+    {id:'p2',nombre:'Producto B',sku:'GEN-002',cat:'General',marca:'',stock:8,min:15,precio:4990},
+    {id:'p3',nombre:'Producto C',sku:'GEN-003',cat:'Premium',marca:'',stock:25,min:5,precio:12990},
+    {id:'cg1', nombre:'KENT ACTRON',      sku:'CIG-001',cat:'Cigarros',marca:'KENT',    stock:0,min:0,precio:5600},
+    {id:'cg2', nombre:'KENT CLICK',       sku:'CIG-002',cat:'Cigarros',marca:'KENT',    stock:0,min:0,precio:5600},
+    {id:'cg3', nombre:'KENT BOOST',       sku:'CIG-003',cat:'Cigarros',marca:'KENT',    stock:0,min:0,precio:5600},
+    {id:'cg4', nombre:'KENT BLUE (8)',    sku:'CIG-004',cat:'Cigarros',marca:'KENT',    stock:0,min:0,precio:5300},
+    {id:'cg5', nombre:'KENT SILVER (4)',  sku:'CIG-005',cat:'Cigarros',marca:'KENT',    stock:0,min:0,precio:5300},
+    {id:'cg6', nombre:'KENT WHITE (1)',   sku:'CIG-006',cat:'Cigarros',marca:'KENT',    stock:0,min:0,precio:5300},
+    {id:'cg7', nombre:'KENT BELMONT (NEO)',sku:'CIG-007',cat:'Cigarros',marca:'KENT',   stock:0,min:0,precio:4800},
+    {id:'cg8', nombre:'KENT IKON (VERDE)',sku:'CIG-008',cat:'Cigarros',marca:'KENT',    stock:0,min:0,precio:5000},
+    {id:'cg9', nombre:'KENT TROPIC (NARAN)',sku:'CIG-009',cat:'Cigarros',marca:'KENT',  stock:0,min:0,precio:5000},
+    {id:'cg10',nombre:'KENT ROSE (ROSADO)',sku:'CIG-010',cat:'Cigarros',marca:'KENT',   stock:0,min:0,precio:5000},
+    {id:'cg11',nombre:'KENT SPLASH',      sku:'CIG-011',cat:'Cigarros',marca:'KENT',    stock:0,min:0,precio:5000},
+    {id:'cg12',nombre:'LS FRESH (SANDIA)',sku:'CIG-012',cat:'Cigarros',marca:'LS',      stock:0,min:0,precio:5700},
+    {id:'cg13',nombre:'LS WILD (BERRIES)',sku:'CIG-013',cat:'Cigarros',marca:'LS',      stock:0,min:0,precio:5700},
+    {id:'cg14',nombre:'LS CRUSH (NARANJA)',sku:'CIG-014',cat:'Cigarros',marca:'LS',     stock:0,min:0,precio:5700},
+    {id:'cg15',nombre:'LS CLICK',         sku:'CIG-015',cat:'Cigarros',marca:'LS',      stock:0,min:0,precio:5600},
+    {id:'cg16',nombre:'LS BLUE (LIGHT)',  sku:'CIG-016',cat:'Cigarros',marca:'LS',      stock:0,min:0,precio:5300},
+    {id:'cg17',nombre:'LS RED (ROJO)',    sku:'CIG-017',cat:'Cigarros',marca:'LS',      stock:0,min:0,precio:5300},
+    {id:'cg18',nombre:'LS COMPACT AZUL',  sku:'CIG-018',cat:'Cigarros',marca:'LS',      stock:0,min:0,precio:4400},
+    {id:'cg19',nombre:'LS COMPACT BERRIES',sku:'CIG-019',cat:'Cigarros',marca:'LS',     stock:0,min:0,precio:4400},
+    {id:'cg20',nombre:'LS AMBER',         sku:'CIG-020',cat:'Cigarros',marca:'LS',      stock:0,min:0,precio:4400},
+    {id:'cg21',nombre:'LS ECLIPSE',       sku:'CIG-021',cat:'Cigarros',marca:'LS',      stock:0,min:0,precio:5700},
+    {id:'cg22',nombre:'LS PATTERSON AZUL',sku:'CIG-022',cat:'Cigarros',marca:'LS',      stock:0,min:0,precio:3800},
+    {id:'cg23',nombre:'LS PATTERSON ROJO',sku:'CIG-023',cat:'Cigarros',marca:'LS',      stock:0,min:0,precio:3800},
+    {id:'cg24',nombre:'PM XL BOOST (VERDE)',sku:'CIG-024',cat:'Cigarros',marca:'PM',    stock:0,min:0,precio:4600},
+    {id:'cg25',nombre:'PM XL SUNSET (ROSADO)',sku:'CIG-025',cat:'Cigarros',marca:'PM',  stock:0,min:0,precio:4600},
+    {id:'cg26',nombre:'PM XL CLICK AZUL', sku:'CIG-026',cat:'Cigarros',marca:'PM',      stock:0,min:0,precio:4600},
+    {id:'cg27',nombre:'PM XL SUNRISE',    sku:'CIG-027',cat:'Cigarros',marca:'PM',      stock:0,min:0,precio:4600},
+    {id:'cg28',nombre:'PM XL GRIS',       sku:'CIG-028',cat:'Cigarros',marca:'PM',      stock:0,min:0,precio:3900},
+    {id:'cg29',nombre:'PM XL ROJO',       sku:'CIG-029',cat:'Cigarros',marca:'PM',      stock:0,min:0,precio:3900},
+    {id:'cg30',nombre:'PM XL AZUL',       sku:'CIG-030',cat:'Cigarros',marca:'PM',      stock:0,min:0,precio:3900},
+    {id:'cg31',nombre:'PALL 18 ROSADO',   sku:'CIG-031',cat:'Cigarros',marca:'PM',      stock:0,min:0,precio:3900},
+    {id:'cg32',nombre:'PM BLANDO AZUL',   sku:'CIG-032',cat:'Cigarros',marca:'PM',      stock:0,min:0,precio:3400},
+    {id:'cg33',nombre:'PALL 18 AZUL',     sku:'CIG-033',cat:'Cigarros',marca:'PM',      stock:0,min:0,precio:2900},
+    {id:'cg34',nombre:'PM AZUL 10',       sku:'CIG-034',cat:'Cigarros',marca:'PM',      stock:0,min:0,precio:2200},
+    {id:'cg35',nombre:'PM BOOST 10',      sku:'CIG-035',cat:'Cigarros',marca:'PM',      stock:0,min:0,precio:2600},
+    {id:'cg36',nombre:'PM AZUL CLICK 10', sku:'CIG-036',cat:'Cigarros',marca:'PM',      stock:0,min:0,precio:2600},
+    {id:'cg37',nombre:'FOREST 12 (VERDE)',sku:'CIG-037',cat:'Cigarros',marca:'MARLBORO',stock:0,min:0,precio:2600},
+    {id:'cg38',nombre:'GARDEN 12 (MORADO)',sku:'CIG-038',cat:'Cigarros',marca:'MARLBORO',stock:0,min:0,precio:2600},
+    {id:'cg39',nombre:'ARTESANAL AZUL',   sku:'CIG-039',cat:'Cigarros',marca:'MARLBORO',stock:0,min:0,precio:3900},
+    {id:'cg40',nombre:'ARTESANAL ROJO',   sku:'CIG-040',cat:'Cigarros',marca:'MARLBORO',stock:0,min:0,precio:3900},
+    {id:'cg41',nombre:'TOUCH',            sku:'CIG-041',cat:'Cigarros',marca:'MARLBORO',stock:0,min:0,precio:4400},
+    {id:'cg42',nombre:'VISTA SUMMER (SANDIA)',sku:'CIG-042',cat:'Cigarros',marca:'MARLBORO',stock:0,min:0,precio:4400},
+    {id:'cg43',nombre:'GOLD',             sku:'CIG-043',cat:'Cigarros',marca:'MARLBORO',stock:0,min:0,precio:5300},
+    {id:'cg44',nombre:'BLOSSOM FUSIÓN',   sku:'CIG-044',cat:'Cigarros',marca:'MARLBORO',stock:0,min:0,precio:4600},
+  ],
+  sisLabels: { ef:'Efectivo', tarj:'Tarjetas / POS', otros:'Amipass, Edenred, etc.' },
+  tienda: { nombre:'Kombi Store', dir:'' },
+  sucursales: [
+    { id:'s1', nombre:'Sucursal Principal', dir:'', activa:true }
+  ],
+  sucursalActiva: 's1',
+  editPid: null,
+  repEmail: '',
+  gasUrl: '',
+  turnos: [],
+  turnoActivo: 'mañana',
+  historialPrecios: []
+};
+
+const BILLS=[20000,10000,5000,2000,1000,500,200,100,50,10];
+
+function save(){ try{ localStorage.setItem('ks2',JSON.stringify(S)); }catch(e){} }
+function load(){
+  try{
+    const d=localStorage.getItem('ks2');
+    if(d){ const p=JSON.parse(d); S=Object.assign({},S,p); }
+  }catch(e){}
+}
+
+/* ============ HELPERS ============ */
+const clp=n=>'$'+Number(n||0).toLocaleString('es-CL');
+const today=()=>new Date().toISOString().slice(0,10);
+const timeNow=()=>new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+const fdate=s=>{if(!s)return'—';return new Date(s+'T12:00').toLocaleDateString('es-CL',{day:'numeric',month:'short',year:'numeric'});};
+
+function toast(m,d=2800){
+  const t=document.getElementById('toast');
+  t.textContent=m; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),d);
+}
+
+/* ============ LUCIDE SAFE ============ */
+function ico(){
+  if(typeof lucide!=='undefined') lucide.createIcons();
+}
+window.addEventListener('load',()=>{ ico(); });
+
+/* ============ LOGIN ============ */
+let selRole='operador';
+function setRole(r,el){
+  selRole=r;
+  document.querySelectorAll('.role-tab').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+}
+function fillDemo(r){
+  selRole=r;
+  if(r==='operador'){ document.getElementById('tab-op').click(); document.getElementById('lPin').value=S.claves.op; }
+  else{ document.getElementById('tab-adm').click(); document.getElementById('lPin').value=S.claves.adm; }
+  document.getElementById('lPin').focus();
+}
+function setTurno(t,el){
+  S.turnoActivo=t;
+  document.querySelectorAll('#turno-man,#turno-tar,#turno-noc').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+}
+function populateSucursalSelector(){
+  const sel=document.getElementById('lSucursal'); if(!sel)return;
+  const sucs=S.sucursales||[];
+  sel.innerHTML=sucs.map(s=>`<option value="${s.id}">${s.nombre}${s.dir?' — '+s.dir:''}</option>`).join('');
+  if(S.sucursalActiva) sel.value=S.sucursalActiva;
+  const field=document.getElementById('sucursalField');
+  if(field) field.style.display=sucs.length<=1?'none':'block';
+  // Restore turno active button
+  const ta=S.turnoActivo||'mañana';
+  const map={'mañana':'turno-man','tarde':'turno-tar','noche':'turno-noc'};
+  document.querySelectorAll('#turno-man,#turno-tar,#turno-noc').forEach(b=>b.classList.remove('active'));
+  document.getElementById(map[ta])?.classList.add('active');
+}
+function login(){
+  const pin=document.getElementById('lPin').value;
+  const err=document.getElementById('lErr');
+  let ok=false;
+  if(selRole==='operador'&&pin===S.claves.op){ok=true;S.role='op';}
+  if(selRole==='admin'&&pin===S.claves.adm){ok=true;S.role='adm';}
+  if(ok){
+    err.classList.add('hidden');
+    // Set active sucursal
+    const sucSel=document.getElementById('lSucursal');
+    S.sucursalActiva=sucSel?.value||(S.sucursales?.[0]?.id||'s1');
+    S.userName=document.getElementById('lNombre').value.trim()||(selRole==='admin'?'Admin':'Operador');
+    document.getElementById('ls').style.display='none';
+    document.getElementById('app').classList.add('v');
+    document.getElementById('uLabel').textContent=S.userName;
+    document.getElementById('rLabel').textContent=selRole==='admin'?'Administrador':'Operador';
+    // Show sucursal + turno in topbar
+    const suc=S.sucursales?.find(s=>s.id===S.sucursalActiva);
+    const turnoEmoji={'mañana':'☀️','tarde':'🌤','noche':'🌙'};
+    const sucLbl=document.getElementById('sucursalLabel');
+    if(sucLbl) sucLbl.textContent=`${suc?.nombre||''} ${turnoEmoji[S.turnoActivo]||''}`.trim();
+    document.getElementById('lPin').value='';
+    document.getElementById('lNombre').value='';
+    save();
+    initApp();
+  } else {
+    err.classList.remove('hidden');
+    document.getElementById('lPin').value='';
+  }
+}
+function logout(){
+  S.role=null;
+  document.getElementById('app').classList.remove('v');
+  document.getElementById('ls').style.display='flex';
+  populateSucursalSelector();
+}
+
+/* ============ APP INIT ============ */
+function initApp(){
+  const isAdm=S.role==='adm';
+  document.getElementById('opNav').classList.toggle('hidden',isAdm);
+  document.getElementById('adNav').classList.toggle('hidden',!isAdm);
+  document.getElementById('turnoFecha').textContent=new Date().toLocaleDateString('es-CL',{weekday:'short',day:'numeric',month:'short'});
+  renderBills('apBills','ap');
+  renderBills('ciBills','ci');
+  renderRetList();
+  renderCiPosInputs();
+  renderPosTermList();
+  renderInv();
+  renderOpCig();
+  document.getElementById('vFecha').value=today();
+  if(isAdm){ renderDash(); renderVChart(); renderVH(); renderAdCk(); renderCaja(); renderAjustes(); }
+  // restore wizard state
+  apGoTo(1); ciGoTo(1);
+  ico();
+}
+
+/* ============ SIDEBAR ============ */
+function toggleSidebar(){ document.getElementById('sb').classList.toggle('open'); document.getElementById('ov').style.display='block'; }
+function closeSidebar(){ document.getElementById('sb').classList.remove('open'); document.getElementById('ov').style.display='none'; }
+function showSec(id,el){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id)?.classList.add('active');
+  document.querySelectorAll('.ni').forEach(b=>b.classList.remove('active'));
+  el?.classList.add('active');
+  if(id==='ad-dash') renderDash();
+  if(id==='ad-caja') renderCaja();
+  if(id==='ad-v'){ renderVChart(); renderVH(); }
+  if(id==='ad-ck') renderAdCk();
+  if(id==='ad-aj') renderAjustes();
+  if(id==='ad-inv'){ _invCat='TODOS'; renderInv(); }
+  if(id==='op-cig') renderOpCig();
+  if(id==='ad-hist') renderHistorial();
+  if(id==='ad-rep'){
+    document.getElementById('repFecha').value=today();
+    const gi=document.getElementById('gasUrlInput');
+    if(gi&&S.gasUrl) gi.value=S.gasUrl;
+  }
+  closeSidebar(); ico();
+}
+
+/* ============ BILL GRID ============ */
+function renderBills(cid, tgt){
+  const c=document.getElementById(cid); if(!c)return;
+  c.innerHTML=BILLS.map(b=>`
+    <div class="bi">
+      <div class="bi-d">${clp(b)}</div>
+      <div style="display:flex;align-items:center;gap:.25rem">
+        <span style="font-size:.75rem;color:var(--g400)">×</span>
+        <input class="bi-i" type="number" min="0" placeholder="0" value="${S[tgt].bills[b]||''}"
+          oninput="setBill(${b},'${tgt}',this.value)"/>
+      </div>
+      <div class="bi-s" id="bs_${tgt}_${b}">${S[tgt].bills[b]?clp(b*S[tgt].bills[b]):''}</div>
+    </div>
+  `).join('');
+}
+function setBill(d,t,v){
+  S[t].bills[d]=parseInt(v)||0;
+  const s=document.getElementById(`bs_${t}_${d}`);
+  if(s) s.textContent=S[t].bills[d]?clp(d*S[t].bills[d]):'';
+  if(t==='ap') updApEf();
+  if(t==='ci') updCiEf();
+}
+function totalBills(t){ return BILLS.reduce((a,b)=>a+(b*(S[t].bills[b]||0)),0); }
+
+/* ============ APERTURA WIZARD ============ */
+let apStep=1;
+function apGoTo(n){
+  apStep=n;
+  document.querySelectorAll('[id^="apP"]').forEach(p=>p.classList.remove('active'));
+  document.getElementById('apP'+n)?.classList.add('active');
+  for(let i=1;i<=4;i++){
+    const w=document.getElementById('apW'+i); if(!w)continue;
+    w.classList.remove('active','done');
+    if(i===n) w.classList.add('active');
+    else if(i<n) w.classList.add('done');
+  }
+  if(n===2) renderCigCatalog('apCigCatalog','ap');
+  if(n===3) renderApCkInline();
+  if(n===4) renderApResumen();
+  ico();
+}
+
+/* ============ CIGARRO CATALOG RENDER ============ */
+function renderCigCatalog(containerId, storeKey){
+  const c=document.getElementById(containerId); if(!c)return;
+  const cat=S.inventario.filter(i=>i.cat==='Cigarros');
+  if(!cat.length){ c.innerHTML='<p class="fs13 text-gray">Sin productos en catálogo</p>'; return; }
+  const marcas=[...new Set(cat.map(x=>x.marca))];
+  const stored=S[storeKey].cigarros||[];
+  const getQty=id=>{ const f=stored.find(x=>x.id===id); return f?f.stock:null; };
+  c.innerHTML=marcas.map(m=>{
+    const items=cat.filter(x=>x.marca===m);
+    return `
+    <div style="margin-bottom:1rem">
+      <div style="font-size:.75rem;font-weight:800;color:var(--a700);text-transform:uppercase;letter-spacing:.06em;padding:.375rem 0;margin-bottom:.25rem;border-bottom:2px solid var(--a200)">${m}</div>
+      <table class="cig-table">
+        <thead><tr><th>Producto</th><th style="width:80px;text-align:right">Precio</th><th style="width:90px;text-align:center">Cantidad</th></tr></thead>
+        <tbody>
+          ${items.map(cg=>{
+            const qty=getQty(cg.id);
+            const hasVal=qty!==null&&qty!==undefined;
+            return `<tr>
+              <td>${cg.nombre}</td>
+              <td style="text-align:right;font-family:var(--mono);color:var(--g500)">${clp(cg.precio)}</td>
+              <td style="text-align:center">
+                <input class="cig-inp" type="number" min="0" value="${hasVal?qty:''}" placeholder="—"
+                  style="width:64px;text-align:center;${hasVal?'background:var(--a50);border-color:var(--a400);font-weight:700':''}"
+                  oninput="setCigQty('${storeKey}','${cg.id}','${cg.nombre}','${m}',this)"/>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  }).join('');
+}
+function setCigQty(storeKey,id,nombre,marca,input){
+  const val=input.value.trim();
+  const stock=val===''?null:parseInt(val)||0;
+  if(!S[storeKey].cigarros) S[storeKey].cigarros=[];
+  const idx=S[storeKey].cigarros.findIndex(x=>x.id===id);
+  // Find precio from inventario
+  const inv=S.inventario.find(x=>x.id===id);
+  const precio=inv?inv.precio:0;
+  if(stock!==null){
+    if(idx>=0){ S[storeKey].cigarros[idx].stock=stock; S[storeKey].cigarros[idx].precio=precio; }
+    else S[storeKey].cigarros.push({id,nombre,marca,stock,precio});
+    input.style.background='var(--a50)'; input.style.borderColor='var(--a400)'; input.style.fontWeight='700';
+  } else {
+    if(idx>=0) S[storeKey].cigarros.splice(idx,1);
+    input.style.background=''; input.style.borderColor=''; input.style.fontWeight='';
+  }
+  save();
+}
+function saveApCigs(){
+  S.ap.obs=document.getElementById('apCigObs')?.value||'';
+  save();
+}
+function saveCiCigs(){
+  S.ci.obs=document.getElementById('ciCigObs')?.value||'';
+  save();
+}
+
+function renderApCkInline(){
+  const items=S.ck.apertura;
+  const done=items.filter(i=>i.done).length;
+  const pct=items.length?Math.round(done/items.length*100):0;
+  const prog=document.getElementById('apCkProg');
+  const bar=document.getElementById('apCkBar');
+  const list=document.getElementById('apCkItems');
+  if(prog) prog.textContent=`${done} de ${items.length}`;
+  if(bar) bar.style.width=pct+'%';
+  if(!list) return;
+  list.innerHTML=items.map(it=>`
+    <div class="ci ${it.done?'done':''}" onclick="toggleApCk('${it.id}')">
+      <div class="cb">${it.done?'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg>':''}</div>
+      <span class="cl">${it.text}</span>
+    </div>`).join('');
+}
+function toggleApCk(id){
+  const item=S.ck.apertura.find(i=>i.id===id); if(!item)return;
+  item.done=!item.done;
+  if(S.ck.apertura.every(i=>i.done)) confetti();
+  renderApCkInline();
+  save();
+}
+function updApEf(){
+  const ef=totalBills('ap');
+  const el=document.getElementById('apEfTotal');
+  if(el) el.textContent=clp(ef);
+}
+function renderApResumen(){
+  const c=document.getElementById('apResumen'); if(!c)return;
+  const ef=totalBills('ap');
+  const cigs=S.ap.cigarros||[];
+  c.innerHTML=`
+    <div class="ar"><span class="ar-l">💵 Efectivo contado</span><span class="ar-v">${clp(ef)}</span></div>
+    <div class="ar tot"><span class="ar-l">Total Apertura</span><span class="ar-v">${clp(ef)}</span></div>
+    ${cigs.length?`
+      <div class="div"></div>
+      <div class="fs12 text-gray fw6" style="padding:.25rem 1rem .5rem;text-transform:uppercase;letter-spacing:.05em">Stock Cigarros Apertura</div>
+      ${cigs.map(cg=>`<div class="ar"><span class="ar-l">🚬 ${cg.nombre||cg.marca}</span><span class="ar-v">${cg.stock??cg.cant??0} unid.</span></div>`).join('')}
+    `:''}
+    <div style="background:var(--a50);border:1.5px solid var(--a200);border-radius:8px;padding:.75rem 1rem;margin-top:.75rem;font-size:.8125rem;color:var(--a700)">
+      <strong>Hora:</strong> ${timeNow()} — ${new Date().toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'})}
+    </div>`;
+}
+function resetApertura(){
+  S.ap={bills:{},pos:{},transf:0,cigarros:[],obs:'',saved:false,hora:''};
+  renderBills('apBills','ap'); updApEf(); apGoTo(1); save(); toast('Apertura limpiada');
+}
+function saveApertura(){
+  S.ap.saved=true; S.ap.hora=timeNow();
+  S.ap.obs=document.getElementById('apCigObs')?.value||'';
+  save();
+  const w4=document.getElementById('apW4');
+  if(w4){ w4.classList.remove('active'); w4.classList.add('done'); }
+  toast('✅ Apertura guardada — turno iniciado');
+}
+function resetApertura(){
+  S.ap={bills:{},pos:{},transf:0,cigarros:[],obs:'',saved:false,hora:''};
+  renderBills('apBills','ap'); updApEf(); apGoTo(1); save(); toast('Apertura limpiada');
+}
+
+/* ============ CONFETTI ============ */
+function confetti(){
+  const cv=document.getElementById('cc'),ctx=cv.getContext('2d');
+  cv.width=innerWidth; cv.height=innerHeight;
+  const ps=Array.from({length:120},()=>({
+    x:Math.random()*cv.width,y:-10,vx:(Math.random()-.5)*4,vy:Math.random()*3+2,
+    col:['#F59E0B','#22C55E','#3B82F6','#EF4444','#8B5CF6'][Math.floor(Math.random()*5)],
+    r:Math.random()*6+3,a:Math.random()*Math.PI*2,sp:(Math.random()-.5)*.2
+  }));
+  let f=0;
+  function draw(){
+    ctx.clearRect(0,0,cv.width,cv.height);
+    ps.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=.05;p.a+=p.sp;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.a);ctx.fillStyle=p.col;ctx.fillRect(-p.r,-p.r/2,p.r*2,p.r);ctx.restore();});
+    if(++f<180) requestAnimationFrame(draw);
+    else ctx.clearRect(0,0,cv.width,cv.height);
+  }
+  draw();
+}
+
+/* ============ RETIROS / ABONOS + PIN ============ */
+let _pinCb=null;
+function reqPin(title,desc,cb){
+  _pinCb=cb;
+  document.getElementById('pinTitle').textContent=title;
+  document.getElementById('pinDesc').textContent=desc;
+  document.getElementById('pinInput').value='';
+  document.getElementById('pinErr').classList.add('hidden');
+  document.getElementById('pinOverlay').classList.remove('hidden');
+  setTimeout(()=>document.getElementById('pinInput').focus(),100);
+}
+function cancelPin(){ document.getElementById('pinOverlay').classList.add('hidden'); _pinCb=null; }
+function confirmPin(){
+  const v=document.getElementById('pinInput').value;
+  if(v===S.claves.op||v===S.claves.adm){
+    document.getElementById('pinOverlay').classList.add('hidden');
+    if(_pinCb){ _pinCb(v); _pinCb=null; }
+  } else {
+    document.getElementById('pinErr').classList.remove('hidden');
+    document.getElementById('pinInput').value='';
+  }
+}
+
+function reqPinRetiro(){
+  const monto=parseFloat(document.getElementById('retMonto').value)||0;
+  const tipo=document.getElementById('retTipo').value;
+  const categoria=document.getElementById('retCategoria')?.value||'Otro';
+  if(!monto){ toast('Ingresa un monto'); return; }
+  reqPin(`Autorizar ${tipo==='retiro'?'Retiro':'Abono'}`,`Clave requerida para registrar un ${tipo} de ${clp(monto)}`,()=>{
+    const motivo=document.getElementById('retMotivo').value;
+    const resp=document.getElementById('retResp').value;
+    S.retiros.push({tipo,monto,categoria,motivo,resp,hora:timeNow(),fecha:today(),sucursal:S.sucursalActiva,turno:S.turnoActivo});
+    document.getElementById('retMonto').value='';
+    document.getElementById('retMotivo').value='';
+    document.getElementById('retResp').value='';
+    renderRetList(); save(); toast(`✅ ${tipo==='retiro'?'Retiro':'Abono'} registrado`);
+  });
+}
+function renderRetList(){
+  const c=document.getElementById('retList'); if(!c)return;
+  const hoy=S.retiros.filter(r=>r.fecha===today());
+  if(!hoy.length){ c.innerHTML='<p class="fs14 text-gray">Sin movimientos hoy</p>'; }
+  else c.innerHTML=hoy.map(r=>`
+    <div class="mi">
+      <div>
+        <div style="display:flex;align-items:center;gap:.375rem">
+          <span class="mt-i ${r.tipo==='retiro'?'c-re':'c-ab'}">${r.tipo.toUpperCase()}</span>
+          ${r.categoria?`<span class="badge ba" style="font-size:.7rem">${r.categoria}</span>`:''}
+        </div>
+        <div class="fs12 text-gray">${r.motivo||''} · ${r.resp||'—'} · ${r.hora}${r.turno?` · ${r.turno}`:''}</div>
+      </div>
+      <span class="ma ${r.tipo==='retiro'?'c-re':'c-ab'}">${r.tipo==='retiro'?'-':'+'} ${clp(r.monto)}</span>
+    </div>`).join('');
+  const totRet=hoy.filter(r=>r.tipo==='retiro').reduce((a,r)=>a+r.monto,0);
+  const totAb=hoy.filter(r=>r.tipo==='abono').reduce((a,r)=>a+r.monto,0);
+  document.getElementById('retTotal').textContent=clp(totRet);
+  document.getElementById('abonoTotal').textContent=clp(totAb);
+}
+
+/* ============ CIERRE WIZARD ============ */
+let ciStep=1;
+const CI_STEPS=7;
+function ciGoTo(n){
+  ciStep=n;
+  document.querySelectorAll('[id^="ciP"]').forEach(p=>p.classList.remove('active'));
+  document.getElementById('ciP'+n)?.classList.add('active');
+  for(let i=1;i<=CI_STEPS;i++){
+    const w=document.getElementById('ciW'+i); if(!w) continue;
+    w.classList.remove('active','done');
+    if(i===n) w.classList.add('active');
+    else if(i<n) w.classList.add('done');
+  }
+  // Mostrar siempre el paso 1 (todos lo completan)
+  const ciW1=document.getElementById('ciW1');
+  const ciWL1=ciW1?.nextElementSibling;
+  if(ciW1){ ciW1.style.display='flex'; if(ciWL1) ciWL1.style.display='block'; }
+  // Restaurar numeración original (todos ven 7 pasos)
+  const labels=['Sistema','Efectivo','POS/Transfer.','Movimientos','Cigarros','Resumen','Checklist'];
+  for(let i=1;i<=7;i++){
+    const w=document.getElementById('ciW'+i); if(!w) continue;
+    const dot=w.querySelector('.wsd'); if(dot) dot.textContent=i;
+    const lbl=w.querySelector('span'); if(lbl) lbl.textContent=labels[i-1];
+  }
+  if(n===4) renderCiMovFromRet();
+  if(n===5) renderCigCatalog('ciCigCatalog','ci');
+  if(n===6) renderCiResumen();
+  if(n===7) renderCiCheckFotos();
+  const p2Back=document.getElementById('ciP2Back');
+  if(p2Back) p2Back.style.visibility='visible';
+  ico();
+}
+function ciNext(n){ ciGoTo(n); }
+
+function saveCiSis(){
+  S.ci.sis={
+    ef:parseFloat(document.getElementById('ciSisEf').value)||0,
+    tarj:parseFloat(document.getElementById('ciSisTarj').value)||0,
+    otros:parseFloat(document.getElementById('ciSisOtros').value)||0,
+    otrosDesc:document.getElementById('ciSisOtrosDesc').value
+  };
+  save();
+}
+function refreshCiSisTotal(){
+  // apply custom labels from settings
+  const sl=S.sisLabels||{};
+  const lEf=document.querySelector('label[for-sis="ef"]');
+  ['ciSisEf','ciSisTarj','ciSisOtros'].forEach((id,i)=>{
+    const labels=['ef','tarj','otros'];
+    const lbl=document.querySelector(`label.lbl[data-sis="${labels[i]}"]`);
+    // fallback: just update via sibling approach handled in saveCiSis render
+  });
+  // restore saved values if fields are empty (first visit)
+  const sis=S.ci.sis||{};
+  const efEl=document.getElementById('ciSisEf');
+  const tarjEl=document.getElementById('ciSisTarj');
+  const otrosEl=document.getElementById('ciSisOtros');
+  const otrosDescEl=document.getElementById('ciSisOtrosDesc');
+  if(efEl&&!efEl.value&&sis.ef) efEl.value=sis.ef;
+  if(tarjEl&&!tarjEl.value&&sis.tarj) tarjEl.value=sis.tarj;
+  if(otrosEl&&!otrosEl.value&&sis.otros) otrosEl.value=sis.otros;
+  if(otrosDescEl&&!otrosDescEl.value&&sis.otrosDesc) otrosDescEl.value=sis.otrosDesc;
+  const ef=parseFloat(efEl?.value)||0;
+  const tarj=parseFloat(tarjEl?.value)||0;
+  const otros=parseFloat(otrosEl?.value)||0;
+  const el=document.getElementById('ciSisTotal');
+  if(el) el.textContent=clp(ef+tarj+otros);
+  // update labels text
+  const lblEf=document.getElementById('ciSisLblEf'); if(lblEf) lblEf.textContent=(sl.ef||'Efectivo')+' (sistema)';
+  const lblTj=document.getElementById('ciSisLblTarj'); if(lblTj) lblTj.textContent=(sl.tarj||'Tarjetas / POS')+' (sistema)';
+  const lblOt=document.getElementById('ciSisLblOtros'); if(lblOt) lblOt.textContent=sl.otros||'Otros — Amipass, Edenred, etc.';
+}
+
+function renderCiPosInputs(){
+  const c=document.getElementById('ciPosInputs'); if(!c)return;
+  c.innerHTML=S.pos.map(t=>`
+    <div class="fld"><label class="lbl">${t.name}</label>
+    <input class="inp" type="number" placeholder="0" value="${S.ci.pos[t.id]||''}"
+      oninput="S.ci.pos['${t.id}']=parseFloat(this.value)||0;calcCierre()"/></div>`).join('');
+}
+
+function updCiEf(){
+  const ef=totalBills('ci');
+  const el=document.getElementById('ciEfTotal');
+  if(el) el.textContent=clp(ef);
+}
+
+function calcCierre(){
+  updCiEf();
+}
+
+function renderCiMovFromRet(){
+  // Show retiros/abonos del turno (autorizados con clave) como movimientos de referencia
+  const c=document.getElementById('ciMovFromRet'); if(!c)return;
+  const hoy=S.retiros.filter(r=>r.fecha===today());
+  if(!hoy.length){
+    c.innerHTML='<p class="fs13 text-gray" style="padding:.5rem 0">Sin retiros ni abonos registrados en el turno.</p>';
+    return;
+  }
+  c.innerHTML=`
+    <div class="fs12 fw6 text-gray" style="text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem">Del turno (Retiros/Abonos)</div>
+    `+hoy.map(r=>`
+    <div class="mi" style="opacity:.85">
+      <div>
+        <div class="mt-i ${r.tipo==='retiro'?'c-re':'c-ab'}">${r.tipo.toUpperCase()} <span style="font-weight:400;font-size:.7rem;text-transform:none;color:var(--g400)">— autorizado</span></div>
+        <div class="fs12 text-gray">${r.motivo||'—'} · ${r.resp||'—'} · ${r.hora}</div>
+      </div>
+      <span class="ma ${r.tipo==='retiro'?'c-re':'c-ab'}">${r.tipo==='retiro'?'-':'+'} ${clp(r.monto)}</span>
+    </div>`).join('');
+}
+
+function addCiMov(){
+  const tipo=document.getElementById('ciMovTipo').value;
+  const monto=parseFloat(document.getElementById('ciMovMonto').value)||0;
+  const desc=document.getElementById('ciMovDesc').value;
+  if(!monto){ toast('Ingresa un monto'); return; }
+  S.ci.movs.push({tipo,monto,desc,hora:timeNow()});
+  document.getElementById('ciMovMonto').value='';
+  document.getElementById('ciMovDesc').value='';
+  renderCiMovList(); save();
+}
+function renderCiMovList(){
+  const c=document.getElementById('ciMovList'); if(!c)return;
+  if(!S.ci.movs.length){ c.innerHTML='<p class="fs14 text-gray">Sin movimientos</p>'; return; }
+  c.innerHTML=S.ci.movs.map((m,i)=>`
+    <div class="mi">
+      <div><div class="mt-i ${m.tipo==='retiro'?'c-re':'c-ab'}">${m.tipo.toUpperCase()}</div><div class="fs12 text-gray">${m.desc||'—'} · ${m.hora}</div></div>
+      <div style="display:flex;align-items:center;gap:.5rem">
+        <span class="ma ${m.tipo==='retiro'?'c-re':'c-ab'}">${clp(m.monto)}</span>
+        <button class="btn btn-g sm" onclick="delCiMov(${i})">✕</button>
+      </div>
+    </div>`).join('');
+}
+function delCiMov(i){ S.ci.movs.splice(i,1); renderCiMovList(); save(); }
+
+
+function renderCiResumen(){
+  const c=document.getElementById('ciResumen'); if(!c)return;
+  const title=document.getElementById('ciResumenTitle');
+  if(title) title.textContent=S.role==='op'?'✅ Confirmar Cierre':'📊 Resumen de Cierre';
+  const ef=totalBills('ci');
+  const posTotal=S.pos.reduce((a,t)=>a+(S.ci.pos[t.id]||0),0);
+  const transf=parseFloat(document.getElementById('ciTransf')?.value)||S.ci.transf||0;
+  const cigsAp=S.ap.cigarros||[];
+  const cigsCi=S.ci.cigarros||[];
+  // Build diff: apertura stock vs cierre stock
+  const cigRows=cigsCi.map(cc=>{
+    const ca=cigsAp.find(x=>x.id===cc.id);
+    const diff=ca?(cc.stock-ca.stock):null;
+    return {...cc,stockAp:ca?ca.stock:null,diff};
+  });
+  const cigHtml=cigRows.length?`<div class="div"></div>
+    <div style="font-size:.75rem;font-weight:700;color:var(--g400);text-transform:uppercase;letter-spacing:.06em;padding:.5rem 1rem .25rem">Stock Cigarros</div>
+    ${cigRows.map(cg=>`
+      <div class="ar">
+        <span class="ar-l">🚬 ${cg.nombre}</span>
+        <span class="ar-v" style="display:flex;gap:.75rem;align-items:center">
+          <span class="mono">${cg.stock} unid.</span>
+          ${cg.diff!==null?`<span class="badge ${cg.diff<0?'br':cg.diff>0?'bg':'ba'}">${cg.diff>0?'+':''}${cg.diff}</span>`:''}
+        </span>
+      </div>`).join('')}`:'';
+
+
+  if(S.role==='op'){
+    const sis=S.ci.sis||{};
+    const sisTotal=(sis.ef||0)+(sis.tarj||0)+(sis.otros||0);
+    const retCnt=S.retiros.filter(r=>r.fecha===today()).length;
+    c.innerHTML=`
+      <div style="background:var(--a50);border:1.5px solid var(--a200);border-radius:10px;padding:1.25rem;text-align:center;margin-bottom:1rem">
+        <div style="font-size:2rem;margin-bottom:.5rem">📋</div>
+        <div style="font-weight:800;font-size:1rem;color:var(--a900);margin-bottom:.25rem">Resumen del Turno</div>
+        <div style="font-size:.875rem;color:var(--a700)">${new Date().toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long'})}</div>
+      </div>
+      <div style="font-size:.75rem;font-weight:700;color:var(--g400);text-transform:uppercase;letter-spacing:.06em;padding:.5rem 1rem .25rem">Lo que registraste en el sistema</div>
+      <div class="ar"><span class="ar-l">🖥️ Efectivo sistema</span><span class="ar-v">${clp(sis.ef||0)}</span></div>
+      <div class="ar"><span class="ar-l">🖥️ Tarjetas / POS</span><span class="ar-v">${clp(sis.tarj||0)}</span></div>
+      ${sis.otros?`<div class="ar"><span class="ar-l">🖥️ ${sis.otrosDesc||'Otros'}</span><span class="ar-v">${clp(sis.otros)}</span></div>`:''}
+      <div class="ar tot"><span class="ar-l">Total Sistema</span><span class="ar-v">${clp(sisTotal)}</span></div>
+      <div style="font-size:.75rem;font-weight:700;color:var(--g400);text-transform:uppercase;letter-spacing:.06em;padding:.5rem 1rem .25rem;margin-top:.5rem">Operaciones del turno</div>
+      <div class="ar"><span class="ar-l">Movimientos</span><span class="ar-v">${retCnt} registrados</span></div>
+      <div class="ar"><span class="ar-l">Cigarros</span><span class="ar-v">${cigsCi.length?cigsCi.length+' productos contados':'Sin contar'}</span></div>
+      ${cigHtml}
+      <div style="background:var(--gr100);border:1.5px solid var(--gr500);border-radius:8px;padding:.875rem 1rem;margin-top:1rem;font-size:.875rem;color:var(--gr600);font-weight:600;text-align:center">
+        Continúa al checklist para completar el cierre
+      </div>`;
+    return;
+  }
+
+  // Admin: resumen financiero completo
+  const retHoy=S.retiros.filter(r=>r.fecha===today()&&r.tipo==='retiro').reduce((a,r)=>a+r.monto,0);
+  const abHoy=S.retiros.filter(r=>r.fecha===today()&&r.tipo==='abono').reduce((a,r)=>a+r.monto,0);
+  const efAp=totalBills('ap');
+  const saldoEsp=efAp+abHoy-retHoy;
+  const diffEf=ef-saldoEsp;
+  const sis=S.ci.sis||{};
+  const sisTotal=(sis.ef||0)+(sis.tarj||0)+(sis.otros||0);
+  const totalReal=ef+posTotal+transf;
+  const diffSis=totalReal-sisTotal;
+  const sec=l=>`<div style="font-size:.75rem;font-weight:700;color:var(--g400);text-transform:uppercase;letter-spacing:.06em;padding:.5rem 1rem .25rem">${l}</div>`;
+  c.innerHTML=
+    sec('Sistema')+
+    `<div class="ar"><span class="ar-l">🖥️ Efectivo sistema</span><span class="ar-v">${clp(sis.ef||0)}</span></div>`+
+    `<div class="ar"><span class="ar-l">🖥️ Tarjetas sistema</span><span class="ar-v">${clp(sis.tarj||0)}</span></div>`+
+    (sis.otros?`<div class="ar"><span class="ar-l">🖥️ Otros (${sis.otrosDesc||'Amipass / Edenred'})</span><span class="ar-v">${clp(sis.otros)}</span></div>`:'')+
+    `<div class="ar tot"><span class="ar-l">Total Sistema</span><span class="ar-v">${clp(sisTotal)}</span></div>`+
+    `<div class="div"></div>`+sec('Conteo Real')+
+    `<div class="ar"><span class="ar-l">💵 Efectivo contado</span><span class="ar-v">${clp(ef)}</span></div>`+
+    S.pos.map(t=>`<div class="ar"><span class="ar-l">💳 ${t.name}</span><span class="ar-v">${clp(S.ci.pos[t.id]||0)}</span></div>`).join('')+
+    `<div class="ar"><span class="ar-l">🔄 Transferencias</span><span class="ar-v">${clp(transf)}</span></div>`+
+    `<div class="ar tot"><span class="ar-l">Total Contado</span><span class="ar-v">${clp(totalReal)}</span></div>`+
+    `<div class="div"></div>`+sec('Cuadraturas')+
+    `<div class="ar"><span class="ar-l">Efectivo apertura</span><span class="ar-v">${clp(efAp)}</span></div>`+
+    `<div class="ar"><span class="ar-l">Retiros turno</span><span class="ar-v text-red">-${clp(retHoy)}</span></div>`+
+    `<div class="ar"><span class="ar-l">Abonos turno</span><span class="ar-v text-green">+${clp(abHoy)}</span></div>`+
+    `<div class="ar"><span class="ar-l">Saldo esperado efectivo</span><span class="ar-v">${clp(saldoEsp)}</span></div>`+
+    `<div class="ar ${diffEf===0?'tot':diffEf>0?'dp':'dn'}"><span class="ar-l">Diferencia efectivo</span><span class="ar-v">${diffEf>=0?'+':''}${clp(diffEf)}</span></div>`+
+    `<div class="ar ${diffSis===0?'tot':diffSis>0?'dp':'dn'}"><span class="ar-l">Diferencia vs Sistema</span><span class="ar-v">${diffSis>=0?'+':''}${clp(diffSis)}</span></div>`+
+    cigHtml;
+}
+
+function renderCiCheckFotos(){
+  const c=document.getElementById('ciCheckFotos'); if(!c)return;
+  c.innerHTML=S.ck.cierre.map((it,i)=>`
+    <div style="margin-bottom:1.25rem;padding-bottom:1.25rem;border-bottom:1px solid var(--g100)">
+      <div class="flex aic gap2 mb2">
+        <div class="cb ${it.photo?'done':''}">
+          ${it.photo?'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg>':''}
+        </div>
+        <span class="fw6 fs15">${it.text}</span>
+      </div>
+      <div class="photo-slot ${it.photo?'has-photo':''}" onclick="document.getElementById('ph${i}').click()">
+        <input type="file" id="ph${i}" accept="image/*" capture="environment" onchange="uploadPhoto('${it.id}',this,${i})"/>
+        ${it.photo
+          ? `<img src="${it.photo}" alt="foto"/><div style="font-size:.75rem;color:var(--gr600);margin-top:.375rem;font-weight:600">✓ Foto subida — click para cambiar</div>`
+          : `<div style="font-size:2rem;margin-bottom:.375rem">📷</div><div class="fs13 text-gray">Toca para tomar foto o subir imagen</div><div class="fs12 text-gray" style="margin-top:.25rem">Requerida para enviar el cierre</div>`
+        }
+      </div>
+    </div>`).join('');
+  checkCierreReady();
+}
+function uploadPhoto(id,input,idx){
+  const file=input.files[0]; if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    S.ck.cierre[idx].photo=e.target.result;
+    save(); renderCiCheckFotos();
+  };
+  reader.readAsDataURL(file);
+}
+function checkCierreReady(){
+  const allPhotos=S.ck.cierre.every(it=>it.photo);
+  const btn=document.getElementById('ciEnviarBtn');
+  if(btn){ btn.style.opacity=allPhotos?'1':'0.4'; btn.style.pointerEvents=allPhotos?'auto':'none'; }
+}
+function enviarCierre(){
+  S.ci.saved=true; S.ci.hora=timeNow();
+  // Archive turno
+  const ef=totalBills('ci');
+  const posTotal=S.pos.reduce((a,t)=>a+(S.ci.pos[t.id]||0),0);
+  const transf=parseFloat(document.getElementById('ciTransf')?.value)||0;
+  S.ci.transf=transf;
+  const retHoy=S.retiros.filter(r=>r.fecha===today()&&r.tipo==='retiro').reduce((a,r)=>a+r.monto,0);
+  const abHoy=S.retiros.filter(r=>r.fecha===today()&&r.tipo==='abono').reduce((a,r)=>a+r.monto,0);
+  const efAp=totalBills('ap');
+  const saldoEsp=efAp+abHoy-retHoy;
+  const diffEf=ef-saldoEsp;
+  const sis=S.ci.sis||{};
+  const sisTotal=(sis.ef||0)+(sis.tarj||0)+(sis.otros||0);
+  const totalReal=ef+posTotal+transf;
+  const diffSis=totalReal-sisTotal;
+  const turno={
+    id:'t'+Date.now(),
+    fecha:today(),
+    horaAp:S.ap.hora, horaCi:S.ci.hora,
+    operador:S.userName||'—',
+    sucursal:(S.sucursales?.find(s=>s.id===S.sucursalActiva)?.nombre)||'—',
+    sucursalId:S.sucursalActiva,
+    turno:S.turnoActivo||'mañana',
+    efAp, efCi:ef, posTotal, transf, totalReal,
+    retiros:retHoy, abonos:abHoy, saldoEsp, diffEf,
+    sisTotal, diffSis,
+    ventas:S.ventas.find(v=>v.fecha===today())||null,
+    cigarrosAp:[...(S.ap.cigarros||[])],
+    cigarrosCi:[...(S.ci.cigarros||[])],
+    sis:{...sis},
+    pos:S.pos.map(t=>({name:t.name,ap:S.ap.pos[t.id]||0,ci:S.ci.pos[t.id]||0})),
+    fotos:Object.keys(S.ci.fotos||{}).length
+  };
+  if(!S.turnos) S.turnos=[];
+  // Replace if same date
+  const idx=S.turnos.findIndex(t=>t.fecha===today());
+  if(idx>=0) S.turnos[idx]=turno; else S.turnos.unshift(turno);
+  save();
+  confetti();
+  // Alert on any difference
+  const hasDiff=diffEf!==0||diffSis!==0;
+  if(hasDiff){
+    const msg=[];
+    if(diffEf!==0) msg.push(`Efectivo: ${diffEf>0?'+':''}${clp(diffEf)}`);
+    if(diffSis!==0) msg.push(`vs Sistema: ${diffSis>0?'+':''}${clp(diffSis)}`);
+    showDiffAlert(msg.join(' | '), diffEf<0||diffSis<0);
+  } else {
+    toast('✅ Cierre enviado — caja cuadra perfectamente',4000);
+  }
+}
+
+function showDiffAlert(msg, isNegative){
+  const existing=document.getElementById('diffAlertBanner');
+  if(existing) existing.remove();
+  const div=document.createElement('div');
+  div.id='diffAlertBanner';
+  div.style.cssText=`position:fixed;top:64px;left:50%;transform:translateX(-50%);
+    background:${isNegative?'var(--r500)':'var(--b500)'};color:#fff;
+    padding:.875rem 1.5rem;border-radius:10px;font-weight:700;font-size:.9375rem;
+    box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:997;
+    display:flex;align-items:center;gap:.75rem;max-width:calc(100vw - 2rem)`;
+  div.innerHTML=`<span style="font-size:1.25rem">${isNegative?'⚠️':'ℹ️'}</span>
+    <span>Diferencia detectada — ${msg}</span>
+    <button onclick="this.parentElement.remove()" style="background:rgba(255,255,255,.25);border:none;color:#fff;border-radius:6px;padding:.25rem .5rem;cursor:pointer;font-weight:700;margin-left:.5rem">✕</button>`;
+  document.body.appendChild(div);
+  setTimeout(()=>div.remove(), 10000);
+  toast(`⚠️ Cierre con diferencia: ${msg}`, 5000);
+}
+
+/* ============ CAJA ADMIN ============ */
+function renderCaja(){
+  const c=document.getElementById('cajaContent'); if(!c)return;
+  const efAp=totalBills('ap');
+  const posAp=S.pos.reduce((a,t)=>a+(S.ap.pos[t.id]||0),0);
+  const transfAp=S.ap.transf||0;
+  const retHoy=S.retiros.filter(r=>r.fecha===today()&&r.tipo==='retiro').reduce((a,r)=>a+r.monto,0);
+  const abHoy=S.retiros.filter(r=>r.fecha===today()&&r.tipo==='abono').reduce((a,r)=>a+r.monto,0);
+  const saldo=efAp+abHoy-retHoy;
+  const efCi=totalBills('ci');
+  const posCi=S.pos.reduce((a,t)=>a+(S.ci.pos[t.id]||0),0);
+  const transfCi=parseFloat(document.getElementById('ciTransf')?.value)||S.ci.transf||0;
+  const totalCi=efCi+posCi+transfCi;
+  const totalAp=efAp+posAp+transfAp;
+  const diff=S.ci.saved?totalCi-totalAp:null;
+  let rows=[
+    {l:'EFECTIVO',v:efAp},
+    {l:'TRANSFERENCIAS',v:transfAp},
+    {l:'TOTAL CAJA',v:efAp+transfAp,cls:'tot'},
+    {l:'INICIO TURNO',v:efAp},
+    {l:'ABONO A CAJA',v:abHoy},
+    {l:'RETIRO CAJA',v:retHoy,neg:true},
+    {l:'SALDO',v:saldo,cls:'tot'},
+  ];
+  S.pos.forEach(t=>rows.push({l:t.name.toUpperCase(),v:S.ap.pos[t.id]||0}));
+  const totPos=S.pos.reduce((a,t)=>a+(S.ap.pos[t.id]||0),0);
+  rows.push({l:'TOTAL POS',v:totPos,cls:'tot'});
+  rows.push({l:'TOTAL',v:saldo+totPos+transfAp,cls:'tot'});
+  if(diff!==null) rows.push({l:'DIFERENCIA',v:diff,cls:diff>=0?'dp':'dn'});
+  c.innerHTML=rows.map(r=>`
+    <div class="ar ${r.cls||''}">
+      <span class="ar-l">${r.l}</span>
+      <span class="ar-v ${r.neg?'text-red':''}">${r.neg&&r.v?'-':''}${clp(r.v)}</span>
+    </div>`).join('');
+}
+
+/* ============ VENTAS ============ */
+function calcVenta(){
+  const e=parseFloat(document.getElementById('vEf')?.value)||0;
+  const p=parseFloat(document.getElementById('vPos')?.value)||0;
+  const t=parseFloat(document.getElementById('vTr')?.value)||0;
+  document.getElementById('vTotal').textContent=clp(e+p+t);
+}
+function saveVenta(){
+  const fecha=document.getElementById('vFecha').value;
+  const ef=parseFloat(document.getElementById('vEf').value)||0;
+  const pos=parseFloat(document.getElementById('vPos').value)||0;
+  const tr=parseFloat(document.getElementById('vTr').value)||0;
+  if(!ef&&!pos&&!tr){ toast('Ingresa al menos un monto'); return; }
+  const idx=S.ventas.findIndex(v=>v.fecha===fecha);
+  const entry={fecha,ef,pos,tr,total:ef+pos+tr,obs:document.getElementById('vObs').value};
+  if(idx>=0) S.ventas[idx]=entry; else S.ventas.unshift(entry);
+  S.ventas.sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  ['vEf','vPos','vTr','vObs'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('vTotal').textContent='$0';
+  save(); renderVChart(); renderVH(); toast('✅ Ventas guardadas');
+}
+function renderVChart(){
+  const c=document.getElementById('vChart')||document.getElementById('dashChart');
+  if(!c)return;
+  const d=[...S.ventas].slice(0,7).reverse();
+  const max=Math.max(...d.map(v=>v.total),1);
+  c.innerHTML=d.length?`<div class="cbars">${d.map(v=>{const h=Math.round(v.total/max*140)||4;return`<div class="cbw"><div class="cvl">${v.total>=1000?Math.round(v.total/1000)+'k':v.total}</div><div class="cbar ${v.fecha===today()?'today':''}" style="height:${h}px"></div><div class="cbl">${v.fecha.slice(5)}</div></div>`;}).join('')}</div>`:'<p class="fs14 text-gray" style="padding:1rem">Sin datos</p>';
+}
+function renderVH(){
+  const c=document.getElementById('vHist'); if(!c)return;
+  let v=[...S.ventas];
+  const mes=document.getElementById('vFiltroMes')?.value;
+  if(mes) v=v.filter(x=>x.fecha.slice(0,7)===mes);
+  fillMeses();
+  if(!v.length){ c.innerHTML='<p class="fs14 text-gray">Sin registros</p>'; return; }
+  c.innerHTML=`<div class="tw"><table><thead><tr><th>Fecha</th><th>Efectivo</th><th>POS</th><th>Transfer.</th><th>Total</th></tr></thead><tbody>${v.map(x=>`<tr><td>${fdate(x.fecha)}</td><td class="mono">${clp(x.ef)}</td><td class="mono">${clp(x.pos)}</td><td class="mono">${clp(x.tr)}</td><td class="mono fw7 text-amber">${clp(x.total)}</td></tr>`).join('')}</tbody></table></div>`;
+}
+function fillMeses(){
+  const sel=document.getElementById('vFiltroMes'); if(!sel)return;
+  const ms=[...new Set(S.ventas.map(v=>v.fecha.slice(0,7)))].sort().reverse();
+  const cur=sel.value;
+  sel.innerHTML='<option value="">Todos los meses</option>'+ms.map(m=>`<option value="${m}" ${m===cur?'selected':''}>${m}</option>`).join('');
+}
+function exportVentas(){
+  let csv='Fecha,Efectivo,POS,Transferencias,Total\n';
+  S.ventas.forEach(v=>{csv+=`${v.fecha},${v.ef},${v.pos},${v.tr},${v.total}\n`;});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='ventas.csv'; a.click();
+}
+
+/* ============ INVENTARIO ============ */
+let _invCat='TODOS', _invSearch='';
+function getInvCats(){ return ['TODOS',...new Set(S.inventario.map(i=>i.cat).filter(Boolean))]; }
+
+function renderInvCatTabs(){
+  const c=document.getElementById('invCatTabs'); if(!c)return;
+  c.innerHTML=getInvCats().map(cat=>`
+    <button class="marca-tag ${_invCat===cat?'active':''}" onclick="_invCat='${cat}';renderInv()">
+      ${cat==='TODOS'?'Todos':cat}
+    </button>`).join('');
+  // populate datalist
+  const dl=document.getElementById('catList');
+  if(dl){ dl.innerHTML=[...new Set(S.inventario.map(i=>i.cat).filter(Boolean))].map(c=>`<option value="${c}"/>`).join(''); }
+}
+
+function renderInv(search){
+  if(search!==undefined) _invSearch=search;
+  renderInvCatTabs();
+  const b=document.getElementById('invBody'); if(!b)return;
+  let items=S.inventario;
+  if(_invCat!=='TODOS') items=items.filter(i=>i.cat===_invCat);
+  if(_invSearch) items=items.filter(i=>i.nombre.toLowerCase().includes(_invSearch.toLowerCase())||i.sku.toLowerCase().includes(_invSearch.toLowerCase())||(i.marca||'').toLowerCase().includes(_invSearch.toLowerCase()));
+  if(!items.length){ b.innerHTML=`<tr><td colspan="8" style="text-align:center;color:var(--g400);padding:2rem">Sin productos</td></tr>`; return; }
+  // group by marca for cigarros
+  b.innerHTML=items.map(i=>`<tr>
+    <td class="fw6">${i.nombre}</td>
+    <td class="text-gray fs13">${i.marca||'—'}</td>
+    <td class="mono text-gray fs12">${i.sku}</td>
+    <td><span class="badge ${i.cat==='Cigarros'?'ba':i.cat==='Premium'?'bb':'badge'}" style="${i.cat!=='Cigarros'&&i.cat!=='Premium'?'background:var(--g100);color:var(--g600)':''}">${i.cat}</span></td>
+    <td><span class="badge ${i.stock<=i.min&&i.min>0?'br':i.stock>i.min*2?'bg':'ba'}">${i.stock}</span></td>
+    <td class="text-gray fs13">${i.min}</td>
+    <td class="mono">${clp(i.precio)}</td>
+    <td><div style="display:flex;gap:.375rem">
+      <button class="btn btn-s sm" onclick="editProd('${i.id}')">✎</button>
+      <button class="btn btn-d sm" onclick="delProd('${i.id}')">✕</button>
+    </div></td></tr>`).join('');
+}
+function filterInv(v){ renderInv(v); }
+
+function openPM(){
+  document.getElementById('pmTitle').textContent='Nuevo Producto';
+  S.editPid=null;
+  ['pN','pS','pC','pMarca','pSt','pMn','pPr'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  renderInvCatTabs();
+  document.getElementById('pm').classList.remove('hidden');
+}
+function closePM(){ document.getElementById('pm').classList.add('hidden'); }
+function editProd(id){
+  const it=S.inventario.find(i=>i.id===id); if(!it)return;
+  S.editPid=id;
+  document.getElementById('pmTitle').textContent='Editar Producto';
+  document.getElementById('pN').value=it.nombre;
+  document.getElementById('pS').value=it.sku;
+  document.getElementById('pC').value=it.cat;
+  document.getElementById('pMarca').value=it.marca||'';
+  document.getElementById('pSt').value=it.stock;
+  document.getElementById('pMn').value=it.min;
+  document.getElementById('pPr').value=it.precio;
+  document.getElementById('pm').classList.remove('hidden');
+}
+function saveProduct(){
+  const n=document.getElementById('pN').value.trim(); if(!n){ toast('Ingresa el nombre'); return; }
+  const e={
+    nombre:n, sku:document.getElementById('pS').value,
+    cat:document.getElementById('pC').value||'General',
+    marca:document.getElementById('pMarca').value.trim().toUpperCase()||'',
+    stock:parseInt(document.getElementById('pSt').value)||0,
+    min:parseInt(document.getElementById('pMn').value)||0,
+    precio:parseInt(document.getElementById('pPr').value)||0
+  };
+  if(S.editPid){
+    const i=S.inventario.findIndex(x=>x.id===S.editPid);
+    if(i>=0){
+      // Track price change
+      const old=S.inventario[i];
+      if(old.precio!==e.precio){
+        if(!S.historialPrecios) S.historialPrecios=[];
+        S.historialPrecios.unshift({
+          id:old.id, nombre:old.nombre, cat:old.cat,
+          precioAnterior:old.precio, precioNuevo:e.precio,
+          fecha:today(), hora:timeNow()
+        });
+        // Keep last 200 changes
+        if(S.historialPrecios.length>200) S.historialPrecios=S.historialPrecios.slice(0,200);
+      }
+      S.inventario[i]={...e,id:S.editPid};
+    }
+  }
+  else{ e.id='p'+Date.now(); S.inventario.push(e); }
+  closePM(); renderInv(); save(); toast('✅ Producto guardado');
+}
+function delProd(id){ if(!confirm('¿Eliminar?'))return; S.inventario=S.inventario.filter(i=>i.id!==id); renderInv(); save(); toast('Eliminado'); }
+
+/* ============ OPERADOR CIGARROS ============ */
+let _opCigMarca='TODOS';
+function renderOpCig(){
+  const cigs=S.inventario.filter(i=>i.cat==='Cigarros');
+  const marcas=['TODOS',...new Set(cigs.map(c=>c.marca).filter(Boolean))];
+  const tabs=document.getElementById('opCigMarcaTabs');
+  if(tabs) tabs.innerHTML=marcas.map(m=>`
+    <button class="marca-tag ${_opCigMarca===m?'active':''}" onclick="_opCigMarca='${m}';renderOpCig()">${m}</button>`).join('');
+  const items=_opCigMarca==='TODOS'?cigs:cigs.filter(c=>c.marca===_opCigMarca);
+  const stored=S.ci.cigarros||[];
+  const getQty=id=>{ const f=stored.find(x=>x.id===id); return f?f.cant:0; };
+  const b=document.getElementById('opCigBody');
+  if(b) b.innerHTML=items.map(cg=>{
+    const qty=getQty(cg.id);
+    return `<tr>
+      <td class="fw6 fs14">${cg.nombre}</td>
+      <td style="text-align:right;font-family:var(--mono);color:var(--g500)">${clp(cg.precio)}</td>
+      <td style="text-align:center">
+        <input class="cig-inp" type="number" min="0" value="${qty||''}" placeholder="0"
+          style="width:70px;text-align:center;${qty>0?'background:var(--a50);border-color:var(--a400);font-weight:700':''}"
+          oninput="setOpCigQty('${cg.id}','${cg.nombre}','${cg.marca||''}',this)"/>
+      </td></tr>`;
+  }).join('');
+  renderOpCigResumen();
+}
+function setOpCigQty(id,nombre,marca,input){
+  const cant=parseInt(input.value)||0;
+  if(!S.ci.cigarros) S.ci.cigarros=[];
+  const idx=S.ci.cigarros.findIndex(x=>x.id===id);
+  if(cant>0){
+    if(idx>=0) S.ci.cigarros[idx].cant=cant;
+    else S.ci.cigarros.push({id,nombre,marca,cant});
+    input.style.background='var(--a50)'; input.style.borderColor='var(--a400)'; input.style.fontWeight='700';
+  } else {
+    if(idx>=0) S.ci.cigarros.splice(idx,1);
+    input.style.background=''; input.style.borderColor=''; input.style.fontWeight='';
+  }
+  renderOpCigResumen(); save();
+}
+function renderOpCigResumen(){
+  const c=document.getElementById('opCigResumen'); if(!c)return;
+  const cigs=S.ci.cigarros||[];
+  if(!cigs.length){ c.innerHTML='<p class="fs13 text-gray">Sin stock registrado</p>'; return; }
+  c.innerHTML=`<table class="cig-table"><thead><tr><th>Producto</th><th style="text-align:center">Cantidad</th><th style="text-align:right">Precio unit.</th></tr></thead><tbody>
+    ${cigs.map(cg=>`<tr>
+      <td>${cg.nombre}</td>
+      <td style="text-align:center"><span class="badge ba">${cg.stock??cg.cant??0}</span></td>
+      <td style="text-align:right;font-family:var(--mono);color:var(--g500)">${clp(cg.precio||0)}</td>
+    </tr>`).join('')}
+    </tbody></table>`;
+}
+function renderAjustes(){
+  // Tienda
+  const t=S.tienda||{};
+  const ajN=document.getElementById('ajNombre'); if(ajN) ajN.value=t.nombre||'Kombi Store';
+  const ajD=document.getElementById('ajDir'); if(ajD) ajD.value=t.dir||'';
+  // Sis labels
+  const sl=S.sisLabels||{};
+  const ajEf=document.getElementById('ajSisLblEf'); if(ajEf) ajEf.value=sl.ef||'Efectivo';
+  const ajTj=document.getElementById('ajSisLblTarj'); if(ajTj) ajTj.value=sl.tarj||'Tarjetas / POS';
+  const ajOt=document.getElementById('ajSisLblOtros'); if(ajOt) ajOt.value=sl.otros||'Amipass, Edenred, etc.';
+  // Lists
+  renderPosTermList();
+  renderAjCkList('apertura');
+  renderAjCkList('cierre');
+  renderAjSucList();
+  renderPrecioHist();
+}
+
+function renderPrecioHist(){
+  const c=document.getElementById('ajPrecioHist'); if(!c)return;
+  const hist=S.historialPrecios||[];
+  if(!hist.length){ c.innerHTML='<p class="fs13 text-gray">Sin cambios de precio registrados aún.</p>'; return; }
+  const show=hist.slice(0,30);
+  c.innerHTML=`<div class="tw"><table>
+    <thead><tr><th>Producto</th><th>Cat.</th><th style="text-align:right">Antes</th><th style="text-align:right">Después</th><th style="text-align:right">Dif.</th><th>Fecha</th></tr></thead>
+    <tbody>${show.map(h=>{
+      const diff=h.precioNuevo-h.precioAnterior;
+      return`<tr>
+        <td class="fw6 fs13">${h.nombre}</td>
+        <td class="fs12 text-gray">${h.cat||'—'}</td>
+        <td style="text-align:right;font-family:var(--mono);color:var(--g400)">${clp(h.precioAnterior)}</td>
+        <td style="text-align:right;font-family:var(--mono);font-weight:700">${clp(h.precioNuevo)}</td>
+        <td style="text-align:right"><span class="badge ${diff>0?'br':'bg'}">${diff>0?'+':''}${clp(diff)}</span></td>
+        <td class="fs12 text-gray">${fdate(h.fecha)} ${h.hora}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div>
+  ${hist.length>30?`<p class="fs12 text-gray mt2">Mostrando 30 de ${hist.length} cambios</p>`:''}`;
+}
+
+
+function renderAjCkList(cat){
+  const id=cat==='apertura'?'ajCkApList':'ajCkCiList';
+  const c=document.getElementById(id); if(!c)return;
+  c.innerHTML=S.ck[cat].map((it,i)=>`
+    <div class="mi">
+      <input class="inp" type="text" value="${it.text}" style="flex:1;margin-right:.5rem"
+        onchange="S.ck['${cat}'][${i}].text=this.value;save()"/>
+      <button class="btn btn-d sm" onclick="delCkItem('${cat}',${i})">✕</button>
+    </div>`).join('');
+}
+
+function addCkItem(cat){
+  const inputId=cat==='apertura'?'ajCkApNew':'ajCkCiNew';
+  const text=document.getElementById(inputId)?.value.trim();
+  if(!text){ toast('Ingresa el texto del ítem'); return; }
+  const newItem={ id:'u'+Date.now(), text, done:false };
+  if(cat==='cierre') newItem.photo=null;
+  S.ck[cat].push(newItem);
+  document.getElementById(inputId).value='';
+  renderAjCkList(cat); save(); toast('✅ Ítem agregado');
+}
+
+function delCkItem(cat,i){
+  S.ck[cat].splice(i,1);
+  renderAjCkList(cat); save(); toast('Ítem eliminado');
+}
+
+function saveClaves(){
+  const op=document.getElementById('ajOp').value.trim();
+  const adm=document.getElementById('ajAdm').value.trim();
+  if(op) S.claves.op=op;
+  if(adm) S.claves.adm=adm;
+  document.getElementById('ajOp').value=''; document.getElementById('ajAdm').value='';
+  save(); toast('✅ Claves actualizadas');
+}
+
+function saveSisLabels(){
+  S.sisLabels={
+    ef: document.getElementById('ajSisLblEf').value.trim()||'Efectivo',
+    tarj: document.getElementById('ajSisLblTarj').value.trim()||'Tarjetas / POS',
+    otros: document.getElementById('ajSisLblOtros').value.trim()||'Amipass, Edenred, etc.'
+  };
+  save(); refreshCiSisTotal(); toast('✅ Etiquetas actualizadas');
+}
+
+function renderPosTermList(){
+  const c=document.getElementById('posTermList'); if(!c)return;
+  c.innerHTML=S.pos.map(t=>`
+    <div class="mi">
+      <span class="fw6 fs14">💳 ${t.name}</span>
+      <button class="btn btn-d sm" onclick="deleteTerminal('${t.id}')">✕</button>
+    </div>`).join('');
+}
+function addTerminal(){
+  const n=document.getElementById('newTerm').value.trim(); if(!n){ toast('Ingresa el nombre'); return; }
+  S.pos.push({id:'t'+Date.now(),name:n}); document.getElementById('newTerm').value='';
+  renderPosTermList(); renderCiPosInputs(); save(); toast('Terminal agregada');
+}
+function deleteTerminal(id){
+  if(S.pos.length<=1){ toast('Mínimo 1 terminal'); return; }
+  S.pos=S.pos.filter(t=>t.id!==id); renderPosTermList(); renderCiPosInputs(); save(); toast('Terminal eliminada');
+}
+function saveTienda(){
+  if(!S.tienda) S.tienda={};
+  S.tienda.nombre=document.getElementById('ajNombre').value;
+  S.tienda.dir=document.getElementById('ajDir').value;
+  save(); toast('✅ Datos guardados');
+}
+
+
+/* ============ DASHBOARD ============ */
+let _dashPeriod='dia';
+function setDashPeriod(p,el){
+  _dashPeriod=p;
+  document.querySelectorAll('#dPeriodDia,#dPeriodSem,#dPeriodMes,#dPeriodAno').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  renderDash();
+}
+
+function getVentasForPeriod(period){
+  const now=new Date(); const t=today();
+  let ventas=S.ventas;
+  if(period==='dia') ventas=ventas.filter(v=>v.fecha===t);
+  else if(period==='semana'){
+    const d=new Date(now); d.setDate(d.getDate()-6);
+    const desde=d.toISOString().slice(0,10);
+    ventas=ventas.filter(v=>v.fecha>=desde&&v.fecha<=t);
+  } else if(period==='mes'){
+    const mes=t.slice(0,7);
+    ventas=ventas.filter(v=>v.fecha.slice(0,7)===mes);
+  } else if(period==='ano'){
+    const ano=t.slice(0,4);
+    ventas=ventas.filter(v=>v.fecha.slice(0,4)===ano);
+  }
+  return ventas;
+}
+
+function renderDash(){
+  const stats=document.getElementById('dashStats'); if(!stats)return;
+  const ventas=getVentasForPeriod(_dashPeriod);
+  const totalV=ventas.reduce((a,v)=>a+v.total,0);
+  const avgV=ventas.length?Math.round(totalV/ventas.length):0;
+  const stk=S.inventario.filter(i=>i.stock<=i.min&&i.min>0).length;
+  const retHoy=S.retiros.filter(r=>r.fecha===today()&&r.tipo==='retiro').reduce((a,r)=>a+r.monto,0);
+  const periodos={'dia':'Hoy','semana':'Esta semana','mes':'Este mes','ano':'Este año'};
+  const lbl=periodos[_dashPeriod];
+  document.getElementById('dPeriodLabel').textContent=`${ventas.length} días con ventas`;
+
+  stats.innerHTML=[
+    {l:`Ventas ${lbl}`,v:clp(totalV),sub:ventas.length?`${ventas.length} registros`:'-',col:'var(--a500)'},
+    {l:'Promedio diario',v:clp(avgV),sub:'del período seleccionado',col:'var(--b500)'},
+    {l:'Stock crítico',v:stk,sub:'productos bajo mínimo',col:stk?'var(--r500)':'var(--gr500)'},
+    {l:'Retiros hoy',v:clp(retHoy),sub:`${S.retiros.filter(r=>r.fecha===today()).length} movimientos`,col:'var(--g500)'},
+  ].map(x=>`<div class="sc">
+    <div class="lbl">${x.l}</div>
+    <div class="val" style="color:${x.col}">${x.v}</div>
+    <div class="sub">${x.sub}</div>
+  </div>`).join('');
+
+  // Ventas chart
+  renderDashChart(ventas);
+  // Composición
+  renderDashCompo(ventas);
+  // Cigarros faltantes
+  renderDashCigs();
+  // Stock crítico
+  renderDashStock();
+  // Timeline
+  renderDashTL();
+  // Best day of week
+  renderDashByDow();
+  // Movimientos
+  renderDashMovs();
+}
+
+function renderDashChart(ventas){
+  const c=document.getElementById('dashChart'); if(!c)return;
+  if(!ventas.length){ c.innerHTML='<p class="fs14 text-gray" style="padding:1rem">Sin datos en el período</p>'; return; }
+  const sorted=[...ventas].sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  const max=Math.max(...sorted.map(v=>v.total),1);
+  // Show up to last 14
+  const show=sorted.slice(-14);
+  c.innerHTML=`<div class="cbars" style="align-items:flex-end;gap:3px;height:160px;margin-top:.5rem">
+    ${show.map(v=>{
+      const h=Math.max(Math.round(v.total/max*140),4);
+      return`<div class="cbw" style="min-width:0">
+        <div class="cvl" style="font-size:.6rem">${v.total>=1000?Math.round(v.total/1000)+'k':v.total}</div>
+        <div class="cbar ${v.fecha===today()?'today':''}" style="height:${h}px" title="${v.fecha}: ${clp(v.total)}"></div>
+        <div class="cbl" style="font-size:.55rem">${v.fecha.slice(5)}</div>
+      </div>`;
+    }).join('')}
+  </div>
+  <div style="display:flex;justify-content:space-between;margin-top:.75rem;font-size:.75rem;color:var(--g400)">
+    <span>Total período: <strong style="color:var(--g800)">${clp(ventas.reduce((a,v)=>a+v.total,0))}</strong></span>
+    <span>Máx día: <strong style="color:var(--g800)">${clp(max)}</strong></span>
+  </div>`;
+}
+
+function renderDashCompo(ventas){
+  const c=document.getElementById('dashCompo'); if(!c)return;
+  if(!ventas.length){ c.innerHTML='<p class="fs14 text-gray" style="padding:1rem">Sin datos</p>'; return; }
+  const ef=ventas.reduce((a,v)=>a+(v.ef||0),0);
+  const pos=ventas.reduce((a,v)=>a+(v.pos||0),0);
+  const tr=ventas.reduce((a,v)=>a+(v.tr||0),0);
+  const total=ef+pos+tr||1;
+  const bars=[
+    {l:'Efectivo',v:ef,col:'var(--a500)'},
+    {l:'POS/Débito',v:pos,col:'var(--b500)'},
+    {l:'Transferencias',v:tr,col:'var(--gr500)'},
+  ];
+  c.innerHTML=bars.map(b=>{
+    const pct=Math.round(b.v/total*100);
+    return`<div style="margin-bottom:.875rem">
+      <div style="display:flex;justify-content:space-between;font-size:.8125rem;margin-bottom:.3rem">
+        <span style="font-weight:600;color:var(--g700)">${b.l}</span>
+        <span style="font-family:var(--mono);color:var(--g500)">${clp(b.v)} <span style="color:var(--g400)">(${pct}%)</span></span>
+      </div>
+      <div style="height:8px;background:var(--g100);border-radius:4px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${b.col};border-radius:4px;transition:width .5s"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderDashCigs(){
+  const c=document.getElementById('dashCigs'); if(!c)return;
+  const cigsAp=S.ap.cigarros||[];
+  const cigsCi=S.ci.cigarros||[];
+  // Merge: show all that have any data
+  const all=[...new Map([...cigsAp,...cigsCi].map(x=>[x.id,x])).values()];
+  if(!all.length){ c.innerHTML='<p class="fs13 text-gray">Sin datos de cigarros</p>'; return; }
+  c.innerHTML=`<table class="cig-table">
+    <thead><tr><th>Producto</th><th style="text-align:center">Apertura</th><th style="text-align:center">Cierre</th><th style="text-align:center">Dif.</th></tr></thead>
+    <tbody>${all.map(cg=>{
+      const ap=cigsAp.find(x=>x.id===cg.id);
+      const ci=cigsCi.find(x=>x.id===cg.id);
+      const stockAp=ap?.stock??'—';
+      const stockCi=ci?.stock??'—';
+      const diff=(ap?.stock!=null&&ci?.stock!=null)?ci.stock-ap.stock:null;
+      return`<tr>
+        <td class="fs13">${cg.nombre}</td>
+        <td style="text-align:center;font-family:var(--mono)">${stockAp}</td>
+        <td style="text-align:center;font-family:var(--mono)">${stockCi}</td>
+        <td style="text-align:center">${diff!==null?`<span class="badge ${diff<0?'br':diff>0?'bg':'ba'}">${diff>0?'+':''}${diff}</span>`:'—'}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
+function renderDashStock(){
+  const c=document.getElementById('dashStock'); if(!c)return;
+  const bajo=S.inventario.filter(i=>i.stock<=i.min&&i.min>0);
+  if(!bajo.length){ c.innerHTML='<p class="fs13 text-green">✓ Todo el stock sobre mínimo</p>'; return; }
+  c.innerHTML=`<table class="cig-table"><thead><tr><th>Producto</th><th style="text-align:center">Stock</th><th style="text-align:center">Mín.</th></tr></thead><tbody>
+    ${bajo.map(i=>`<tr>
+      <td class="fs13">${i.nombre}</td>
+      <td style="text-align:center"><span class="badge br">${i.stock}</span></td>
+      <td style="text-align:center;color:var(--g400);font-size:.8rem">${i.min}</td>
+    </tr>`).join('')}
+  </tbody></table>`;
+}
+
+function renderDashTL(){
+  const tl=document.getElementById('dashTL'); if(!tl)return;
+  const ev=[];
+  if(S.ap.saved) ev.push({t:'Apertura guardada',h:S.ap.hora,c:'g'});
+  S.retiros.filter(r=>r.fecha===today()).forEach(r=>ev.push({t:`${r.tipo==='retiro'?'Retiro':'Abono'}: ${clp(r.monto)}`,h:r.hora,c:r.tipo==='retiro'?'r':'g'}));
+  if(S.ci.saved) ev.push({t:'Cierre enviado',h:S.ci.hora,c:'g'});
+  tl.innerHTML=ev.length?ev.map(e=>`<div class="tli"><div class="tld ${e.c}"></div><div><div class="tlt">${e.t}</div><div class="tltime">${e.h}</div></div></div>`).join(''):'<p class="fs13 text-gray">Sin actividad registrada</p>';
+}
+
+function renderDashByDow(){
+  const c=document.getElementById('dashByDow'); if(!c)return;
+  const dias=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const sums=[0,0,0,0,0,0,0], counts=[0,0,0,0,0,0,0];
+  S.ventas.forEach(v=>{
+    const d=new Date(v.fecha+'T12:00').getDay();
+    sums[d]+=v.total; counts[d]++;
+  });
+  const avgs=sums.map((s,i)=>counts[i]?Math.round(s/counts[i]):0);
+  const max=Math.max(...avgs,1);
+  const bestDow=avgs.indexOf(Math.max(...avgs));
+  c.innerHTML=`<div style="font-size:.8125rem;color:var(--g500);margin-bottom:.75rem">Promedio de ventas por día de la semana</div>
+    <div style="display:flex;align-items:flex-end;gap:4px;height:80px;margin-bottom:.5rem">
+      ${avgs.map((a,i)=>{
+        const h=max?Math.round(a/max*72):4;
+        return`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+          <div style="width:100%;height:${Math.max(h,3)}px;background:${i===bestDow?'var(--a500)':'var(--a200)'};border-radius:3px 3px 0 0"></div>
+          <div style="font-size:.6rem;color:${i===bestDow?'var(--a700)':'var(--g400)'};font-weight:${i===bestDow?700:400}">${dias[i]}</div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="font-size:.8125rem"><span style="color:var(--g500)">Mejor día: </span><strong>${dias[bestDow]}</strong> — prom. ${clp(avgs[bestDow])}</div>`;
+}
+
+function renderDashMovs(){
+  const c=document.getElementById('dashMovs'); if(!c)return;
+  const ventas=getVentasForPeriod(_dashPeriod);
+  const fechas=new Set(ventas.map(v=>v.fecha));
+  const movs=S.retiros.filter(r=>fechas.has(r.fecha));
+  const totRet=movs.filter(r=>r.tipo==='retiro').reduce((a,r)=>a+r.monto,0);
+  const totAb=movs.filter(r=>r.tipo==='abono').reduce((a,r)=>a+r.monto,0);
+  c.innerHTML=`
+    <div class="ar"><span class="ar-l">Total retiros</span><span class="ar-v text-red">${clp(totRet)}</span></div>
+    <div class="ar"><span class="ar-l">Total abonos</span><span class="ar-v text-green">${clp(totAb)}</span></div>
+    <div class="ar tot"><span class="ar-l">Neto</span><span class="ar-v ${totAb-totRet>=0?'text-green':'text-red'}">${totAb-totRet>=0?'+':''}${clp(totAb-totRet)}</span></div>
+    <div style="margin-top:.75rem;font-size:.75rem;color:var(--g400)">${movs.length} movimientos en el período</div>
+  `;
+}
+
+/* ============ ADMIN CHECKLISTS ============ */
+function renderAdCk(){
+  const c=document.getElementById('adCkSum'); if(!c)return;
+  const cats=[{name:'Apertura',items:S.ck.apertura},{name:'Cierre',items:S.ck.cierre}];
+  c.innerHTML=cats.map(cat=>{
+    const done=cat.items.filter(i=>i.done||(i.photo&&i.photo!==null)).length;
+    const pct=cat.items.length?Math.round(done/cat.items.length*100):0;
+    return`<div class="card mb4">
+      <div class="flex jcb aic mb2"><span class="fw6">${cat.name}</span><span class="badge ${pct===100?'bg':'ba'}">${pct}% completado</span></div>
+      <div class="pb" style="height:8px"><div class="pf" style="width:${pct}%"></div></div>
+      <div style="margin-top:.75rem;display:flex;flex-direction:column;gap:.375rem">
+        ${cat.items.map(it=>{
+          const ok=it.done||(it.photo&&it.photo!==null);
+          return`<div style="display:flex;align-items:center;gap:.5rem;font-size:.875rem;color:${ok?'var(--g400)':'var(--g700)'}">
+            <span style="color:${ok?'var(--gr500)':'var(--g300)'}">${ok?'●':'○'}</span>
+            <span style="${ok?'text-decoration:line-through':''}">${it.text}</span>
+            ${it.photo?`<span class="badge bg fs12">📷</span>`:''}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ============ HISTORIAL TURNOS ============ */
+function renderHistorial(){
+  const c=document.getElementById('histList'); if(!c)return;
+  if(!S.turnos?.length){ c.innerHTML='<div class="card"><p class="fs14 text-gray">Sin turnos registrados aún. Los turnos se guardan al hacer clic en "Enviar Cierre".</p></div>'; return; }
+
+  // Populate mes filter
+  const selMes=document.getElementById('histFiltroMes');
+  if(selMes){
+    const meses=[...new Set(S.turnos.map(t=>t.fecha.slice(0,7)))].sort().reverse();
+    const curMes=selMes.value;
+    selMes.innerHTML='<option value="">Todos los meses</option>'+meses.map(m=>`<option value="${m}" ${m===curMes?'selected':''}>${m}</option>`).join('');
+  }
+
+  // Populate sucursal filter
+  const selSuc=document.getElementById('histFiltroSuc');
+  if(selSuc){
+    const sucs=[...new Set(S.turnos.map(t=>t.sucursal).filter(Boolean))].sort();
+    const curSuc=selSuc.value;
+    selSuc.innerHTML='<option value="">Todas las sucursales</option>'+sucs.map(s=>`<option value="${s}" ${s===curSuc?'selected':''}>${s}</option>`).join('');
+  }
+
+  // Apply filters
+  let turnos=[...S.turnos];
+  const mes=selMes?.value;
+  const suc=selSuc?.value;
+  const turnoF=document.getElementById('histFiltroTurno')?.value;
+  if(mes) turnos=turnos.filter(t=>t.fecha.slice(0,7)===mes);
+  if(suc) turnos=turnos.filter(t=>t.sucursal===suc);
+  if(turnoF) turnos=turnos.filter(t=>t.turno===turnoF);
+
+  if(!turnos.length){ c.innerHTML='<div class="card"><p class="fs14 text-gray">Sin turnos para los filtros seleccionados.</p></div>'; return; }
+
+  const turnoEmoji={'mañana':'☀️','tarde':'🌤','noche':'🌙'};
+  c.innerHTML=turnos.map(t=>{
+    const diffOk=t.diffEf===0&&t.diffSis===0;
+    return`<div class="card mb4" style="border-left:4px solid ${diffOk?'var(--gr500)':'var(--r500)'}">
+      <div class="flex jcb aic mb2">
+        <div>
+          <span class="fw7 fs15">${fdate(t.fecha)}</span>
+          <span class="badge ba" style="margin-left:.5rem">${turnoEmoji[t.turno]||''} ${t.turno||'—'}</span>
+          <span class="fs13 text-gray" style="margin-left:.5rem">${t.horaAp||'—'} → ${t.horaCi||'—'}</span>
+        </div>
+        <div style="display:flex;gap:.5rem;align-items:center">
+          <span class="badge ${diffOk?'bg':'br'}">${diffOk?'✓ Cuadra':'⚠ Dif.'}</span>
+          <button class="btn btn-s sm" onclick="verTurno('${t.id}')">Ver detalle</button>
+        </div>
+      </div>
+      <div class="g4" style="gap:.5rem">
+        <div><div class="fs12 text-gray">Efectivo cierre</div><div class="fw7 mono">${clp(t.efCi)}</div></div>
+        <div><div class="fs12 text-gray">POS total</div><div class="fw7 mono">${clp(t.posTotal)}</div></div>
+        <div><div class="fs12 text-gray">Dif. efectivo</div><div class="fw7 mono ${t.diffEf===0?'text-green':t.diffEf>0?'text-amber':'text-red'}">${t.diffEf>=0?'+':''}${clp(t.diffEf)}</div></div>
+        <div><div class="fs12 text-gray">Dif. sistema</div><div class="fw7 mono ${t.diffSis===0?'text-green':t.diffSis>0?'text-amber':'text-red'}">${t.diffSis>=0?'+':''}${clp(t.diffSis)}</div></div>
+      </div>
+      <div class="fs12 text-gray mt2">
+        📍 ${t.sucursal||'—'} · 👤 ${t.operador}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+let _modalTurnoId=null;
+function verTurno(id){
+  const t=S.turnos.find(x=>x.id===id); if(!t)return;
+  _modalTurnoId=id;
+  document.getElementById('histModalTitle').textContent=`Turno ${fdate(t.fecha)}`;
+  document.getElementById('histModalBody').innerHTML=buildTurnoHTML(t);
+  document.getElementById('histModal').classList.remove('hidden');
+}
+function enviarTurnoDesdeModal(){
+  const t=S.turnos.find(x=>x.id===_modalTurnoId); if(!t)return;
+  const body=buildTurnoText(t);
+  const email=S.repEmail||'';
+  const sub=encodeURIComponent(`Reporte Turno ${t.fecha} — ${S.tienda?.nombre||'Kombi Store'}`);
+  window.location.href=`mailto:${email}?subject=${sub}&body=${encodeURIComponent(body)}`;
+}
+function buildTurnoHTML(t){
+  const posRows=(t.pos||[]).map(p=>`
+    <div class="ar"><span class="ar-l">💳 ${p.name}</span>
+      <span class="ar-v" style="display:flex;gap:.5rem">
+        <span class="mono">${clp(p.ci)}</span>
+        ${p.ap!==p.ci?`<span class="badge ${p.ci>p.ap?'bg':'br'}">${p.ci>p.ap?'+':''}${clp(p.ci-p.ap)}</span>`:''}
+      </span>
+    </div>`).join('');
+  const sec=l=>`<div style="font-size:.75rem;font-weight:700;color:var(--g400);text-transform:uppercase;letter-spacing:.06em;padding:.5rem 1rem .25rem">${l}</div>`;
+  return sec('Efectivo')+
+    `<div class="ar"><span class="ar-l">Apertura</span><span class="ar-v mono">${clp(t.efAp)}</span></div>`+
+    `<div class="ar"><span class="ar-l">Cierre</span><span class="ar-v mono">${clp(t.efCi)}</span></div>`+
+    `<div class="ar"><span class="ar-l">Retiros turno</span><span class="ar-v mono text-red">-${clp(t.retiros)}</span></div>`+
+    `<div class="ar"><span class="ar-l">Abonos turno</span><span class="ar-v mono text-green">+${clp(t.abonos)}</span></div>`+
+    `<div class="ar"><span class="ar-l">Saldo esperado</span><span class="ar-v mono">${clp(t.saldoEsp)}</span></div>`+
+    `<div class="ar ${t.diffEf===0?'tot':t.diffEf>0?'dp':'dn'}"><span class="ar-l">Diferencia efectivo</span><span class="ar-v">${t.diffEf>=0?'+':''}${clp(t.diffEf)}</span></div>`+
+    `<div class="div"></div>`+sec('POS / Transferencias')+posRows+
+    `<div class="ar"><span class="ar-l">Transferencias</span><span class="ar-v mono">${clp(t.transf)}</span></div>`+
+    `<div class="ar tot"><span class="ar-l">Total contado</span><span class="ar-v">${clp(t.totalReal)}</span></div>`+
+    `<div class="div"></div>`+sec('Sistema')+
+    `<div class="ar"><span class="ar-l">Total sistema</span><span class="ar-v mono">${clp(t.sisTotal)}</span></div>`+
+    `<div class="ar ${t.diffSis===0?'tot':t.diffSis>0?'dp':'dn'}"><span class="ar-l">Diferencia vs Sistema</span><span class="ar-v">${t.diffSis>=0?'+':''}${clp(t.diffSis)}</span></div>`;
+}
+function buildTurnoText(t){
+  const tienda=S.tienda?.nombre||'Kombi Store';
+  const lines=[
+    `=== REPORTE DE TURNO — ${tienda} ===`,
+    `Fecha: ${fdate(t.fecha)} | Apertura: ${t.horaAp} | Cierre: ${t.horaCi}`,
+    `Operador: ${t.operador}`,``,
+    `--- EFECTIVO ---`,
+    `Apertura:        ${clp(t.efAp)}`,
+    `Cierre:          ${clp(t.efCi)}`,
+    `Retiros:         -${clp(t.retiros)}`,
+    `Abonos:          +${clp(t.abonos)}`,
+    `Saldo esperado:  ${clp(t.saldoEsp)}`,
+    `DIFERENCIA:      ${t.diffEf>=0?'+':''}${clp(t.diffEf)} ${t.diffEf===0?'✓':'⚠'}`,``,
+    `--- POS / TOTAL ---`,
+    ...(t.pos||[]).map(p=>`${p.name.padEnd(16)}${clp(p.ci)}`),
+    `Transferencias:  ${clp(t.transf)}`,
+    `Total contado:   ${clp(t.totalReal)}`,``,
+    `--- SISTEMA ---`,
+    `Total sistema:   ${clp(t.sisTotal)}`,
+    `Dif. vs sistema: ${t.diffSis>=0?'+':''}${clp(t.diffSis)} ${t.diffSis===0?'✓':'⚠'}`,
+  ];
+  if(t.cigarrosCi?.length){
+    lines.push(``,`--- STOCK CIGARROS ---`);
+    t.cigarrosCi.forEach(c=>{
+      const ap=t.cigarrosAp?.find(x=>x.id===c.id);
+      const diff=ap?(c.stock-ap.stock):null;
+      lines.push(`${c.nombre.padEnd(24)}${c.stock} unid.${diff!=null?` (${diff>=0?'+':''}${diff})`:''}`)
+    });
+  }
+  return lines.join('\n');
+}
+function exportHistorialCSV(){
+  if(!S.turnos?.length){ toast('Sin turnos para exportar'); return; }
+  let csv='Fecha,Operador,Ef.Apertura,Ef.Cierre,Retiros,Abonos,Saldo Esp.,Dif.Ef.,Total POS,Transf.,Total,Sis.Total,Dif.Sis.\n';
+  S.turnos.forEach(t=>{
+    csv+=`${t.fecha},"${t.operador}",${t.efAp},${t.efCi},${t.retiros},${t.abonos},${t.saldoEsp},${t.diffEf},${t.posTotal},${t.transf},${t.totalReal},${t.sisTotal},${t.diffSis}\n`;
+  });
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='historial-turnos.csv'; a.click();
+  toast('CSV descargado');
+}
+
+/* ============ REPORTES ============ */
+function saveRepEmail(){
+  S.repEmail=document.getElementById('repEmail')?.value.trim()||'';
+  save(); toast('✅ Correo guardado');
+}
+function saveGasUrl(){
+  const url=document.getElementById('gasUrlInput')?.value.trim();
+  if(!url||!url.startsWith('https://')){ toast('URL inválida'); return; }
+  S.gasUrl=url; save();
+  setGasStatus('✅ URL guardada. Haz clic en "Probar conexión".','var(--gr600)');
+}
+async function testGasUrl(){
+  const url=S.gasUrl||document.getElementById('gasUrlInput')?.value.trim();
+  if(!url){ toast('Primero guarda la URL'); return; }
+  setGasStatus('🔄 Probando…','var(--g500)');
+  try{
+    // no-cors porque GAS no permite CORS desde HTML local
+    await fetch(url,{method:'GET',mode:'no-cors'});
+    setGasStatus('✅ URL alcanzable. Envía un reporte de prueba para confirmar que llega.','var(--gr600)');
+  }catch(e){
+    setGasStatus('❌ No se pudo alcanzar la URL. Verifica que esté publicada y autorizada.','var(--r600)');
+  }
+}
+function setGasStatus(msg,color){
+  const el=document.getElementById('gasStatus');
+  if(el){ el.textContent=msg; el.style.color=color; }
+}
+function generarReporteDiario(){
+  const fecha=document.getElementById('repFecha').value||today();
+  const turno=S.turnos.find(t=>t.fecha===fecha);
+  const venta=S.ventas.find(v=>v.fecha===fecha);
+  const c=document.getElementById('repPreview');
+  if(!c)return;
+  c.classList.remove('hidden');
+  if(!turno&&!venta){ c.innerHTML=`<div class="card"><p class="fs14 text-gray">Sin datos para ${fdate(fecha)}</p></div>`; return; }
+  const tienda=S.tienda?.nombre||'Kombi Store';
+  let html=`<div class="card" style="font-family:var(--mono);font-size:.8125rem;white-space:pre-wrap;line-height:1.7;background:var(--g50)">`;
+  html+=`<strong>${tienda} — Reporte ${fdate(fecha)}</strong>\n\n`;
+  if(venta){
+    html+=`VENTAS DEL DÍA\n`;
+    html+=`  Efectivo:       ${clp(venta.ef)}\n`;
+    html+=`  POS:            ${clp(venta.pos)}\n`;
+    html+=`  Transferencias: ${clp(venta.tr)}\n`;
+    html+=`  TOTAL:          ${clp(venta.total)}\n\n`;
+  }
+  if(turno){
+    html+=`CAJA\n`;
+    html+=`  Ef. apertura:   ${clp(turno.efAp)}\n`;
+    html+=`  Ef. cierre:     ${clp(turno.efCi)}\n`;
+    html+=`  Retiros:       -${clp(turno.retiros)}\n`;
+    html+=`  Abonos:        +${clp(turno.abonos)}\n`;
+    html+=`  Dif. efectivo:  ${turno.diffEf>=0?'+':''}${clp(turno.diffEf)} ${turno.diffEf===0?'✓ CUADRA':'⚠ DIFERENCIA'}\n`;
+    html+=`  Dif. sistema:   ${turno.diffSis>=0?'+':''}${clp(turno.diffSis)} ${turno.diffSis===0?'✓ CUADRA':'⚠ DIFERENCIA'}\n\n`;
+    if(turno.cigarrosCi?.length){
+      html+=`STOCK CIGARROS AL CIERRE\n`;
+      turno.cigarrosCi.forEach(c=>{
+        const ap=turno.cigarrosAp?.find(x=>x.id===c.id);
+        const diff=ap!=null?(c.stock-ap.stock):null;
+        html+=`  ${c.nombre.padEnd(26)}${String(c.stock).padStart(3)} u${diff!=null?`  (${diff>=0?'+':''}${diff})`:'    '}\n`;
+      });
+    }
+  }
+  // Stock crítico
+  const bajo=S.inventario.filter(i=>i.stock<=i.min&&i.min>0);
+  if(bajo.length){
+    html+=`\nSTOCK CRÍTICO (bajo mínimo)\n`;
+    bajo.forEach(i=>{ html+=`  ${i.nombre.padEnd(26)}${i.stock} / ${i.min} mín.\n`; });
+  }
+  html+=`\nGenerado: ${new Date().toLocaleString('es-CL')}`;
+  html+=`</div>`;
+  c.innerHTML=html;
+}
+function enviarReporteDiario(){
+  generarReporteDiario();
+  const fecha=document.getElementById('repFecha').value||today();
+  const turno=S.turnos.find(t=>t.fecha===fecha);
+  const venta=S.ventas.find(v=>v.fecha===fecha);
+  const tienda=S.tienda?.nombre||'Kombi Store';
+  const lines=[`Reporte Diario — ${tienda}`,`Fecha: ${fdate(fecha)}`,``];
+  if(venta){ lines.push('VENTAS',`  Efectivo: ${clp(venta.ef)}`,`  POS: ${clp(venta.pos)}`,`  Transfer.: ${clp(venta.tr)}`,`  TOTAL: ${clp(venta.total)}`,``); }
+  if(turno){ lines.push('CAJA',`  Dif. efectivo: ${turno.diffEf>=0?'+':''}${clp(turno.diffEf)} ${turno.diffEf===0?'✓':'⚠'}`,`  Dif. sistema: ${turno.diffSis>=0?'+':''}${clp(turno.diffSis)} ${turno.diffSis===0?'✓':'⚠'}`,``); }
+  const bajo=S.inventario.filter(i=>i.stock<=i.min&&i.min>0);
+  if(bajo.length){ lines.push('STOCK CRÍTICO',...bajo.map(i=>`  ${i.nombre}: ${i.stock}/${i.min}`)); }
+  abrirEmail(`Reporte ${tienda} — ${fecha}`, lines.join('\n'));
+}
+function generarReporteInv(){
+  const c=document.getElementById('repInvPreview'); if(!c)return;
+  c.classList.remove('hidden');
+  const cats=[...new Set(S.inventario.map(i=>i.cat))];
+  let html=`<div class="card" style="font-family:var(--mono);font-size:.8125rem;white-space:pre-wrap;line-height:1.7;background:var(--g50)">`;
+  html+=`<strong>${S.tienda?.nombre||'Kombi Store'} — Inventario ${new Date().toLocaleDateString('es-CL')}</strong>\n\n`;
+  cats.forEach(cat=>{
+    const items=S.inventario.filter(i=>i.cat===cat);
+    html+=`${cat.toUpperCase()}\n`;
+    items.forEach(i=>{
+      const alert=i.stock<=i.min&&i.min>0?' ⚠':'';
+      html+=`  ${i.nombre.padEnd(28)}${String(i.stock).padStart(4)} u  ${clp(i.precio)}${alert}\n`;
+    });
+    html+=`\n`;
+  });
+  html+=`Total productos: ${S.inventario.length} | Bajo mínimo: ${S.inventario.filter(i=>i.stock<=i.min&&i.min>0).length}`;
+  html+=`</div>`;
+  c.innerHTML=html;
+}
+function enviarReporteInv(){
+  generarReporteInv();
+  const tienda=S.tienda?.nombre||'Kombi Store';
+  const cats=[...new Set(S.inventario.map(i=>i.cat))];
+  const lines=[`Inventario — ${tienda}`,`Fecha: ${new Date().toLocaleDateString('es-CL')}`,``];
+  cats.forEach(cat=>{
+    lines.push(cat.toUpperCase());
+    S.inventario.filter(i=>i.cat===cat).forEach(i=>{ lines.push(`  ${i.nombre}: ${i.stock} u ${i.stock<=i.min&&i.min>0?'⚠ BAJO MÍNIMO':''}`); });
+    lines.push('');
+  });
+  abrirEmail(`Inventario ${tienda} — ${new Date().toLocaleDateString('es-CL')}`, lines.join('\n'));
+}
+/* ============ EMAIL VIA GOOGLE APPS SCRIPT ============ */
+const GAS_URL_KEY = 'kombi_gas_url';
+
+function getGasUrl(){ return S.gasUrl||localStorage.getItem(GAS_URL_KEY)||''; }
+
+async function enviarEmail(asunto, cuerpoTexto, htmlBody, tipo='general'){
+  const url=getGasUrl();
+  if(!url){
+    toast('⚠ Configura la URL del script en Reportes');
+    return false;
+  }
+  try{
+    toast('📤 Enviando correo…',6000);
+    // GAS bloquea CORS desde HTML local → usamos form submit en iframe oculto
+    let iframe=document.getElementById('gas_iframe');
+    if(!iframe){
+      iframe=document.createElement('iframe');
+      iframe.name='gas_iframe';
+      iframe.id='gas_iframe';
+      iframe.style.display='none';
+      document.body.appendChild(iframe);
+    }
+    const form=document.createElement('form');
+    form.method='POST';
+    form.action=url;
+    form.target='gas_iframe';
+    form.style.display='none';
+    // GAS lee e.parameter, no e.postData con form submit
+    const fields={asunto,cuerpo:cuerpoTexto,html:htmlBody,tipo};
+    Object.entries(fields).forEach(([k,v])=>{
+      const inp=document.createElement('input');
+      inp.type='hidden'; inp.name=k; inp.value=v;
+      form.appendChild(inp);
+    });
+    document.body.appendChild(form);
+    form.submit();
+    form.remove();
+    setTimeout(()=>toast('✅ Correo enviado a appkombi@gmail.com',4000),1500);
+    return true;
+  } catch(err){
+    toast('❌ Error al enviar: '+err.message,5000);
+    return false;
+  }
+}
+
+function buildHTMLTable(rows){
+  return `<table style="width:100%;border-collapse:collapse;font-size:13px;margin:8px 0">
+    ${rows.map((r,i)=>r.header
+      ? `<tr style="background:#F9FAFB"><td colspan="2" style="padding:10px 12px;font-weight:800;font-size:11px;color:#6B7280;text-transform:uppercase;letter-spacing:.06em;border-bottom:2px solid #F59E0B">${r.header}</td></tr>`
+      : `<tr style="border-bottom:1px solid #F3F4F6${r.total?';background:#FFFBEB;font-weight:700':''}">
+          <td style="padding:8px 12px;color:${r.total?'#92400E':'#6B7280'}">${r.label}</td>
+          <td style="padding:8px 12px;text-align:right;font-family:monospace;color:${r.neg?'#DC2626':r.pos?'#16A34A':r.total?'#B45309':'#111827'};font-weight:${r.total?700:500}">${r.value}</td>
+        </tr>`
+    ).join('')}
+  </table>`;
+}
+
+function abrirEmail(asunto, cuerpo){ /* legacy fallback - replaced by enviarEmail */ }
+
+/* Override report send functions to use GAS */
+async function enviarReporteDiario(){
+  generarReporteDiario();
+  const fecha=document.getElementById('repFecha').value||today();
+  const turno=S.turnos.find(t=>t.fecha===fecha);
+  const venta=S.ventas.find(v=>v.fecha===fecha);
+  const tienda=S.tienda?.nombre||'Kombi Store';
+  const asunto=`Reporte Diario — ${tienda} — ${fdate(fecha)}`;
+
+  const rows=[];
+  if(venta){
+    rows.push({header:'VENTAS DEL DÍA'});
+    rows.push({label:'Efectivo',value:clp(venta.ef)});
+    rows.push({label:'POS / Débito',value:clp(venta.pos)});
+    rows.push({label:'Transferencias',value:clp(venta.tr)});
+    rows.push({label:'TOTAL',value:clp(venta.total),total:true});
+  }
+  if(turno){
+    rows.push({header:'CAJA'});
+    rows.push({label:'Efectivo apertura',value:clp(turno.efAp)});
+    rows.push({label:'Efectivo cierre',value:clp(turno.efCi)});
+    rows.push({label:'Retiros',value:'-'+clp(turno.retiros),neg:true});
+    rows.push({label:'Abonos',value:'+'+clp(turno.abonos),pos:true});
+    rows.push({label:'Diferencia efectivo',value:(turno.diffEf>=0?'+':'')+clp(turno.diffEf),neg:turno.diffEf<0,pos:turno.diffEf>0,total:true});
+    rows.push({label:'Diferencia vs Sistema',value:(turno.diffSis>=0?'+':'')+clp(turno.diffSis),neg:turno.diffSis<0,pos:turno.diffSis>0,total:true});
+  }
+  const bajo=S.inventario.filter(i=>i.stock<=i.min&&i.min>0);
+  if(bajo.length){
+    rows.push({header:`⚠ STOCK CRÍTICO (${bajo.length} productos)`});
+    bajo.forEach(i=>rows.push({label:i.nombre,value:`${i.stock} / ${i.min} mín.`,neg:true}));
+  }
+
+  const html=buildHTMLTable(rows);
+  const texto=`Reporte diario ${fdate(fecha)}\nTotal ventas: ${clp(venta?.total||0)}\nDif. efectivo: ${clp(turno?.diffEf||0)}`;
+  await enviarEmail(asunto, texto, html, 'diario');
+}
+
+async function enviarReporteInv(){
+  generarReporteInv();
+  const tienda=S.tienda?.nombre||'Kombi Store';
+  const asunto=`Inventario — ${tienda} — ${new Date().toLocaleDateString('es-CL')}`;
+  const cats=[...new Set(S.inventario.map(i=>i.cat))];
+  const rows=[];
+  cats.forEach(cat=>{
+    rows.push({header:cat.toUpperCase()});
+    S.inventario.filter(i=>i.cat===cat).forEach(i=>{
+      const bajo=i.stock<=i.min&&i.min>0;
+      rows.push({label:`${i.nombre}${bajo?' ⚠':''}`,value:`${i.stock} u — ${clp(i.precio)}`,neg:bajo});
+    });
+  });
+  const bajo=S.inventario.filter(i=>i.stock<=i.min&&i.min>0).length;
+  const html=buildHTMLTable(rows)+`<p style="margin-top:12px;font-size:12px;color:#6B7280">Total: ${S.inventario.length} productos · ${bajo} bajo mínimo</p>`;
+  const texto=`Inventario ${new Date().toLocaleDateString('es-CL')}\n${S.inventario.length} productos, ${bajo} bajo mínimo`;
+  await enviarEmail(asunto, texto, html, 'inventario');
+}
+
+async function enviarTurnoDesdeModal(){
+  const t=S.turnos.find(x=>x.id===_modalTurnoId); if(!t)return;
+  const tienda=S.tienda?.nombre||'Kombi Store';
+  const turnoEmoji={'mañana':'☀️','tarde':'🌤','noche':'🌙'};
+  const asunto=`Cierre ${turnoEmoji[t.turno]||''} ${t.turno||''} — ${tienda} — ${fdate(t.fecha)}`;
+  const rows=[
+    {header:'EFECTIVO'},
+    {label:'Apertura',value:clp(t.efAp)},
+    {label:'Cierre',value:clp(t.efCi)},
+    {label:'Retiros',value:'-'+clp(t.retiros),neg:true},
+    {label:'Abonos',value:'+'+clp(t.abonos),pos:true},
+    {label:'Saldo esperado',value:clp(t.saldoEsp)},
+    {label:'Diferencia efectivo',value:(t.diffEf>=0?'+':'')+clp(t.diffEf),neg:t.diffEf<0,pos:t.diffEf>0,total:true},
+    {header:'POS / TRANSFERENCIAS'},
+    ...(t.pos||[]).map(p=>({label:p.name,value:clp(p.ci)})),
+    {label:'Transferencias',value:clp(t.transf)},
+    {label:'Total contado',value:clp(t.totalReal),total:true},
+    {header:'SISTEMA'},
+    {label:'Total sistema',value:clp(t.sisTotal)},
+    {label:'Diferencia vs sistema',value:(t.diffSis>=0?'+':'')+clp(t.diffSis),neg:t.diffSis<0,pos:t.diffSis>0,total:true},
+  ];
+  if(t.cigarrosCi?.length){
+    rows.push({header:'STOCK CIGARROS AL CIERRE'});
+    t.cigarrosCi.forEach(c=>{
+      const ap=t.cigarrosAp?.find(x=>x.id===c.id);
+      const diff=ap!=null?(c.stock-ap.stock):null;
+      rows.push({label:c.nombre,value:`${c.stock} u${diff!=null?` (${diff>=0?'+':''}${diff})`:''}`,neg:diff<0,pos:diff>0});
+    });
+  }
+  const info=`<p style="font-size:12px;color:#6B7280;margin-bottom:16px">📍 ${t.sucursal||'—'} · 👤 ${t.operador} · ${t.horaAp||'—'} → ${t.horaCi||'—'}</p>`;
+  const html=info+buildHTMLTable(rows);
+  const tipo=t.diffEf!==0||t.diffSis!==0?'diferencia':'cierre';
+  await enviarEmail(asunto, buildTurnoText(t), html, tipo);
+}
+
+/* ============ SUCURSALES ============ */
+function renderAjSucList(){
+  const c=document.getElementById('ajSucList'); if(!c)return;
+  const sucs=S.sucursales||[];
+  if(!sucs.length){ c.innerHTML='<p class="fs13 text-gray">Sin sucursales configuradas</p>'; return; }
+  c.innerHTML=sucs.map((s,i)=>`
+    <div class="mi">
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:.5rem">
+          <input class="inp" type="text" value="${s.nombre}"
+            style="font-weight:600;flex:1"
+            onchange="S.sucursales[${i}].nombre=this.value;save();populateSucursalSelector()"/>
+          ${s.id===S.sucursalActiva?`<span class="badge bg" style="flex-shrink:0">Activa</span>`:''}
+        </div>
+        <input class="inp" type="text" value="${s.dir||''}" placeholder="Dirección (opcional)"
+          style="margin-top:.375rem;font-size:.8125rem"
+          onchange="S.sucursales[${i}].dir=this.value;save()"/>
+      </div>
+      <button class="btn btn-d sm" style="margin-left:.75rem;flex-shrink:0;align-self:center"
+        onclick="delSucursal('${s.id}')"
+        ${sucs.length<=1?'disabled':''}>✕</button>
+    </div>`).join('');
+}
+function addSucursal(){
+  const nombre=document.getElementById('ajSucNombre')?.value.trim();
+  if(!nombre){ toast('Ingresa el nombre de la sucursal'); return; }
+  const dir=document.getElementById('ajSucDir')?.value.trim()||'';
+  if(!S.sucursales) S.sucursales=[];
+  S.sucursales.push({id:'s'+Date.now(),nombre,dir});
+  document.getElementById('ajSucNombre').value='';
+  document.getElementById('ajSucDir').value='';
+  renderAjSucList(); populateSucursalSelector(); save();
+  toast('✅ Sucursal agregada');
+}
+function delSucursal(id){
+  if((S.sucursales||[]).length<=1){ toast('Debe haber al menos 1 sucursal'); return; }
+  if(id===S.sucursalActiva){ toast('No puedes eliminar la sucursal activa'); return; }
+  S.sucursales=S.sucursales.filter(s=>s.id!==id);
+  renderAjSucList(); populateSucursalSelector(); save();
+  toast('Sucursal eliminada');
+}
+
+/* ============ BOOT ============ */
+document.addEventListener('DOMContentLoaded',()=>{
+  load();
+  populateSucursalSelector();
+  if(typeof lucide!=='undefined') lucide.createIcons();
+  else{
+    const s=document.querySelector('script[src*="lucide"]');
+    if(s) s.addEventListener('load',()=>lucide.createIcons());
+  }
+});
+</script>
+<script src="https://unpkg.com/lucide@0.383.0/dist/umd/lucide.min.js" defer></script>
+</body>
+</html>
