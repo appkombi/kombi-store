@@ -185,6 +185,7 @@ tr:hover td{background:var(--g50)}
 .rep-tab{padding:.5rem 1rem;border:none;background:none;font-size:.875rem;font-weight:500;color:var(--g500);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s}
 .rep-tab:hover{color:var(--g900)}
 .rep-tab.active{color:var(--a600);border-bottom-color:var(--a500);font-weight:700}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
 .cbars{display:flex;align-items:flex-end;gap:4px;height:160px}
 .cbw{display:flex;flex-direction:column;align-items:center;flex:1;gap:4px}
 .cbar{width:100%;background:var(--a200);border-radius:4px 4px 0 0;min-height:4px;transition:height .5s}
@@ -436,7 +437,10 @@ tr:hover td{background:var(--g50)}
             <div class="wnav"><button class="btn btn-s" onclick="ciGoTo(4)">← Atrás</button><button class="btn btn-p" onclick="ciGoTo(6)">Siguiente →</button></div>
           </div>
           <div class="wp" id="ciP6">
-            <div class="card"><div class="ct" id="ciResumenTitle">📊 Resumen</div><div id="ciResumen"></div></div>
+            <div class="card"><div class="ct" id="ciResumenTitle">📊 Resumen</div><div id="ciResumen"></div>
+              <div class="div"></div>
+              <div class="fld"><label class="lbl">💬 Comentario del turno (opcional)</label><textarea class="inp" id="ciComentario" rows="2" placeholder="Ej: Falta de cambio, problema con POS, observación importante…" style="resize:vertical"></textarea></div>
+            </div>
             <div class="wnav"><button class="btn btn-s" onclick="ciGoTo(5)">← Atrás</button><button class="btn btn-p" onclick="ciGoTo(7)">Siguiente →</button></div>
           </div>
           <div class="wp" id="ciP7">
@@ -448,6 +452,19 @@ tr:hover td{background:var(--g50)}
 
       <div class="section" id="ad-dash">
         <div class="ph"><h2>Dashboard</h2><p>Análisis operativo</p></div>
+
+        <!-- PANEL OPERATIVO EN VIVO (gerente/superadmin) -->
+        <div id="panelOperativo" class="hidden" style="margin-bottom:1.25rem">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.625rem">
+            <div class="fw6 fs14">🟢 Estado en vivo de sucursales</div>
+            <div class="fs12 text-gray" id="panelUltActz">Actualizando…</div>
+          </div>
+          <div id="panelSucursales" class="g3"></div>
+        </div>
+
+        <!-- NOTIFICACIONES -->
+        <div id="notifBanner" style="margin-bottom:1rem"></div>
+
         <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem">
           <button class="marca-tag active" onclick="setDashPeriod('dia',this)">Día</button>
           <button class="marca-tag" onclick="setDashPeriod('semana',this)">Semana</button>
@@ -899,7 +916,7 @@ async function confirmarSucursal(){
   document.getElementById('loginScreen').style.display='none';
   await showApp();
 }
-async function logout(){await auditLog('logout');await auth.signOut();}
+async function logout(){stopRealTimeListeners();await auditLog('logout');await auth.signOut();}
 
 async function loadConfig(){
   try{
@@ -945,6 +962,8 @@ async function showApp(){
   if(CFG.gasUrl){const gi=document.getElementById('gasUrlInput');if(gi)gi.value=CFG.gasUrl;}
   if(isOp)showSec('op-ap',document.querySelector('#opNav .ni'));
   else showSec('ad-dash',document.querySelector('#adNav .ni'));
+  // Start real-time listeners for admins
+  startRealTimeListeners();
   if(CU.mustChangePassword){
     setTimeout(()=>{
       toast('⚠️ Tu contraseña fue reiniciada. Por favor cámbiala.',5000);
@@ -1105,7 +1124,18 @@ function renderCiCheckFotos(){
   c.innerHTML=CK_CIERRE.map((it,i)=>`<div style="margin-bottom:1.25rem;padding-bottom:1.25rem;border-bottom:1px solid var(--g100)"><div class="flex aic gap2 mb2"><div class="cb ${it.photo?'done':''}">${it.photo?'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg>':''}</div><span class="fw6">${it.text}</span></div><div class="photo-slot ${it.photo?'has-photo':''}" onclick="document.getElementById('ph${i}').click()"><input type="file" id="ph${i}" accept="image/*" capture="environment" onchange="uploadCiPhoto('${it.id}',this,${i})"/>${it.photo?`<img src="${it.photo}"/><div class="fs12" style="color:var(--gr600);margin-top:.375rem">✓ Foto subida</div>`:'<div style="font-size:2rem;margin-bottom:.375rem">📷</div><div class="fs13 text-gray">Toca para foto</div>'}</div></div>`).join('');
   checkCierreReady();
 }
-function uploadCiPhoto(id,input,idx){const file=input.files[0];if(!file)return;const reader=new FileReader();reader.onload=e=>{CK_CIERRE[idx].photo=e.target.result;renderCiCheckFotos();};reader.readAsDataURL(file);}
+function uploadCiPhoto(id,input,idx){
+  const file=input.files[0];if(!file)return;
+  // Show local preview immediately
+  const reader=new FileReader();
+  reader.onload=e=>{
+    CK_CIERRE[idx].photoLocal=e.target.result;
+    CK_CIERRE[idx].photoFile=file;
+    CK_CIERRE[idx].photo=e.target.result; // use local until uploaded
+    renderCiCheckFotos();
+  };
+  reader.readAsDataURL(file);
+}
 function checkCierreReady(){const ok=CK_CIERRE.every(it=>it.photo);const btn=document.getElementById('ciEnviarBtn');if(btn){btn.style.opacity=ok?'1':'0.4';btn.style.pointerEvents=ok?'auto':'none';}}
 
 async function enviarCierre(){
@@ -1115,13 +1145,76 @@ async function enviarCierre(){
   const retHoy=RETIROS.filter(r=>r.fecha===today()&&r.tipo==='retiro').reduce((a,r)=>a+r.monto,0),abHoy=RETIROS.filter(r=>r.fecha===today()&&r.tipo==='abono').reduce((a,r)=>a+r.monto,0);
   const efAp=totalBills(AP),saldoEsp=efAp+abHoy-retHoy,diffEf=ef-saldoEsp;
   const sis=CI.sis||{},sisTotal=(sis.ef||0)+(sis.tarj||0)+(sis.otros||0),totalReal=ef+posTotal+transf,diffSis=totalReal-sisTotal;
-  const turno={fecha:today(),horaAp:AP.hora,horaCi:CI.hora,operador:CU.nombre,uid:CU.uid,sucursal:CU.sucursalActivaNombre||CU.sucursalNombre||'',sucursalId:CU.sucursalActiva||CU.sucursalId||'',turno:CU.turnoActivo||CU.turno||'',efAp,efCi:ef,posTotal,transf,totalReal,retiros:retHoy,abonos:abHoy,saldoEsp,diffEf,sisTotal,diffSis,sis:{...sis},pos:POS_TERMINALES.map(t=>({name:t.name,ap:AP.pos?.[t.id]||0,ci:CI.pos[t.id]||0})),cigarrosAp:[...(AP.cigarros||[])],cigarrosCi:[...(CI.cigarros||[])],timestamp:firebase.firestore.FieldValue.serverTimestamp()};
-  try{await db.collection('turnos').add(turno);TURNOS.unshift({id:'new',...turno});await auditLog('cierre',{diffEf,diffSis,totalReal});
-    notificarGerentes(turno);
+  const comentario=document.getElementById('ciComentario')?.value.trim()||'';
+
+  // Upload fotos a Google Drive vía GAS
+  toast('📤 Subiendo fotos a Drive…',10000);
+  const fotosURLs={};
+  const url=getGasUrl();
+  for(const item of CK_CIERRE){
+    if(item.photoFile||item.photoLocal){
+      try{
+        if(url){
+          const driveUrl=await subirFotoADrive(item,CU.sucursalActivaNombre||'',CU.turnoActivo||'',today());
+          if(driveUrl) fotosURLs[item.id]=driveUrl;
+          else fotosURLs[item.id]=item.photoLocal||''; // fallback
+        } else {
+          fotosURLs[item.id]=item.photoLocal||''; // sin GAS configurado
+        }
+      }catch(e){
+        console.warn('Drive upload failed:',e);
+        fotosURLs[item.id]=item.photoLocal||'';
+      }
+    }
+  }
+
+  const turno={
+    fecha:today(),horaAp:AP.hora,horaCi:CI.hora,
+    operador:CU.nombre,uid:CU.uid,
+    sucursal:CU.sucursalActivaNombre||CU.sucursalNombre||'',
+    sucursalId:CU.sucursalActiva||CU.sucursalId||'',
+    turno:CU.turnoActivo||CU.turno||'',
+    efAp,efCi:ef,posTotal,transf,totalReal,
+    retiros:retHoy,abonos:abHoy,saldoEsp,diffEf,
+    sisTotal,diffSis,sis:{...sis},
+    pos:POS_TERMINALES.map(t=>({name:t.name,ap:AP.pos?.[t.id]||0,ci:CI.pos[t.id]||0})),
+    cigarrosAp:[...(AP.cigarros||[])],
+    cigarrosCi:[...(CI.cigarros||[])],
+    fotos:fotosURLs,
+    comentario,
+    timestamp:firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  try{
+    const ref=await db.collection('turnos').add(turno);
+    TURNOS.unshift({id:ref.id,...turno});
+    await auditLog('cierre',{diffEf,diffSis,totalReal,comentario:comentario?'sí':'no'});
+
+    // Write real-time notification for admins/gerentes
+    await db.collection('notificaciones').add({
+      tipo: diffEf!==0||diffSis!==0 ? 'diferencia' : 'cierre_ok',
+      titulo: diffEf!==0||diffSis!==0 ? '⚠️ Cierre con diferencia' : '✅ Cierre enviado',
+      mensaje: `${CU.nombre} — ${CU.sucursalActivaNombre||''} — ${CU.turnoActivo||''}${diffEf!==0?' · Dif. ef: '+(diffEf>=0?'+':'')+clp(diffEf):''}${diffSis!==0?' · Dif. sis: '+(diffSis>=0?'+':'')+clp(diffSis):''}${comentario?' · "'+comentario+'"':''}`,
+      sucursalId:CU.sucursalActiva||CU.sucursalId||'',
+      sucursal:CU.sucursalActivaNombre||'',
+      operador:CU.nombre,
+      diffEf,diffSis,
+      leida:false,
+      timestamp:firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    notificarGerentes({...turno,id:ref.id});
     confetti();
-    if(diffEf!==0||diffSis!==0){const msg=[];if(diffEf!==0)msg.push(`Efectivo: ${diffEf>=0?'+':''}${clp(diffEf)}`);if(diffSis!==0)msg.push(`vs Sistema: ${diffSis>=0?'+':''}${clp(diffSis)}`);showDiffAlert(msg.join(' | '),diffEf<0||diffSis<0);}
-    else toast('✅ Cierre enviado — caja cuadra',4000);
-  }catch(e){toast('❌ Error: '+e.message,5000);}
+    if(diffEf!==0||diffSis!==0){
+      const msg=[];
+      if(diffEf!==0)msg.push(`Efectivo: ${diffEf>=0?'+':''}${clp(diffEf)}`);
+      if(diffSis!==0)msg.push(`vs Sistema: ${diffSis>=0?'+':''}${clp(diffSis)}`);
+      showDiffAlert(msg.join(' | '),diffEf<0||diffSis<0);
+    } else {
+      toast('✅ Cierre enviado — caja cuadra perfectamente',4000);
+    }
+  }catch(e){toast('❌ Error al guardar cierre: '+e.message,5000);}
+}
 }
 function showDiffAlert(msg,isNeg){const d=document.createElement('div');d.style.cssText=`position:fixed;top:64px;left:50%;transform:translateX(-50%);background:${isNeg?'var(--r500)':'var(--b500)'};color:#fff;padding:.875rem 1.5rem;border-radius:10px;font-weight:700;font-size:.9375rem;box-shadow:var(--shl);z-index:997;display:flex;align-items:center;gap:.75rem;max-width:calc(100vw - 2rem)`;d.innerHTML=`<span>${isNeg?'⚠️':'ℹ️'}</span><span>${msg}</span><button onclick="this.parentElement.remove()" style="background:rgba(255,255,255,.25);border:none;color:#fff;border-radius:6px;padding:.25rem .5rem;cursor:pointer;font-weight:700;margin-left:.5rem">✕</button>`;document.body.appendChild(d);setTimeout(()=>d.remove(),10000);}
 
@@ -1160,11 +1253,33 @@ function renderHistorial(){
   if(selSuc){const cur=selSuc.value;selSuc.innerHTML='<option value="">Todas las sucursales</option>'+sucs.map(s=>`<option value="${s}" ${s===cur?'selected':''}>${s}</option>`).join('');}
   let ts=[...TURNOS];if(selMes?.value)ts=ts.filter(t=>t.fecha?.slice(0,7)===selMes.value);if(selSuc?.value)ts=ts.filter(t=>t.sucursal===selSuc.value);if(selTurno?.value)ts=ts.filter(t=>t.turno===selTurno.value);
   const emoji={'mañana':'☀️','tarde':'🌤','noche':'🌙'};
-  c.innerHTML=ts.map(t=>{const ok=t.diffEf===0&&t.diffSis===0;return`<div class="card mb4" style="border-left:4px solid ${ok?'var(--gr500)':'var(--r500)'}"><div class="flex jcb aic mb2"><div><span class="fw7">${fdate(t.fecha)}</span><span class="badge ba" style="margin-left:.5rem">${emoji[t.turno]||''} ${t.turno||'—'}</span><span class="fs13 text-gray" style="margin-left:.5rem">${t.horaAp||'—'} → ${t.horaCi||'—'}</span></div><div style="display:flex;gap:.5rem;align-items:center"><span class="badge ${ok?'bg':'br'}">${ok?'✓ Cuadra':'⚠ Dif.'}</span><button class="btn btn-s sm" onclick="verTurno('${t.id}')">Ver</button></div></div><div class="g4" style="gap:.5rem"><div><div class="fs12 text-gray">Ef. cierre</div><div class="fw7 mono">${clp(t.efCi)}</div></div><div><div class="fs12 text-gray">POS</div><div class="fw7 mono">${clp(t.posTotal)}</div></div><div><div class="fs12 text-gray">Dif. ef.</div><div class="fw7 mono ${t.diffEf===0?'text-green':t.diffEf>0?'text-amber':'text-red'}">${t.diffEf>=0?'+':''}${clp(t.diffEf)}</div></div><div><div class="fs12 text-gray">Dif. sis.</div><div class="fw7 mono ${t.diffSis===0?'text-green':t.diffSis>0?'text-amber':'text-red'}">${t.diffSis>=0?'+':''}${clp(t.diffSis)}</div></div></div><div class="fs12 text-gray mt2">📍 ${t.sucursal||'—'} · 👤 ${t.operador}</div></div>`;}).join('');
+  c.innerHTML=ts.map(t=>{const ok=t.diffEf===0&&t.diffSis===0;return`<div class="card mb4" style="border-left:4px solid ${ok?'var(--gr500)':'var(--r500)'}"><div class="flex jcb aic mb2"><div><span class="fw7">${fdate(t.fecha)}</span><span class="badge ba" style="margin-left:.5rem">${emoji[t.turno]||''} ${t.turno||'—'}</span><span class="fs13 text-gray" style="margin-left:.5rem">${t.horaAp||'—'} → ${t.horaCi||'—'}</span></div><div style="display:flex;gap:.5rem;align-items:center"><span class="badge ${ok?'bg':'br'}">${ok?'✓ Cuadra':'⚠ Dif.'}</span><button class="btn btn-s sm" onclick="verTurno('${t.id}')">Ver</button></div></div><div class="g4" style="gap:.5rem"><div><div class="fs12 text-gray">Ef. cierre</div><div class="fw7 mono">${clp(t.efCi)}</div></div><div><div class="fs12 text-gray">POS</div><div class="fw7 mono">${clp(t.posTotal)}</div></div><div><div class="fs12 text-gray">Dif. ef.</div><div class="fw7 mono ${t.diffEf===0?'text-green':t.diffEf>0?'text-amber':'text-red'}">${t.diffEf>=0?'+':''}${clp(t.diffEf)}</div></div><div><div class="fs12 text-gray">Dif. sis.</div><div class="fw7 mono ${t.diffSis===0?'text-green':t.diffSis>0?'text-amber':'text-red'}">${t.diffSis>=0?'+':''}${clp(t.diffSis)}</div></div></div><div class="fs12 text-gray mt2">📍 ${t.sucursal||'—'} · 👤 ${t.operador}${t.comentario?` · 💬 "${t.comentario.slice(0,50)}${t.comentario.length>50?'…':''}"`:''}</div></div>`;}).join('');
 }
 let _modalTurnoId=null;
 function verTurno(id){const t=TURNOS.find(x=>x.id===id);if(!t)return;_modalTurnoId=id;document.getElementById('histModalTitle').textContent=`Turno ${fdate(t.fecha)}`;document.getElementById('histModalBody').innerHTML=buildTurnoHTML(t);document.getElementById('histModal').classList.remove('hidden');}
-function buildTurnoHTML(t){const sec=l=>`<div style="font-size:.75rem;font-weight:700;color:var(--g400);text-transform:uppercase;letter-spacing:.06em;padding:.5rem 1rem .25rem">${l}</div>`;return`<p style="font-size:.8125rem;color:var(--g500);margin-bottom:1rem">📍 ${t.sucursal||'—'} · 👤 ${t.operador} · ${t.horaAp||'—'} → ${t.horaCi||'—'}</p>`+sec('Efectivo')+`<div class="ar"><span class="ar-l">Apertura</span><span class="ar-v">${clp(t.efAp)}</span></div><div class="ar"><span class="ar-l">Cierre</span><span class="ar-v">${clp(t.efCi)}</span></div><div class="ar"><span class="ar-l">Retiros</span><span class="ar-v text-red">-${clp(t.retiros)}</span></div><div class="ar"><span class="ar-l">Abonos</span><span class="ar-v text-green">+${clp(t.abonos)}</span></div><div class="ar ${t.diffEf===0?'tot':t.diffEf>0?'dp':'dn'}"><span class="ar-l">Diferencia</span><span class="ar-v">${t.diffEf>=0?'+':''}${clp(t.diffEf)}</span></div><div class="div"></div>`+sec('Total')+`<div class="ar tot"><span class="ar-l">Total contado</span><span class="ar-v">${clp(t.totalReal)}</span></div><div class="ar ${t.diffSis===0?'tot':t.diffSis>0?'dp':'dn'}"><span class="ar-l">Dif. Sistema</span><span class="ar-v">${t.diffSis>=0?'+':''}${clp(t.diffSis)}</span></div>`;}
+function buildTurnoHTML(t){
+  const sec=l=>`<div style="font-size:.75rem;font-weight:700;color:var(--g400);text-transform:uppercase;letter-spacing:.06em;padding:.5rem 1rem .25rem">${l}</div>`;
+  let html=`<p style="font-size:.8125rem;color:var(--g500);margin-bottom:1rem">📍 ${t.sucursal||'—'} · 👤 ${t.operador} · ${t.horaAp||'—'} → ${t.horaCi||'—'}</p>`;
+  if(t.comentario) html+=`<div style="background:var(--a50);border:1px solid var(--a200);border-radius:8px;padding:.75rem 1rem;margin-bottom:1rem;font-size:.875rem;color:var(--a900)"><span style="font-weight:700">💬 Comentario:</span> ${t.comentario}</div>`;
+  html+=sec('Efectivo')+
+    `<div class="ar"><span class="ar-l">Apertura</span><span class="ar-v">${clp(t.efAp)}</span></div>`+
+    `<div class="ar"><span class="ar-l">Cierre</span><span class="ar-v">${clp(t.efCi)}</span></div>`+
+    `<div class="ar"><span class="ar-l">Retiros</span><span class="ar-v text-red">-${clp(t.retiros)}</span></div>`+
+    `<div class="ar"><span class="ar-l">Abonos</span><span class="ar-v text-green">+${clp(t.abonos)}</span></div>`+
+    `<div class="ar ${t.diffEf===0?'tot':t.diffEf>0?'dp':'dn'}"><span class="ar-l">Diferencia</span><span class="ar-v">${t.diffEf>=0?'+':''}${clp(t.diffEf)}</span></div><div class="div"></div>`+
+    sec('Total')+
+    `<div class="ar tot"><span class="ar-l">Total contado</span><span class="ar-v">${clp(t.totalReal)}</span></div>`+
+    `<div class="ar ${t.diffSis===0?'tot':t.diffSis>0?'dp':'dn'}"><span class="ar-l">Dif. Sistema</span><span class="ar-v">${t.diffSis>=0?'+':''}${clp(t.diffSis)}</span></div>`;
+  // Show fotos if available
+  if(t.fotos&&Object.keys(t.fotos).length){
+    html+=`<div class="div"></div>${sec('Fotos del checklist')}<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:.5rem;padding:.5rem 1rem">`;
+    Object.entries(t.fotos).forEach(([id,url])=>{
+      if(url&&url.startsWith('http'))html+=`<img src="${url}" style="width:100%;height:80px;object-fit:cover;border-radius:6px;cursor:pointer" onclick="window.open('${url}','_blank')"/>`;
+    });
+    html+='</div>';
+  }
+  return html;
+}
 function buildTurnoText(t){return[`=== TURNO ${t.fecha} ===`,`Sucursal: ${t.sucursal||'—'} | Turno: ${t.turno} | Op: ${t.operador}`,``,`EFECTIVO`,`  Ap: ${clp(t.efAp)} | Ci: ${clp(t.efCi)} | Ret: -${clp(t.retiros)} | Ab: +${clp(t.abonos)}`,`  Dif: ${t.diffEf>=0?'+':''}${clp(t.diffEf)} ${t.diffEf===0?'✓':'⚠'}`,``,`TOTAL: ${clp(t.totalReal)} | Sis: ${clp(t.sisTotal)} | Dif: ${t.diffSis>=0?'+':''}${clp(t.diffSis)} ${t.diffSis===0?'✓':'⚠'}`].join('\n');}
 function exportHistorialCSV(){if(!TURNOS.length){toast('Sin datos');return;}let csv='Fecha,Sucursal,Turno,Operador,Ef.Ap,Ef.Ci,Retiros,Abonos,Dif.Ef,Total,Sis,Dif.Sis\n';TURNOS.forEach(t=>{csv+=`${t.fecha},"${t.sucursal}","${t.turno}","${t.operador}",${t.efAp},${t.efCi},${t.retiros},${t.abonos},${t.diffEf},${t.totalReal},${t.sisTotal},${t.diffSis}\n`;});const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='historial.csv';a.click();}
 
@@ -1196,7 +1311,191 @@ async function saveProduct(){
 }
 async function delProd(id){if(!confirm('¿Eliminar?'))return;try{await db.collection('inventario').doc(id).delete();await loadInventario();renderInv();toast('Eliminado');}catch(e){toast('❌ '+e.message);}}
 
-/* ============ REPORT TABS ============ */
+/* ============ FOTOS EN GOOGLE DRIVE ============ */
+async function subirFotoADrive(item, sucursal, turno, fecha){
+  return new Promise((resolve)=>{
+    const url=getGasUrl();
+    if(!url){resolve('');return;}
+
+    // Convert file to base64
+    const reader=new FileReader();
+    const file=item.photoFile;
+    if(!file){resolve('');return;}
+
+    reader.onload=e=>{
+      const b64=e.target.result.split(',')[1]; // strip data:image/...;base64,
+      const mime=file.type||'image/jpeg';
+
+      // Create hidden iframe for response
+      const iframeId='drive_iframe_'+item.id;
+      let iframe=document.getElementById(iframeId);
+      if(!iframe){
+        iframe=document.createElement('iframe');
+        iframe.id=iframeId;
+        iframe.name=iframeId;
+        iframe.style.display='none';
+        document.body.appendChild(iframe);
+      }
+
+      // Listen for postMessage response from GAS
+      const handler=(msg)=>{
+        if(msg.data?.itemId===item.id||msg.data?.ok){
+          window.removeEventListener('message',handler);
+          resolve(msg.data?.url||'');
+        }
+      };
+      window.addEventListener('message',handler);
+
+      // Send via form POST
+      const form=document.createElement('form');
+      form.method='POST';form.action=url;form.target=iframeId;form.style.display='none';
+      const fields={accion:'foto',fecha,sucursal,turno,itemId:item.id,itemText:item.text||item.id,foto:b64,mime};
+      Object.entries(fields).forEach(([k,v])=>{
+        const inp=document.createElement('input');inp.type='hidden';inp.name=k;inp.value=v;form.appendChild(inp);
+      });
+      document.body.appendChild(form);form.submit();form.remove();
+
+      // Timeout fallback después de 15s
+      setTimeout(()=>{
+        window.removeEventListener('message',handler);
+        resolve(item.photoLocal||'');
+      },15000);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ============ REAL-TIME LISTENERS ============ */
+let _unsubNotif=null, _unsubPanel=null;
+
+function startRealTimeListeners(){
+  const rol=CU.rolActivo||CU.rol||'';
+  const isAdm=['admin','gerente','superadmin'].includes(rol);
+  if(!isAdm) return;
+
+  // 1. Notificaciones en tiempo real
+  _unsubNotif=db.collection('notificaciones')
+    .where('leida','==',false)
+    .orderBy('timestamp','desc')
+    .limit(20)
+    .onSnapshot(snap=>{
+      const notifs=snap.docs.map(d=>({id:d.id,...d.data()}));
+      renderNotifBanner(notifs);
+    }, e=>console.warn('Notif listener:',e));
+
+  // 2. Panel operativo: estado en tiempo real de aperturas de hoy
+  if(rol==='gerente'||rol==='superadmin'){
+    document.getElementById('panelOperativo')?.classList.remove('hidden');
+    _unsubPanel=db.collection('aperturas')
+      .where('fecha','==',today())
+      .onSnapshot(snap=>{
+        const aperturas=snap.docs.map(d=>({id:d.id,...d.data()}));
+        renderPanelOperativo(aperturas);
+      }, e=>console.warn('Panel listener:',e));
+  }
+}
+
+function stopRealTimeListeners(){
+  if(_unsubNotif){_unsubNotif();_unsubNotif=null;}
+  if(_unsubPanel){_unsubPanel();_unsubPanel=null;}
+}
+
+function renderNotifBanner(notifs){
+  const c=document.getElementById('notifBanner');if(!c)return;
+  if(!notifs.length){c.innerHTML='';return;}
+  const diff=notifs.filter(n=>n.tipo==='diferencia');
+  const ok=notifs.filter(n=>n.tipo==='cierre_ok');
+  let html='';
+  diff.forEach(n=>{
+    html+=`<div style="display:flex;align-items:flex-start;gap:.75rem;background:var(--r100);border:1px solid var(--r500);border-radius:10px;padding:.875rem 1rem;margin-bottom:.5rem">
+      <span style="font-size:1.25rem;flex-shrink:0">⚠️</span>
+      <div style="flex:1">
+        <div class="fw7 fs14" style="color:var(--r600)">${n.titulo}</div>
+        <div class="fs13" style="color:var(--r600);margin-top:.125rem">${n.mensaje}</div>
+        <div class="fs12 text-gray mt2">${n.timestamp?.toDate?.()?.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})||''}</div>
+      </div>
+      <button onclick="marcarLeida('${n.id}')" style="background:none;border:none;color:var(--r500);cursor:pointer;font-size:1.125rem;flex-shrink:0">✕</button>
+    </div>`;
+  });
+  if(ok.length){
+    html+=`<div style="display:flex;align-items:center;gap:.75rem;background:var(--gr100);border:1px solid var(--gr500);border-radius:10px;padding:.75rem 1rem;margin-bottom:.5rem">
+      <span style="font-size:1.125rem">✅</span>
+      <div style="flex:1;font-size:.8125rem;color:var(--gr600)">
+        ${ok.length===1?ok[0].mensaje:`${ok.length} cierres sin diferencias — ${ok.map(n=>n.sucursal).filter((v,i,a)=>a.indexOf(v)===i).join(', ')}`}
+      </div>
+      <button onclick="marcarTodasLeidas()" style="background:none;border:none;color:var(--gr600);cursor:pointer;font-size:.875rem;font-weight:600">Limpiar</button>
+    </div>`;
+  }
+  c.innerHTML=html;
+  // Also show toast for new diff notifications
+  diff.forEach(n=>{
+    if(!n._toasted){
+      n._toasted=true;
+      showToastNotif(n.titulo, n.mensaje, n.tipo==='diferencia');
+    }
+  });
+}
+
+function showToastNotif(titulo,msg,isAlert){
+  const d=document.createElement('div');
+  d.style.cssText=`position:fixed;top:70px;right:1rem;background:${isAlert?'var(--r600)':'var(--gr600)'};color:#fff;padding:.875rem 1.25rem;border-radius:10px;font-size:.875rem;font-weight:500;box-shadow:var(--shl);z-index:998;max-width:360px;cursor:pointer;animation:slideIn .3s ease`;
+  d.innerHTML=`<div class="fw7">${titulo}</div><div style="margin-top:.25rem;font-size:.8125rem;opacity:.9">${msg}</div>`;
+  d.onclick=()=>{d.remove();showSec('ad-dash',document.querySelector('#adNav .ni'));};
+  document.body.appendChild(d);
+  setTimeout(()=>d.remove(),8000);
+}
+
+async function marcarLeida(id){
+  try{await db.collection('notificaciones').doc(id).update({leida:true});}catch(e){}
+}
+async function marcarTodasLeidas(){
+  const snap=await db.collection('notificaciones').where('leida','==',false).get();
+  const batch=db.batch();snap.docs.forEach(d=>batch.update(d.ref,{leida:true}));
+  await batch.commit();
+}
+
+/* ============ PANEL OPERATIVO ============ */
+function renderPanelOperativo(aperturas){
+  const c=document.getElementById('panelSucursales');if(!c)return;
+  const upd=document.getElementById('panelUltActz');
+  if(upd)upd.textContent='Actualizado: '+new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+
+  // Match aperturas with sucursales and check if cierre exists
+  c.innerHTML=SUCURSALES.map(suc=>{
+    const sucAps=aperturas.filter(a=>a.sucursalId===suc.id);
+    const turnos=['mañana','tarde','noche'];
+    const turnoEmoji={'mañana':'☀️','tarde':'🌤','noche':'🌙'};
+    const estadoTurnos=turnos.map(t=>{
+      const ap=sucAps.find(a=>a.turno===t);
+      const ci=TURNOS.find(tu=>tu.fecha===today()&&tu.sucursalId===suc.id&&tu.turno===t);
+      if(ci){
+        const ok=ci.diffEf===0&&ci.diffSis===0;
+        return`<div style="display:flex;align-items:center;gap:.375rem;font-size:.75rem">
+          <span>${turnoEmoji[t]}</span>
+          <span class="badge ${ok?'bg':'br'}" style="font-size:.6875rem">${ok?'✓ Cuadra':'⚠ Dif.'}</span>
+          <span class="text-gray">${ci.horaCi||''}</span>
+        </div>`;
+      } else if(ap){
+        return`<div style="display:flex;align-items:center;gap:.375rem;font-size:.75rem">
+          <span>${turnoEmoji[t]}</span>
+          <span class="badge bb" style="font-size:.6875rem">En turno</span>
+          <span class="text-gray">${ap.hora||''}</span>
+        </div>`;
+      }
+      return`<div style="display:flex;align-items:center;gap:.375rem;font-size:.75rem">
+        <span style="opacity:.3">${turnoEmoji[t]}</span>
+        <span class="fs12 text-gray">Sin actividad</span>
+      </div>`;
+    });
+    const tieneActivo=sucAps.length>0;
+    return`<div class="card" style="border-left:4px solid ${tieneActivo?'var(--gr500)':'var(--g300)'}">
+      <div class="fw7 fs14 mb2">🏬 ${suc.nombre}</div>
+      <div style="display:flex;flex-direction:column;gap:.375rem">${estadoTurnos.join('')}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ============ BOOT (updated) ============ */
 function showRepTab(tab,el){
   ['analisis','comparativa','envio'].forEach(t=>{
     const el2=document.getElementById('repTab'+t.charAt(0).toUpperCase()+t.slice(1));
