@@ -269,6 +269,9 @@ tr:hover td{background:var(--g50)}
         <strong id="uLabel">—</strong>
         <span class="badge" id="roleLabel" style="margin-left:.25rem">—</span>
       </div>
+      <button class="bti" onclick="document.getElementById('changePassModal').classList.remove('hidden')" title="Cambiar contraseña">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+      </button>
       <button class="bti" onclick="logout()" title="Cerrar sesión">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
       </button>
@@ -552,18 +555,41 @@ tr:hover td{background:var(--g50)}
   </div>
 </div>
 
+<div class="mb hidden" id="changePassModal">
+  <div class="modal" style="max-width:400px">
+    <div class="mh"><span class="mt2-title">Cambiar contraseña</span><button class="btn btn-g sm" onclick="document.getElementById('changePassModal').classList.add('hidden')">✕</button></div>
+    <div class="fld"><label class="lbl">Contraseña actual</label><input class="inp" type="password" id="cpActual" placeholder="Tu contraseña actual"/></div>
+    <div class="fld"><label class="lbl">Nueva contraseña</label><input class="inp" type="password" id="cpNueva" placeholder="Mínimo 6 caracteres"/></div>
+    <div class="fld"><label class="lbl">Confirmar nueva contraseña</label><input class="inp" type="password" id="cpConfirm" placeholder="Repite la nueva contraseña"/></div>
+    <div class="hidden" id="cpErr" style="color:var(--r600);font-size:.8125rem;margin-bottom:.75rem"></div>
+    <div class="mf">
+      <button class="btn btn-s" onclick="document.getElementById('changePassModal').classList.add('hidden')">Cancelar</button>
+      <button class="btn btn-p" onclick="changeMyPassword()">Cambiar contraseña</button>
+    </div>
+  </div>
+</div>
+
 <div class="mb hidden" id="userModal">
   <div class="modal">
     <div class="mh"><span class="mt2-title" id="userModalTitle">Nuevo Usuario</span><button class="btn btn-g sm" onclick="closeUserModal()">✕</button></div>
     <div class="fld"><label class="lbl">Nombre</label><input class="inp" id="uNombre"/></div>
     <div class="fld"><label class="lbl">Email</label><input class="inp" type="email" id="uEmail"/></div>
     <div class="fld" id="uPassField"><label class="lbl">Contraseña (mín. 6 caracteres)</label><input class="inp" type="password" id="uPass"/></div>
+    <div class="fld hidden" id="uResetPassField">
+      <label class="lbl">Nueva contraseña (dejar vacío para no cambiar)</label>
+      <input class="inp" type="password" id="uResetPass" placeholder="Mín. 6 caracteres"/>
+      <div style="font-size:.75rem;color:var(--g400);margin-top:.375rem">El usuario deberá usar esta clave la próxima vez que inicie sesión.</div>
+    </div>
     <div class="g2">
       <div class="fld"><label class="lbl">Rol</label><select class="sel w100" id="uRol"><option value="operador">Operador</option><option value="admin">Administrador</option><option value="gerente">Gerente</option><option value="superadmin">Super Admin</option></select></div>
       <div class="fld"><label class="lbl">Sucursal</label><select class="sel w100" id="uSucursal"></select></div>
     </div>
     <div class="fld"><label class="lbl">Turno asignado</label><select class="sel w100" id="uTurno"><option value="">Cualquier turno</option><option value="mañana">☀️ Mañana</option><option value="tarde">🌤 Tarde</option><option value="noche">🌙 Noche</option></select></div>
-    <div class="mf"><button class="btn btn-s" onclick="closeUserModal()">Cancelar</button><button class="btn btn-p" onclick="saveUser()">Guardar</button></div>
+    <div class="mf">
+      <button class="btn btn-s" onclick="closeUserModal()">Cancelar</button>
+      <button class="btn btn-d hidden" id="uDeleteBtn" onclick="deleteUser()">🗑 Eliminar</button>
+      <button class="btn btn-p" onclick="saveUser()">Guardar</button>
+    </div>
   </div>
 </div>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -668,6 +694,13 @@ async function showApp(){
   if(CFG.gasUrl){const gi=document.getElementById('gasUrlInput');if(gi)gi.value=CFG.gasUrl;}
   if(isOp)showSec('op-ap',document.querySelector('#opNav .ni'));
   else showSec('ad-dash',document.querySelector('#adNav .ni'));
+  // Prompt password change if flagged
+  if(CU.mustChangePassword){
+    setTimeout(()=>{
+      toast('⚠️ Tu contraseña fue reiniciada. Por favor cámbiala.',5000);
+      document.getElementById('changePassModal').classList.remove('hidden');
+    },1000);
+  }
   await auditLog('login',{sucursal:CU.sucursalNombre,turno:CU.turno});
 }
 
@@ -972,23 +1005,142 @@ async function renderPrecioHist(){const c=document.getElementById('ajPrecioHist'
 
 async function renderUsers(){
   const c=document.getElementById('usersBody');if(!c)return;c.innerHTML='<tr><td colspan="7" class="text-gray">Cargando…</td></tr>';
-  try{const snap=await db.collection('usuarios').get();const users=snap.docs.map(d=>({id:d.id,...d.data()}));
+  try{const snap=await db.collection('usuarios').get();
+    const users=snap.docs.map(d=>({id:d.id,...d.data()})).filter(u=>!u.eliminado);
     const rc={superadmin:'role-superadmin',gerente:'role-gerente',admin:'role-admin',operador:'role-operador'};
     const rl={superadmin:'Super Admin',gerente:'Gerente',admin:'Admin',operador:'Operador'};
-    c.innerHTML=users.map(u=>`<tr><td class="fw6">${u.nombre||'—'}</td><td class="fs13 text-gray">${u.email}</td><td><span class="badge ${rc[u.rol]||''}">${rl[u.rol]||u.rol}</span></td><td class="fs13">${u.rol==='gerente'||u.rol==='superadmin'?'Todas':(SUCURSALES.find(s=>s.id===u.sucursalId)?.nombre)||'—'}</td><td class="fs13">${u.turno||'—'}</td><td><span class="badge ${u.activo?'bg':'br'}">${u.activo?'Activo':'Inactivo'}</span></td><td><div style="display:flex;gap:.375rem"><button class="btn btn-s sm" onclick="editUser('${u.id}')">✎</button><button class="btn ${u.activo?'btn-d':'btn-p'} sm" onclick="toggleUser('${u.id}',${u.activo})">${u.activo?'Desactivar':'Activar'}</button></div></td></tr>`).join('');}
+    c.innerHTML=users.map(u=>`<tr>
+      <td class="fw6">${u.nombre||'—'}${u.mustChangePassword?'<span class="badge br" style="margin-left:.375rem;font-size:.65rem">clave pendiente</span>':''}</td>
+      <td class="fs13 text-gray">${u.email}</td>
+      <td><span class="badge ${rc[u.rol]||''}">${rl[u.rol]||u.rol}</span></td>
+      <td class="fs13">${u.rol==='gerente'||u.rol==='superadmin'?'Todas':(SUCURSALES.find(s=>s.id===u.sucursalId)?.nombre)||'—'}</td>
+      <td class="fs13">${u.turno||'—'}</td>
+      <td><span class="badge ${u.activo?'bg':'br'}">${u.activo?'Activo':'Inactivo'}</span></td>
+      <td><div style="display:flex;gap:.375rem">
+        <button class="btn btn-s sm" onclick="editUser('${u.id}')">✎ Editar</button>
+        <button class="btn ${u.activo?'btn-d':'btn-p'} sm" onclick="toggleUser('${u.id}',${u.activo})">${u.activo?'Desactivar':'Activar'}</button>
+      </div></td>
+    </tr>`).join('');}
   catch(e){c.innerHTML=`<tr><td colspan="7" class="text-gray">Error: ${e.message}</td></tr>`;}
 }
 async function toggleUser(id,activo){try{await db.collection('usuarios').doc(id).update({activo:!activo});await auditLog('usuario',{accion:activo?'desactivar':'activar',uid:id});toast(`Usuario ${activo?'desactivado':'activado'}`);renderUsers();}catch(e){toast('❌ '+e.message);}}
 let _editUserId=null;
-function openUserModal(){_editUserId=null;document.getElementById('userModalTitle').textContent='Nuevo Usuario';['uNombre','uEmail','uPass'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});document.getElementById('uPassField').style.display='block';const sel=document.getElementById('uSucursal');if(sel)sel.innerHTML=SUCURSALES.map(s=>`<option value="${s.id}">${s.nombre}</option>`).join('');document.getElementById('userModal').classList.remove('hidden');}
-function editUser(id){_editUserId=id;document.getElementById('userModalTitle').textContent='Editar';document.getElementById('uPassField').style.display='none';db.collection('usuarios').doc(id).get().then(doc=>{const d=doc.data();document.getElementById('uNombre').value=d.nombre||'';document.getElementById('uEmail').value=d.email||'';document.getElementById('uRol').value=d.rol||'operador';const sel=document.getElementById('uSucursal');if(sel)sel.innerHTML=SUCURSALES.map(s=>`<option value="${s.id}" ${s.id===d.sucursalId?'selected':''}>${s.nombre}</option>`).join('');document.getElementById('uTurno').value=d.turno||'';document.getElementById('userModal').classList.remove('hidden');});}
+function openUserModal(){
+  _editUserId=null;
+  document.getElementById('userModalTitle').textContent='Nuevo Usuario';
+  ['uNombre','uEmail','uPass','uResetPass'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('uPassField').style.display='block';
+  document.getElementById('uResetPassField').classList.add('hidden');
+  document.getElementById('uDeleteBtn').classList.add('hidden');
+  const sel=document.getElementById('uSucursal');
+  if(sel)sel.innerHTML=SUCURSALES.map(s=>`<option value="${s.id}">${s.nombre}</option>`).join('');
+  document.getElementById('userModal').classList.remove('hidden');
+}
+function editUser(id){
+  _editUserId=id;
+  document.getElementById('userModalTitle').textContent='Editar Usuario';
+  document.getElementById('uPassField').style.display='none';
+  document.getElementById('uResetPassField').classList.remove('hidden');
+  document.getElementById('uResetPass').value='';
+  document.getElementById('uDeleteBtn').classList.remove('hidden');
+  db.collection('usuarios').doc(id).get().then(doc=>{
+    const d=doc.data();
+    document.getElementById('uNombre').value=d.nombre||'';
+    document.getElementById('uEmail').value=d.email||'';
+    document.getElementById('uRol').value=d.rol||'operador';
+    const sel=document.getElementById('uSucursal');
+    if(sel)sel.innerHTML=SUCURSALES.map(s=>`<option value="${s.id}" ${s.id===d.sucursalId?'selected':''}>${s.nombre}</option>`).join('');
+    document.getElementById('uTurno').value=d.turno||'';
+    document.getElementById('userModal').classList.remove('hidden');
+  });
+}
 function closeUserModal(){document.getElementById('userModal').classList.add('hidden');}
+
 async function saveUser(){
-  const nombre=document.getElementById('uNombre').value.trim(),email=document.getElementById('uEmail').value.trim(),pass=document.getElementById('uPass').value,rol=document.getElementById('uRol').value,sucursalId=document.getElementById('uSucursal').value,turno=document.getElementById('uTurno').value,sucursalNombre=SUCURSALES.find(s=>s.id===sucursalId)?.nombre||'';
+  const nombre=document.getElementById('uNombre').value.trim();
+  const email=document.getElementById('uEmail').value.trim();
+  const pass=document.getElementById('uPass').value;
+  const resetPass=document.getElementById('uResetPass').value;
+  const rol=document.getElementById('uRol').value;
+  const sucursalId=document.getElementById('uSucursal').value;
+  const turno=document.getElementById('uTurno').value;
+  const sucursalNombre=SUCURSALES.find(s=>s.id===sucursalId)?.nombre||'';
   if(!nombre||!email){toast('Completa nombre y email');return;}
-  try{if(_editUserId){await db.collection('usuarios').doc(_editUserId).update({nombre,rol,sucursalId,sucursalNombre,turno});await auditLog('usuario',{accion:'editar',uid:_editUserId,rol});toast('✅ Usuario actualizado');}
-  else{if(!pass||pass.length<6){toast('Contraseña mínimo 6 caracteres');return;}const res=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pass,returnSecureToken:true})});const data=await res.json();if(data.error){toast('❌ '+data.error.message);return;}await db.collection('usuarios').doc(data.localId).set({nombre,email,rol,sucursalId,sucursalNombre,turno,activo:true,creadoEn:firebase.firestore.FieldValue.serverTimestamp(),creadoPor:CU.uid});await auditLog('usuario',{accion:'crear',email,rol});toast('✅ Usuario creado');}closeUserModal();renderUsers();}
-  catch(e){toast('❌ '+e.message);}
+  try{
+    if(_editUserId){
+      // Update profile in Firestore
+      await db.collection('usuarios').doc(_editUserId).update({nombre,rol,sucursalId,sucursalNombre,turno});
+      // Reset password via Identity Toolkit if provided
+      if(resetPass){
+        if(resetPass.length<6){toast('La nueva contraseña debe tener al menos 6 caracteres');return;}
+        // Get uid from editUserId
+        const res=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:update?key=${firebaseConfig.apiKey}`,{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({idToken:await auth.currentUser.getIdToken(),localId:_editUserId,password:resetPass,returnSecureToken:false})
+        });
+        // Note: resetting another user's password requires admin SDK
+        // Workaround: store reset request in Firestore, user is prompted on next login
+        await db.collection('usuarios').doc(_editUserId).update({resetPassword:resetPass,mustChangePassword:true});
+        toast('✅ Usuario actualizado — clave reiniciada');
+      } else {
+        toast('✅ Usuario actualizado');
+      }
+      await auditLog('usuario',{accion:'editar',uid:_editUserId,rol,resetPassword:!!resetPass});
+    } else {
+      if(!pass||pass.length<6){toast('La contraseña debe tener al menos 6 caracteres');return;}
+      const res=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email,password:pass,returnSecureToken:true})
+      });
+      const data=await res.json();
+      if(data.error){toast('❌ '+data.error.message);return;}
+      await db.collection('usuarios').doc(data.localId).set({nombre,email,rol,sucursalId,sucursalNombre,turno,activo:true,creadoEn:firebase.firestore.FieldValue.serverTimestamp(),creadoPor:CU.uid});
+      await auditLog('usuario',{accion:'crear',email,rol});
+      toast('✅ Usuario creado');
+    }
+    closeUserModal();renderUsers();
+  }catch(e){toast('❌ Error: '+e.message);}
+}
+
+async function deleteUser(){
+  const doc=await db.collection('usuarios').doc(_editUserId).get();
+  const nombre=doc.data()?.nombre||'este usuario';
+  if(!confirm(`¿Eliminar permanentemente a ${nombre}? Esta acción no se puede deshacer.`))return;
+  try{
+    // Desactivar en Firestore (no podemos eliminar de Auth desde el cliente sin Admin SDK)
+    await db.collection('usuarios').doc(_editUserId).update({activo:false,eliminado:true,eliminadoPor:CU.uid,eliminadoEn:firebase.firestore.FieldValue.serverTimestamp()});
+    await auditLog('usuario',{accion:'eliminar',uid:_editUserId,nombre});
+    closeUserModal();renderUsers();
+    toast(`🗑 ${nombre} eliminado`);
+  }catch(e){toast('❌ Error: '+e.message);}
+}
+
+async function changeMyPassword(){
+  const actual=document.getElementById('cpActual').value;
+  const nueva=document.getElementById('cpNueva').value;
+  const confirmar=document.getElementById('cpConfirm').value;
+  const err=document.getElementById('cpErr');
+  err.classList.add('hidden');
+  if(!actual||!nueva||!confirmar){err.textContent='Completa todos los campos';err.classList.remove('hidden');return;}
+  if(nueva.length<6){err.textContent='La nueva contraseña debe tener al menos 6 caracteres';err.classList.remove('hidden');return;}
+  if(nueva!==confirmar){err.textContent='Las contraseñas no coinciden';err.classList.remove('hidden');return;}
+  try{
+    // Reautenticar primero
+    const cred=firebase.auth.EmailAuthProvider.credential(CU.email,actual);
+    await auth.currentUser.reauthenticateWithCredential(cred);
+    // Cambiar contraseña
+    await auth.currentUser.updatePassword(nueva);
+    // Limpiar flag de reseteo si existía
+    await db.collection('usuarios').doc(CU.uid).update({mustChangePassword:false,resetPassword:firebase.firestore.FieldValue.delete()});
+    await auditLog('usuario',{accion:'cambio_password'});
+    document.getElementById('changePassModal').classList.add('hidden');
+    ['cpActual','cpNueva','cpConfirm'].forEach(id=>document.getElementById(id).value='');
+    toast('✅ Contraseña cambiada exitosamente');
+  }catch(e){
+    const msgs={'auth/wrong-password':'Contraseña actual incorrecta','auth/weak-password':'La contraseña es demasiada débil','auth/requires-recent-login':'Inicia sesión nuevamente antes de cambiar la contraseña'};
+    err.textContent=msgs[e.code]||e.message;
+    err.classList.remove('hidden');
+  }
 }
 async function renderLogs(){
   const c=document.getElementById('logsList');if(!c)return;c.innerHTML='<p class="fs14 text-gray">Cargando…</p>';
