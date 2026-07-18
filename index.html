@@ -176,6 +176,7 @@ tr:hover td{background:var(--g50)}
 .log-user{font-weight:600;color:var(--a700)}
 .section{display:none}.section.active{display:block}
 .role-superadmin{background:#F3E8FF;color:#7C3AED}
+.role-gerente{background:#FEF3C7;color:#B45309}
 .role-admin{background:var(--b100);color:var(--b600)}
 .role-operador{background:var(--gr100);color:var(--gr600)}
 .cbars{display:flex;align-items:flex-end;gap:4px;height:160px}
@@ -558,7 +559,7 @@ tr:hover td{background:var(--g50)}
     <div class="fld"><label class="lbl">Email</label><input class="inp" type="email" id="uEmail"/></div>
     <div class="fld" id="uPassField"><label class="lbl">Contraseña (mín. 6 caracteres)</label><input class="inp" type="password" id="uPass"/></div>
     <div class="g2">
-      <div class="fld"><label class="lbl">Rol</label><select class="sel w100" id="uRol"><option value="operador">Operador</option><option value="admin">Administrador</option><option value="superadmin">Super Admin</option></select></div>
+      <div class="fld"><label class="lbl">Rol</label><select class="sel w100" id="uRol"><option value="operador">Operador</option><option value="admin">Administrador</option><option value="gerente">Gerente</option><option value="superadmin">Super Admin</option></select></div>
       <div class="fld"><label class="lbl">Sucursal</label><select class="sel w100" id="uSucursal"></select></div>
     </div>
     <div class="fld"><label class="lbl">Turno asignado</label><select class="sel w100" id="uTurno"><option value="">Cualquier turno</option><option value="mañana">☀️ Mañana</option><option value="tarde">🌤 Tarde</option><option value="noche">🌙 Noche</option></select></div>
@@ -649,11 +650,17 @@ async function showApp(){
   document.getElementById('turnoLabel').textContent=CU.turno?(emoji[CU.turno]||'')+''+CU.turno:'';
   document.getElementById('turnoFechaOp').textContent=new Date().toLocaleDateString('es-CL',{weekday:'short',day:'numeric',month:'short'});
   const rb=document.getElementById('roleLabel');
-  rb.className='badge role-'+CU.rol;rb.textContent=CU.rol==='superadmin'?'Super Admin':CU.rol==='admin'?'Admin':'Operador';
+  rb.className='badge role-'+CU.rol;
+  rb.textContent=CU.rol==='superadmin'?'Super Admin':CU.rol==='gerente'?'Gerente':CU.rol==='admin'?'Admin':'Operador';
   const isOp=CU.rol==='operador',isAdm=CU.rol!=='operador';
   document.getElementById('opNav').classList.toggle('hidden',!isOp);
   document.getElementById('adNav').classList.toggle('hidden',!isAdm);
   if(CU.rol==='superadmin')document.getElementById('superAdminNav').style.display='block';
+  if(CU.rol==='gerente'){
+    document.getElementById('superAdminNav').style.display='block';
+    // Gerente: hide users management, show only logs
+    document.querySelectorAll('#superAdminNav .ni[data-sec="sa-users"]').forEach(b=>b.style.display='none');
+  }
   document.querySelectorAll('.ni[data-sec]').forEach(btn=>btn.addEventListener('click',()=>showSec(btn.dataset.sec,btn)));
   await Promise.all([loadInventario(),loadVentas(),loadRetiros(),loadTurnos()]);
   renderBills('apBills','AP');renderBills('ciBills','CI');renderCiPosInputs();renderAjustes();
@@ -678,9 +685,21 @@ async function seedInventario(){
   const batch=db.batch();cigs.forEach(c=>{const ref=db.collection('inventario').doc();batch.set(ref,{...c,creadoEn:firebase.firestore.FieldValue.serverTimestamp()});});
   await batch.commit();await loadInventario();
 }
-async function loadVentas(){try{const snap=await db.collection('ventas').where('sucursalId','==',CU.sucursalId||'').orderBy('fecha','desc').limit(90).get();VENTAS=snap.docs.map(d=>({id:d.id,...d.data()}));}catch(e){console.error('Ventas:',e);}}
+async function loadVentas(){
+  try{
+    let q=db.collection('ventas').orderBy('fecha','desc').limit(90);
+    if(CU.rol!=='superadmin'&&CU.rol!=='gerente') q=q.where('sucursalId','==',CU.sucursalId||'');
+    const snap=await q.get();VENTAS=snap.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(e){console.error('Ventas:',e);}
+}
 async function loadRetiros(){try{const snap=await db.collection('retiros').where('sucursalId','==',CU.sucursalId||'').where('fecha','==',today()).get();RETIROS=snap.docs.map(d=>({id:d.id,...d.data()}));renderRetList();}catch(e){console.error('Retiros:',e);}}
-async function loadTurnos(){try{let q=db.collection('turnos').orderBy('fecha','desc').limit(60);if(CU.rol!=='superadmin')q=q.where('sucursalId','==',CU.sucursalId||'');const snap=await q.get();TURNOS=snap.docs.map(d=>({id:d.id,...d.data()}));}catch(e){console.error('Turnos:',e);}}
+async function loadTurnos(){
+  try{
+    let q=db.collection('turnos').orderBy('fecha','desc').limit(60);
+    if(CU.rol!=='superadmin'&&CU.rol!=='gerente') q=q.where('sucursalId','==',CU.sucursalId||'');
+    const snap=await q.get();TURNOS=snap.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(e){console.error('Turnos:',e);}
+}
 
 function toggleSidebar(){document.getElementById('sb').classList.toggle('open');document.getElementById('ov').style.display='block';}
 function closeSidebar(){document.getElementById('sb').classList.remove('open');document.getElementById('ov').style.display='none';}
@@ -805,7 +824,9 @@ async function enviarCierre(){
   const efAp=totalBills(AP),saldoEsp=efAp+abHoy-retHoy,diffEf=ef-saldoEsp;
   const sis=CI.sis||{},sisTotal=(sis.ef||0)+(sis.tarj||0)+(sis.otros||0),totalReal=ef+posTotal+transf,diffSis=totalReal-sisTotal;
   const turno={fecha:today(),horaAp:AP.hora,horaCi:CI.hora,operador:CU.nombre,uid:CU.uid,sucursal:CU.sucursalNombre||'',sucursalId:CU.sucursalId||'',turno:CU.turno||'',efAp,efCi:ef,posTotal,transf,totalReal,retiros:retHoy,abonos:abHoy,saldoEsp,diffEf,sisTotal,diffSis,sis:{...sis},pos:POS_TERMINALES.map(t=>({name:t.name,ap:AP.pos?.[t.id]||0,ci:CI.pos[t.id]||0})),cigarrosAp:[...(AP.cigarros||[])],cigarrosCi:[...(CI.cigarros||[])],timestamp:firebase.firestore.FieldValue.serverTimestamp()};
-  try{await db.collection('turnos').add(turno);TURNOS.unshift({id:'new',...turno});await auditLog('cierre',{diffEf,diffSis,totalReal});confetti();
+  try{await db.collection('turnos').add(turno);TURNOS.unshift({id:'new',...turno});await auditLog('cierre',{diffEf,diffSis,totalReal});
+    notificarGerentes(turno);
+    confetti();
     if(diffEf!==0||diffSis!==0){const msg=[];if(diffEf!==0)msg.push(`Efectivo: ${diffEf>=0?'+':''}${clp(diffEf)}`);if(diffSis!==0)msg.push(`vs Sistema: ${diffSis>=0?'+':''}${clp(diffSis)}`);showDiffAlert(msg.join(' | '),diffEf<0||diffSis<0);}
     else toast('✅ Cierre enviado — caja cuadra',4000);
   }catch(e){toast('❌ Error: '+e.message,5000);}
@@ -900,6 +921,41 @@ function generarReporteInv(){const c=document.getElementById('repInvPreview');if
 async function enviarReporteInv(){generarReporteInv();const tienda=CFG.tienda?.nombre||'Kombi Store',cats=[...new Set(INVENTARIO.map(i=>i.cat))],rows=[];cats.forEach(cat=>{rows.push({header:cat.toUpperCase()});INVENTARIO.filter(i=>i.cat===cat).forEach(i=>rows.push({label:i.nombre+(i.stock<=i.min&&i.min>0?' ⚠':''),value:`${i.stock} u — ${clp(i.precio)}`,neg:i.stock<=i.min&&i.min>0}));});await enviarEmail(`Inventario ${tienda}`,`Inventario ${new Date().toLocaleDateString('es-CL')}`,buildHTMLTable(rows),'inventario');}
 async function enviarTurnoDesdeModal(){const t=TURNOS.find(x=>x.id===_modalTurnoId);if(!t)return;const tienda=CFG.tienda?.nombre||'Kombi Store',emoji={'mañana':'☀️','tarde':'🌤','noche':'🌙'};await enviarEmail(`Cierre ${emoji[t.turno]||''} ${t.turno||''} — ${tienda} — ${fdate(t.fecha)}`,buildTurnoText(t),buildHTMLTable([{header:'EFECTIVO'},{label:'Apertura',value:clp(t.efAp)},{label:'Cierre',value:clp(t.efCi)},{label:'Retiros',value:'-'+clp(t.retiros),neg:true},{label:'Abonos',value:'+'+clp(t.abonos),pos:true},{label:'Diferencia',value:(t.diffEf>=0?'+':'')+clp(t.diffEf),neg:t.diffEf<0,pos:t.diffEf>0,total:true},{header:'TOTAL'},{label:'Total contado',value:clp(t.totalReal),total:true},{label:'Dif. Sistema',value:(t.diffSis>=0?'+':'')+clp(t.diffSis),neg:t.diffSis<0,pos:t.diffSis>0,total:true}]),t.diffEf!==0||t.diffSis!==0?'diferencia':'cierre');}
 
+/* ============ NOTIFICACIÓN GERENTES ============ */
+async function notificarGerentes(turno){
+  const url=getGasUrl(); if(!url) return;
+  try{
+    // Load gerentes from Firestore
+    const snap=await db.collection('usuarios').where('rol','==','gerente').where('activo','==',true).get();
+    const gerentes=snap.docs.map(d=>d.data());
+    if(!gerentes.length) return;
+    const tienda=CFG.tienda?.nombre||'Kombi Store';
+    const emoji={'mañana':'☀️','tarde':'🌤','noche':'🌙'};
+    const diffOk=turno.diffEf===0&&turno.diffSis===0;
+    const tipo=diffOk?'cierre':'diferencia';
+    const asunto=`${diffOk?'✅':'⚠️'} Cierre ${emoji[turno.turno]||''} ${turno.turno} — ${turno.sucursal} — ${fdate(turno.fecha)}`;
+    const rows=[
+      {header:`${turno.sucursal} · ${turno.operador} · ${turno.horaAp||'—'} → ${turno.horaCi||'—'}`},
+      {label:'Efectivo apertura',value:clp(turno.efAp)},
+      {label:'Efectivo cierre',value:clp(turno.efCi)},
+      {label:'Retiros',value:'-'+clp(turno.retiros),neg:true},
+      {label:'Abonos',value:'+'+clp(turno.abonos),pos:true},
+      {label:'Diferencia efectivo',value:(turno.diffEf>=0?'+':'')+clp(turno.diffEf)+' '+(turno.diffEf===0?'✓':'⚠'),neg:turno.diffEf<0,pos:turno.diffEf===0,total:true},
+      {label:'Total contado',value:clp(turno.totalReal),total:true},
+      {label:'Diferencia sistema',value:(turno.diffSis>=0?'+':'')+clp(turno.diffSis)+' '+(turno.diffSis===0?'✓':'⚠'),neg:turno.diffSis<0,pos:turno.diffSis===0,total:true},
+    ];
+    const html=buildHTMLTable(rows);
+    // Send to each gerente via GAS (GAS sends to appkombi@gmail.com as configured)
+    // We pass gerente emails in the subject so GAS can CC them if configured
+    const gerenteMails=gerentes.map(g=>g.email).join(',');
+    let iframe=document.getElementById('gas_iframe');
+    if(!iframe){iframe=document.createElement('iframe');iframe.name='gas_iframe';iframe.id='gas_iframe';iframe.style.display='none';document.body.appendChild(iframe);}
+    const form=document.createElement('form');form.method='POST';form.action=url;form.target='gas_iframe';form.style.display='none';
+    [{k:'asunto',v:asunto},{k:'cuerpo',v:buildTurnoText(turno)},{k:'html',v:html},{k:'tipo',v:tipo},{k:'cc',v:gerenteMails}].forEach(({k,v})=>{const i=document.createElement('input');i.type='hidden';i.name=k;i.value=v;form.appendChild(i);});
+    document.body.appendChild(form);form.submit();form.remove();
+  }catch(e){console.warn('Notif gerentes:',e);}
+}
+
 function renderAjustes(){const t=CFG.tienda||{};const ajN=document.getElementById('ajNombre');if(ajN)ajN.value=t.nombre||'';const ajD=document.getElementById('ajDir');if(ajD)ajD.value=t.dir||'';const sl=CFG.sisLabels||{};const ajEf=document.getElementById('ajSisLblEf');if(ajEf)ajEf.value=sl.ef||'Efectivo';const ajTj=document.getElementById('ajSisLblTarj');if(ajTj)ajTj.value=sl.tarj||'Tarjetas / POS';const ajOt=document.getElementById('ajSisLblOtros');if(ajOt)ajOt.value=sl.otros||'Amipass, Edenred, etc.';renderAjSucList();renderPosTermList();renderAjCkList('apertura');renderAjCkList('cierre');renderPrecioHist();if(CFG.gasUrl){const gi=document.getElementById('gasUrlInput');if(gi)gi.value=CFG.gasUrl;}}
 async function saveTienda(){CFG.tienda={nombre:document.getElementById('ajNombre').value,dir:document.getElementById('ajDir').value};await db.collection('config').doc('global').update({tienda:CFG.tienda});toast('✅ Guardado');}
 async function saveSisLabels(){CFG.sisLabels={ef:document.getElementById('ajSisLblEf').value.trim()||'Efectivo',tarj:document.getElementById('ajSisLblTarj').value.trim()||'Tarjetas / POS',otros:document.getElementById('ajSisLblOtros').value.trim()||'Amipass, Edenred, etc.'};await db.collection('config').doc('global').update({sisLabels:CFG.sisLabels});refreshCiSisTotal();toast('✅ Etiquetas actualizadas');}
@@ -916,7 +972,10 @@ async function renderPrecioHist(){const c=document.getElementById('ajPrecioHist'
 
 async function renderUsers(){
   const c=document.getElementById('usersBody');if(!c)return;c.innerHTML='<tr><td colspan="7" class="text-gray">Cargando…</td></tr>';
-  try{const snap=await db.collection('usuarios').get();const users=snap.docs.map(d=>({id:d.id,...d.data()}));const rc={superadmin:'role-superadmin',admin:'role-admin',operador:'role-operador'};c.innerHTML=users.map(u=>`<tr><td class="fw6">${u.nombre||'—'}</td><td class="fs13 text-gray">${u.email}</td><td><span class="badge ${rc[u.rol]||''}">${u.rol}</span></td><td class="fs13">${(SUCURSALES.find(s=>s.id===u.sucursalId)?.nombre)||'—'}</td><td class="fs13">${u.turno||'—'}</td><td><span class="badge ${u.activo?'bg':'br'}">${u.activo?'Activo':'Inactivo'}</span></td><td><div style="display:flex;gap:.375rem"><button class="btn btn-s sm" onclick="editUser('${u.id}')">✎</button><button class="btn ${u.activo?'btn-d':'btn-p'} sm" onclick="toggleUser('${u.id}',${u.activo})">${u.activo?'Desactivar':'Activar'}</button></div></td></tr>`).join('');}
+  try{const snap=await db.collection('usuarios').get();const users=snap.docs.map(d=>({id:d.id,...d.data()}));
+    const rc={superadmin:'role-superadmin',gerente:'role-gerente',admin:'role-admin',operador:'role-operador'};
+    const rl={superadmin:'Super Admin',gerente:'Gerente',admin:'Admin',operador:'Operador'};
+    c.innerHTML=users.map(u=>`<tr><td class="fw6">${u.nombre||'—'}</td><td class="fs13 text-gray">${u.email}</td><td><span class="badge ${rc[u.rol]||''}">${rl[u.rol]||u.rol}</span></td><td class="fs13">${u.rol==='gerente'||u.rol==='superadmin'?'Todas':(SUCURSALES.find(s=>s.id===u.sucursalId)?.nombre)||'—'}</td><td class="fs13">${u.turno||'—'}</td><td><span class="badge ${u.activo?'bg':'br'}">${u.activo?'Activo':'Inactivo'}</span></td><td><div style="display:flex;gap:.375rem"><button class="btn btn-s sm" onclick="editUser('${u.id}')">✎</button><button class="btn ${u.activo?'btn-d':'btn-p'} sm" onclick="toggleUser('${u.id}',${u.activo})">${u.activo?'Desactivar':'Activar'}</button></div></td></tr>`).join('');}
   catch(e){c.innerHTML=`<tr><td colspan="7" class="text-gray">Error: ${e.message}</td></tr>`;}
 }
 async function toggleUser(id,activo){try{await db.collection('usuarios').doc(id).update({activo:!activo});await auditLog('usuario',{accion:activo?'desactivar':'activar',uid:id});toast(`Usuario ${activo?'desactivado':'activado'}`);renderUsers();}catch(e){toast('❌ '+e.message);}}
