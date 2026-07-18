@@ -55,6 +55,9 @@ input,select,textarea{font-family:inherit}
 .btn-login{width:100%;padding:.875rem;background:var(--a500);border:none;border-radius:var(--rad);font-size:1rem;font-weight:700;color:#fff;transition:all .2s}
 .btn-login:hover{background:var(--a600);transform:translateY(-1px)}
 .login-err{background:var(--r100);color:var(--r600);padding:.75rem 1rem;border-radius:var(--rad);font-size:.875rem;font-weight:500;margin-top:.75rem;text-align:center}
+.turno-btn{padding:.625rem .5rem;border:1.5px solid var(--g200);border-radius:8px;background:#fff;font-size:.875rem;font-weight:500;color:var(--g600);cursor:pointer;transition:all .15s;text-align:center}
+.turno-btn:hover{border-color:var(--a400);color:var(--a700)}
+.turno-btn.active{background:var(--a500);border-color:var(--a500);color:#fff;font-weight:700}
 #app{display:none;height:100vh;flex-direction:column}
 #app.v{display:flex}
 .topbar{height:56px;background:#fff;border-bottom:1px solid var(--g200);display:flex;align-items:center;padding:0 1rem;gap:1rem;flex-shrink:0;z-index:30}
@@ -176,9 +179,12 @@ tr:hover td{background:var(--g50)}
 .log-user{font-weight:600;color:var(--a700)}
 .section{display:none}.section.active{display:block}
 .role-superadmin{background:#F3E8FF;color:#7C3AED}
-.role-gerente{background:#FEF3C7;color:#B45309}
 .role-admin{background:var(--b100);color:var(--b600)}
 .role-operador{background:var(--gr100);color:var(--gr600)}
+.role-gerente{background:#FEF3C7;color:#B45309}
+.rep-tab{padding:.5rem 1rem;border:none;background:none;font-size:.875rem;font-weight:500;color:var(--g500);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s}
+.rep-tab:hover{color:var(--g900)}
+.rep-tab.active{color:var(--a600);border-bottom-color:var(--a500);font-weight:700}
 .cbars{display:flex;align-items:flex-end;gap:4px;height:160px}
 .cbw{display:flex;flex-direction:column;align-items:center;flex:1;gap:4px}
 .cbar{width:100%;background:var(--a200);border-radius:4px 4px 0 0;min-height:4px;transition:height .5s}
@@ -242,12 +248,41 @@ tr:hover td{background:var(--g50)}
       </div>
     </div>
     <div class="lr">
-      <h2>Iniciar Sesión</h2>
-      <p class="sub">Accede con tu correo y contraseña</p>
-      <div class="fg"><label>Correo electrónico</label><input type="email" id="lEmail" placeholder="tu@correo.com" onkeydown="if(event.key==='Enter')document.getElementById('lPass').focus()"/></div>
-      <div class="fg"><label>Contraseña</label><input type="password" id="lPass" placeholder="••••••••" onkeydown="if(event.key==='Enter')login()"/></div>
-      <button class="btn-login" onclick="login()">Ingresar</button>
-      <div class="login-err hidden" id="lErr">Correo o contraseña incorrectos</div>
+
+      <!-- PASO 1: Credenciales -->
+      <div id="loginStep1">
+        <h2>Iniciar Sesión</h2>
+        <p class="sub">Accede con tu correo y contraseña</p>
+        <div class="fg"><label>Correo electrónico</label><input type="email" id="lEmail" placeholder="tu@correo.com" onkeydown="if(event.key==='Enter')document.getElementById('lPass').focus()"/></div>
+        <div class="fg"><label>Contraseña</label><input type="password" id="lPass" placeholder="••••••••" onkeydown="if(event.key==='Enter')login()"/></div>
+        <button class="btn-login" onclick="login()">Ingresar</button>
+        <div class="login-err hidden" id="lErr">Correo o contraseña incorrectos</div>
+      </div>
+
+      <!-- PASO 2: Selección de sucursal y turno -->
+      <div id="loginStep2" style="display:none">
+        <h2 id="loginStep2Title">¿Dónde estás trabajando hoy?</h2>
+        <p class="sub" id="loginStep2Sub">Confirma tu sucursal y turno para este ingreso</p>
+        <div class="fg">
+          <label>Sucursal</label>
+          <select class="sel w100" id="lSucursal" style="padding:.75rem 1rem;font-size:.9375rem"></select>
+        </div>
+        <div class="fg" id="lRolField" style="display:none">
+          <label>¿Con qué rol ingresas hoy?</label>
+          <div id="lRolBtns" style="display:flex;flex-direction:column;gap:.375rem"></div>
+        </div>
+        <div class="fg">
+          <label>Turno</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem">
+            <button type="button" class="turno-btn active" id="tBtnMan" onclick="selectTurno('mañana',this)">☀️ Mañana</button>
+            <button type="button" class="turno-btn" id="tBtnTar" onclick="selectTurno('tarde',this)">🌤 Tarde</button>
+            <button type="button" class="turno-btn" id="tBtnNoc" onclick="selectTurno('noche',this)">🌙 Noche</button>
+          </div>
+        </div>
+        <button class="btn-login" onclick="confirmarSucursal()">Entrar →</button>
+        <button type="button" onclick="volverLogin()" style="width:100%;margin-top:.75rem;padding:.625rem;background:none;border:none;color:var(--g500);font-size:.875rem;cursor:pointer">← Volver</button>
+      </div>
+
     </div>
   </div>
 </div>
@@ -468,37 +503,150 @@ tr:hover td{background:var(--g50)}
       </div>
 
       <div class="section" id="ad-inv">
-        <div class="ph"><h2>Inventario</h2></div>
+        <div class="ph"><h2>Inventario</h2><p>Gestión de stock y productos</p></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-wrap:wrap;gap:.5rem">
           <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
             <input class="inp" type="search" placeholder="Buscar…" style="max-width:200px" oninput="filterInv(this.value)"/>
             <div id="invCatTabs" style="display:flex;gap:.375rem;flex-wrap:wrap"></div>
           </div>
-          <button class="btn btn-p" onclick="openPM()">+ Nuevo Producto</button>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+            <button class="btn btn-s" onclick="document.getElementById('invImportCard').classList.toggle('hidden')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Importar archivo
+            </button>
+            <button class="btn btn-p" onclick="openPM()">+ Nuevo Producto</button>
+          </div>
+        </div>
+        <!-- Import card -->
+        <div class="card hidden mb4" id="invImportCard">
+          <div class="ct">📂 Importar Inventario desde archivo</div>
+          <p class="fs13 text-gray mb4">Acepta Excel (.xlsx) o CSV (.csv). La primera fila debe tener los encabezados. Los campos reconocidos son: <strong>nombre, sku, categoria, marca, stock, minimo, precio</strong>. El nombre es obligatorio.</p>
+          <div style="border:2px dashed var(--g300);border-radius:10px;padding:1.5rem;text-align:center;cursor:pointer;transition:all .2s;position:relative;margin-bottom:1rem" id="invDropZone" onclick="document.getElementById('invFileInput').click()" ondragover="event.preventDefault();this.style.borderColor='var(--a500)'" ondragleave="this.style.borderColor='var(--g300)'" ondrop="handleInvDrop(event)">
+            <input type="file" id="invFileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleInvFile(this.files[0])"/>
+            <div style="font-size:2rem;margin-bottom:.5rem">📄</div>
+            <div class="fw6 fs14">Arrastra un archivo aquí o haz click</div>
+            <div class="fs13 text-gray mt2">Excel (.xlsx) o CSV (.csv)</div>
+          </div>
+          <div id="invImportPreview" class="hidden">
+            <div style="background:var(--g50);border-radius:8px;padding:.875rem;margin-bottom:1rem;font-size:.8125rem">
+              <div id="invImportSummary"></div>
+            </div>
+            <div class="tw" style="max-height:280px;overflow-y:auto;margin-bottom:1rem">
+              <table><thead><tr id="invImportHeaders"></tr></thead><tbody id="invImportRows"></tbody></table>
+            </div>
+            <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center">
+              <div class="fld" style="margin:0;flex:1;min-width:160px">
+                <label class="lbl">Modo de importación</label>
+                <select class="sel w100" id="invImportMode">
+                  <option value="merge">Actualizar existentes + agregar nuevos</option>
+                  <option value="add">Solo agregar nuevos (no modificar existentes)</option>
+                  <option value="replace">Reemplazar todo el inventario</option>
+                </select>
+              </div>
+              <button class="btn btn-p" onclick="confirmarImportInv()" style="margin-top:1.25rem">✅ Confirmar importación</button>
+              <button class="btn btn-s" onclick="cancelarImportInv()" style="margin-top:1.25rem">Cancelar</button>
+            </div>
+          </div>
         </div>
         <div class="tw"><table><thead><tr><th>Producto</th><th>Marca</th><th>Cat.</th><th>Stock</th><th>Mín.</th><th>Precio</th><th></th></tr></thead><tbody id="invBody"></tbody></table></div>
       </div>
 
       <div class="section" id="ad-rep">
-        <div class="ph"><h2>Reportes</h2></div>
-        <div style="max-width:640px;display:flex;flex-direction:column;gap:1rem">
-          <div class="card">
-            <div class="ct">🔗 Google Apps Script</div>
-            <p class="fs13 text-gray mb4">URL para envío de correos a appkombi@gmail.com</p>
-            <div class="fld"><label class="lbl">URL Web App</label><input class="inp" type="url" id="gasUrlInput" placeholder="https://script.google.com/macros/s/…/exec"/></div>
-            <div style="display:flex;gap:.75rem"><button class="btn btn-p" onclick="saveGasUrl()">Guardar</button><button class="btn btn-s" onclick="testGasUrl()">🧪 Probar</button></div>
-            <div id="gasStatus" style="margin-top:.75rem;font-size:.8125rem"></div>
+        <div class="ph"><h2>Reportes y Análisis</h2><p>Análisis de ventas, comparativas y envío por correo</p></div>
+
+        <!-- Tabs -->
+        <div style="display:flex;gap:.375rem;margin-bottom:1.25rem;border-bottom:2px solid var(--g200);padding-bottom:-.5rem">
+          <button class="rep-tab active" onclick="showRepTab('analisis',this)">📊 Análisis de Ventas</button>
+          <button class="rep-tab" onclick="showRepTab('comparativa',this)">🏬 Comparativa Sucursales</button>
+          <button class="rep-tab" onclick="showRepTab('envio',this)">📧 Enviar Reportes</button>
+        </div>
+
+        <!-- TAB: ANÁLISIS -->
+        <div id="repTabAnalisis">
+          <!-- Filtros -->
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
+            <select class="sel" id="anPeriodo" onchange="renderAnalisis()">
+              <option value="7">Últimos 7 días</option>
+              <option value="14">Últimos 14 días</option>
+              <option value="30" selected>Últimos 30 días</option>
+              <option value="90">Últimos 90 días</option>
+            </select>
+            <select class="sel" id="anSucursal" onchange="renderAnalisis()">
+              <option value="">Todas las sucursales</option>
+            </select>
+            <button class="btn btn-s sm" onclick="renderAnalisis()">🔄 Actualizar</button>
           </div>
-          <div class="card">
-            <div class="ct">📊 Reporte Diario</div>
-            <div class="fld"><label class="lbl">Fecha</label><input class="inp" type="date" id="repFecha"/></div>
-            <div style="display:flex;gap:.75rem"><button class="btn btn-p" onclick="generarReporteDiario()">Ver</button><button class="btn btn-s" onclick="enviarReporteDiario()">📧 Enviar</button></div>
-            <div id="repPreview" class="hidden" style="margin-top:1rem"></div>
+
+          <!-- KPIs -->
+          <div class="g4" id="anKPIs" style="margin-bottom:1rem"></div>
+
+          <!-- Gráficos -->
+          <div class="g2" style="margin-bottom:1rem">
+            <div class="card">
+              <div class="ct">📈 Tendencia de Ventas</div>
+              <div id="anTendencia" style="min-height:180px"></div>
+            </div>
+            <div class="card">
+              <div class="ct">💰 Composición Medios de Pago</div>
+              <div id="anComposicion" style="min-height:180px"></div>
+            </div>
           </div>
-          <div class="card">
-            <div class="ct">📦 Inventario</div>
-            <div style="display:flex;gap:.75rem"><button class="btn btn-p" onclick="generarReporteInv()">Ver</button><button class="btn btn-s" onclick="enviarReporteInv()">📧 Enviar</button></div>
-            <div id="repInvPreview" class="hidden" style="margin-top:1rem"></div>
+          <div class="g3" style="margin-bottom:1rem">
+            <div class="card">
+              <div class="ct">📅 Mejor día de la semana</div>
+              <div id="anDiaSemana"></div>
+            </div>
+            <div class="card">
+              <div class="ct">📆 Ventas por mes</div>
+              <div id="anPorMes"></div>
+            </div>
+            <div class="card">
+              <div class="ct">🎯 Métricas clave</div>
+              <div id="anMetricas"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB: COMPARATIVA -->
+        <div id="repTabComparativa" style="display:none">
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
+            <select class="sel" id="cmpPeriodo" onchange="renderComparativa()">
+              <option value="7">Últimos 7 días</option>
+              <option value="30" selected>Últimos 30 días</option>
+              <option value="90">Últimos 90 días</option>
+            </select>
+            <button class="btn btn-s sm" onclick="renderComparativa()">🔄 Actualizar</button>
+          </div>
+          <div id="cmpContent"></div>
+        </div>
+
+        <!-- TAB: ENVÍO -->
+        <div id="repTabEnvio" style="display:none;max-width:640px">
+          <div style="display:flex;flex-direction:column;gap:1rem">
+            <div class="card">
+              <div class="ct">🔗 Google Apps Script</div>
+              <p class="fs13 text-gray mb4">URL para envío de correos a appkombi@gmail.com</p>
+              <div class="fld"><label class="lbl">URL Web App</label><input class="inp" type="url" id="gasUrlInput" placeholder="https://script.google.com/macros/s/…/exec"/></div>
+              <div style="display:flex;gap:.75rem"><button class="btn btn-p" onclick="saveGasUrl()">Guardar</button><button class="btn btn-s" onclick="testGasUrl()">🧪 Probar</button></div>
+              <div id="gasStatus" style="margin-top:.75rem;font-size:.8125rem"></div>
+            </div>
+            <div class="card">
+              <div class="ct">📊 Reporte Diario</div>
+              <div class="fld"><label class="lbl">Fecha</label><input class="inp" type="date" id="repFecha"/></div>
+              <div style="display:flex;gap:.75rem"><button class="btn btn-p" onclick="generarReporteDiario()">Ver</button><button class="btn btn-s" onclick="enviarReporteDiario()">📧 Enviar</button></div>
+              <div id="repPreview" class="hidden" style="margin-top:1rem"></div>
+            </div>
+            <div class="card">
+              <div class="ct">📈 Reporte de Análisis</div>
+              <p class="fs13 text-gray mb4">Envía el análisis completo de ventas del período seleccionado.</p>
+              <div style="display:flex;gap:.75rem"><button class="btn btn-p" onclick="generarReporteAnalisis()">Ver</button><button class="btn btn-s" onclick="enviarReporteAnalisis()">📧 Enviar</button></div>
+              <div id="repAnalisisPreview" class="hidden" style="margin-top:1rem"></div>
+            </div>
+            <div class="card">
+              <div class="ct">📦 Reporte de Inventario</div>
+              <div style="display:flex;gap:.75rem"><button class="btn btn-p" onclick="generarReporteInv()">Ver</button><button class="btn btn-s" onclick="enviarReporteInv()">📧 Enviar</button></div>
+              <div id="repInvPreview" class="hidden" style="margin-top:1rem"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -581,8 +729,16 @@ tr:hover td{background:var(--g50)}
       <div style="font-size:.75rem;color:var(--g400);margin-top:.375rem">El usuario deberá usar esta clave la próxima vez que inicie sesión.</div>
     </div>
     <div class="g2">
-      <div class="fld"><label class="lbl">Rol</label><select class="sel w100" id="uRol"><option value="operador">Operador</option><option value="admin">Administrador</option><option value="gerente">Gerente</option><option value="superadmin">Super Admin</option></select></div>
-      <div class="fld"><label class="lbl">Sucursal</label><select class="sel w100" id="uSucursal"></select></div>
+      <div class="fld">
+        <label class="lbl">Roles (puede tener más de uno)</label>
+        <div style="display:flex;flex-direction:column;gap:.375rem;padding:.625rem;border:1.5px solid var(--g200);border-radius:8px;background:var(--g50)">
+          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer"><input type="checkbox" id="uRolOp" value="operador"/><span class="fs14">Operador</span></label>
+          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer"><input type="checkbox" id="uRolAdm" value="admin"/><span class="fs14">Administrador</span></label>
+          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer"><input type="checkbox" id="uRolGer" value="gerente"/><span class="fs14">Gerente</span></label>
+          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer"><input type="checkbox" id="uRolSA" value="superadmin"/><span class="fs14">Super Admin</span></label>
+        </div>
+      </div>
+      <div class="fld"><label class="lbl">Sucursal predeterminada</label><select class="sel w100" id="uSucursal"></select></div>
     </div>
     <div class="fld"><label class="lbl">Turno asignado</label><select class="sel w100" id="uTurno"><option value="">Cualquier turno</option><option value="mañana">☀️ Mañana</option><option value="tarde">🌤 Tarde</option><option value="noche">🌙 Noche</option></select></div>
     <div class="mf">
@@ -617,7 +773,7 @@ function toast(m,d=2800){const t=document.getElementById('toast');t.textContent=
 
 async function auditLog(action,details={}){
   if(!CU)return;
-  try{await db.collection('logs').add({uid:CU.uid,nombre:CU.nombre,email:CU.email,rol:CU.rol,sucursal:CU.sucursalNombre||'—',sucursalId:CU.sucursalId||'—',turno:CU.turno||'—',action,details,timestamp:firebase.firestore.FieldValue.serverTimestamp(),fecha:today(),hora:timeNow()});}catch(e){console.warn('Log:',e);}
+  try{await db.collection('logs').add({uid:CU.uid,nombre:CU.nombre,email:CU.email,rol:CU.rolActivo||CU.rol,sucursal:(CU.sucursalActivaNombre||CU.sucursalNombre)||'—',sucursalId:(CU.sucursalActiva||CU.sucursalId)||'—',turno:(CU.turnoActivo||CU.turno)||'—',action,details,timestamp:firebase.firestore.FieldValue.serverTimestamp(),fecha:today(),hora:timeNow()});}catch(e){console.warn('Log:',e);}
 }
 
 auth.onAuthStateChanged(async user=>{
@@ -625,14 +781,19 @@ auth.onAuthStateChanged(async user=>{
     try{
       const doc=await db.collection('usuarios').doc(user.uid).get();
       if(!doc.exists){
-        CU={uid:user.uid,email:user.email,nombre:user.email,rol:'superadmin',sucursalId:'',sucursalNombre:'',turno:''};
+        CU={uid:user.uid,email:user.email,nombre:user.email,rol:'superadmin',roles:['superadmin'],rolActivo:'superadmin',sucursalId:'',sucursalNombre:'',turno:''};
         await db.collection('usuarios').doc(user.uid).set({...CU,activo:true,creadoEn:firebase.firestore.FieldValue.serverTimestamp()});
       } else {
         const d=doc.data();
         if(!d.activo){await auth.signOut();showLogin('Tu cuenta está desactivada');return;}
+        // Normalize: ensure roles array exists
+        if(!Array.isArray(d.roles)||!d.roles.length){
+          d.roles=[d.rol||'operador'];
+        }
         CU={uid:user.uid,...d};
       }
-      await loadConfig();showApp();
+      await loadConfig();
+      showSucursalStep();
     }catch(e){console.error(e);showLogin('Error al cargar perfil');}
   } else {CU=null;showLoading(false);showLogin();}
 });
@@ -642,12 +803,101 @@ function showLogin(err=''){
   showLoading(false);document.getElementById('loginScreen').style.display='flex';document.getElementById('app').classList.remove('v');
   if(err){const e=document.getElementById('lErr');e.textContent=err;e.classList.remove('hidden');}
 }
+let _turnoSeleccionado='mañana';
+let _rolSeleccionado='operador';
+
+function selectRolLogin(r){
+  _rolSeleccionado=r;
+  document.querySelectorAll('[id^="lRolBtn_"]').forEach(el=>{
+    const isThis=el.id===`lRolBtn_${r}`;
+    el.style.border=`1.5px solid ${isThis?'var(--a500)':'var(--g200)'}`;
+    el.style.background=isThis?'var(--a50)':'#fff';
+    const dot=el.querySelector('div>div');
+    if(dot)dot.style.display=isThis?'block':'none';
+  });
+}
+
+function selectTurno(t,el){
+  _turnoSeleccionado=t;
+  document.querySelectorAll('.turno-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function volverLogin(){
+  document.getElementById('loginStep2').style.display='none';
+  document.getElementById('loginStep1').style.display='block';
+  auth.signOut();
+}
+
 async function login(){
   const email=document.getElementById('lEmail').value.trim(),pass=document.getElementById('lPass').value;
   const err=document.getElementById('lErr');err.classList.add('hidden');
   if(!email||!pass){err.textContent='Completa todos los campos';err.classList.remove('hidden');return;}
-  try{showLoading(true);await auth.signInWithEmailAndPassword(email,pass);}
-  catch(e){showLoading(false);err.textContent='Correo o contraseña incorrectos';err.classList.remove('hidden');}
+  try{
+    showLoading(true);
+    await auth.signInWithEmailAndPassword(email,pass);
+    // Auth listener will load profile — then we show step 2
+  }catch(e){
+    showLoading(false);err.textContent='Correo o contraseña incorrectos';err.classList.remove('hidden');
+  }
+}
+
+function showSucursalStep(){
+  showLoading(false);
+  const sel=document.getElementById('lSucursal');
+  if(sel){
+    sel.innerHTML=SUCURSALES.map(s=>`<option value="${s.id}">${s.nombre}</option>`).join('');
+    if(CU.sucursalId) sel.value=CU.sucursalId;
+  }
+  const turnoDefault=CU.turno||'mañana';
+  _turnoSeleccionado=turnoDefault;
+  document.querySelectorAll('.turno-btn').forEach(b=>b.classList.remove('active'));
+  const map={'mañana':'tBtnMan','tarde':'tBtnTar','noche':'tBtnNoc'};
+  document.getElementById(map[turnoDefault])?.classList.add('active');
+
+  // Role selector — show only if user has multiple roles
+  const roles=Array.isArray(CU.roles)&&CU.roles.length?CU.roles:[CU.rol||'operador'];
+  const rolField=document.getElementById('lRolField');
+  const rolBtns=document.getElementById('lRolBtns');
+  const ROLES_LABEL={operador:'👷 Operador',admin:'📊 Administrador',gerente:'📈 Gerente',superadmin:'🔑 Super Admin'};
+  if(roles.length>1){
+    rolField.style.display='block';
+    _rolSeleccionado=roles[0];
+    rolBtns.innerHTML=roles.map(r=>`
+      <label style="display:flex;align-items:center;gap:.625rem;padding:.625rem .875rem;border:1.5px solid ${r===roles[0]?'var(--a500)':'var(--g200)'};border-radius:8px;cursor:pointer;background:${r===roles[0]?'var(--a50)':'#fff'};transition:all .15s" id="lRolBtn_${r}" onclick="selectRolLogin('${r}')">
+        <div style="width:16px;height:16px;border-radius:50%;border:2px solid ${r===roles[0]?'var(--a500)':'var(--g300)'};display:flex;align-items:center;justify-content:center">
+          ${r===roles[0]?'<div style="width:8px;height:8px;border-radius:50%;background:var(--a500)"></div>':''}
+        </div>
+        <span class="fw6 fs14">${ROLES_LABEL[r]||r}</span>
+      </label>`).join('');
+  } else {
+    rolField.style.display='none';
+    _rolSeleccionado=roles[0];
+  }
+
+  document.getElementById('loginStep1').style.display='none';
+  document.getElementById('loginStep2').style.display='block';
+  if(CU.rol==='superadmin'||CU.rol==='gerente'||(Array.isArray(CU.roles)&&(CU.roles.includes('superadmin')||CU.roles.includes('gerente')))){
+    document.getElementById('loginStep2Title').textContent='Selecciona sucursal y turno';
+    document.getElementById('loginStep2Sub').textContent='Puedes acceder a cualquier sucursal';
+  } else {
+    document.getElementById('loginStep2Title').textContent='¿Dónde estás trabajando hoy?';
+    document.getElementById('loginStep2Sub').textContent=`Sucursal predeterminada: ${SUCURSALES.find(s=>s.id===CU.sucursalId)?.nombre||'—'}`;
+  }
+}
+
+async function confirmarSucursal(){
+  const sel=document.getElementById('lSucursal');
+  const sucursalId=sel?.value||(SUCURSALES[0]?.id||'');
+  const sucursalNombre=SUCURSALES.find(s=>s.id===sucursalId)?.nombre||'';
+  // Determine active rol for this session
+  const roles=Array.isArray(CU.roles)&&CU.roles.length?CU.roles:[CU.rol||'operador'];
+  CU.rolActivo=roles.length>1?_rolSeleccionado:roles[0];
+  CU.sucursalActiva=sucursalId;
+  CU.sucursalActivaNombre=sucursalNombre;
+  CU.turnoActivo=_turnoSeleccionado;
+  document.getElementById('loginScreen').style.display='none';
+  await showApp();
 }
 async function logout(){await auditLog('logout');await auth.signOut();}
 
@@ -669,39 +919,39 @@ async function loadConfig(){
 
 async function showApp(){
   showLoading(false);document.getElementById('loginScreen').style.display='none';document.getElementById('app').classList.add('v');
-  const suc=SUCURSALES.find(s=>s.id===CU.sucursalId);
-  document.getElementById('uLabel').textContent=CU.nombre||CU.email;
-  document.getElementById('sucursalLabel').textContent=suc?.nombre||'';
+  const sucId=CU.sucursalActiva||CU.sucursalId||'';
+  const sucNombre=CU.sucursalActivaNombre||(SUCURSALES.find(s=>s.id===sucId)?.nombre)||'';
+  const turno=CU.turnoActivo||CU.turno||'mañana';
   const emoji={'mañana':'☀️','tarde':'🌤','noche':'🌙'};
-  document.getElementById('turnoLabel').textContent=CU.turno?(emoji[CU.turno]||'')+''+CU.turno:'';
+  document.getElementById('uLabel').textContent=CU.nombre||CU.email;
+  document.getElementById('sucursalLabel').textContent=sucNombre;
+  document.getElementById('turnoLabel').textContent=` ${emoji[turno]||''} ${turno}`;
   document.getElementById('turnoFechaOp').textContent=new Date().toLocaleDateString('es-CL',{weekday:'short',day:'numeric',month:'short'});
   const rb=document.getElementById('roleLabel');
-  rb.className='badge role-'+CU.rol;
-  rb.textContent=CU.rol==='superadmin'?'Super Admin':CU.rol==='gerente'?'Gerente':CU.rol==='admin'?'Admin':'Operador';
-  const isOp=CU.rol==='operador',isAdm=CU.rol!=='operador';
+  rb.className='badge role-'+(CU.rolActivo||CU.rol);
+  rb.textContent=(CU.rolActivo||CU.rol)==='superadmin'?'Super Admin':(CU.rolActivo||CU.rol)==='gerente'?'Gerente':(CU.rolActivo||CU.rol)==='admin'?'Admin':'Operador';
+  const isOp=(CU.rolActivo||CU.rol)==='operador',isAdm=(CU.rolActivo||CU.rol)!=='operador';
   document.getElementById('opNav').classList.toggle('hidden',!isOp);
   document.getElementById('adNav').classList.toggle('hidden',!isAdm);
-  if(CU.rol==='superadmin')document.getElementById('superAdminNav').style.display='block';
-  if(CU.rol==='gerente'){
+  if((CU.rolActivo||CU.rol)==='superadmin')document.getElementById('superAdminNav').style.display='block';
+  if((CU.rolActivo||CU.rol)==='gerente'){
     document.getElementById('superAdminNav').style.display='block';
-    // Gerente: hide users management, show only logs
     document.querySelectorAll('#superAdminNav .ni[data-sec="sa-users"]').forEach(b=>b.style.display='none');
   }
   document.querySelectorAll('.ni[data-sec]').forEach(btn=>btn.addEventListener('click',()=>showSec(btn.dataset.sec,btn)));
-  await Promise.all([loadInventario(),loadVentas(),loadRetiros(),loadTurnos()]);
+  await Promise.all([loadInventario(),loadVentas(sucId),loadRetiros(sucId),loadTurnos(sucId)]);
   renderBills('apBills','AP');renderBills('ciBills','CI');renderCiPosInputs();renderAjustes();
   document.getElementById('vFecha').value=today();document.getElementById('repFecha').value=today();
   if(CFG.gasUrl){const gi=document.getElementById('gasUrlInput');if(gi)gi.value=CFG.gasUrl;}
   if(isOp)showSec('op-ap',document.querySelector('#opNav .ni'));
   else showSec('ad-dash',document.querySelector('#adNav .ni'));
-  // Prompt password change if flagged
   if(CU.mustChangePassword){
     setTimeout(()=>{
       toast('⚠️ Tu contraseña fue reiniciada. Por favor cámbiala.',5000);
       document.getElementById('changePassModal').classList.remove('hidden');
     },1000);
   }
-  await auditLog('login',{sucursal:CU.sucursalNombre,turno:CU.turno});
+  await auditLog('login',{sucursal:sucNombre,turno});
 }
 
 async function loadInventario(){
@@ -718,18 +968,26 @@ async function seedInventario(){
   const batch=db.batch();cigs.forEach(c=>{const ref=db.collection('inventario').doc();batch.set(ref,{...c,creadoEn:firebase.firestore.FieldValue.serverTimestamp()});});
   await batch.commit();await loadInventario();
 }
-async function loadVentas(){
+async function loadVentas(sucId){
   try{
+    const sid=sucId||CU.sucursalActiva||CU.sucursalId||'';
     let q=db.collection('ventas').orderBy('fecha','desc').limit(90);
-    if(CU.rol!=='superadmin'&&CU.rol!=='gerente') q=q.where('sucursalId','==',CU.sucursalId||'');
+    if((CU.rolActivo||CU.rol)!=='superadmin'&&(CU.rolActivo||CU.rol)!=='gerente') q=q.where('sucursalId','==',sid);
     const snap=await q.get();VENTAS=snap.docs.map(d=>({id:d.id,...d.data()}));
   }catch(e){console.error('Ventas:',e);}
 }
-async function loadRetiros(){try{const snap=await db.collection('retiros').where('sucursalId','==',CU.sucursalId||'').where('fecha','==',today()).get();RETIROS=snap.docs.map(d=>({id:d.id,...d.data()}));renderRetList();}catch(e){console.error('Retiros:',e);}}
-async function loadTurnos(){
+async function loadRetiros(sucId){
   try{
+    const sid=sucId||CU.sucursalActiva||CU.sucursalId||'';
+    const snap=await db.collection('retiros').where('sucursalId','==',sid).where('fecha','==',today()).get();
+    RETIROS=snap.docs.map(d=>({id:d.id,...d.data()}));renderRetList();
+  }catch(e){console.error('Retiros:',e);}
+}
+async function loadTurnos(sucId){
+  try{
+    const sid=sucId||CU.sucursalActiva||CU.sucursalId||'';
     let q=db.collection('turnos').orderBy('fecha','desc').limit(60);
-    if(CU.rol!=='superadmin'&&CU.rol!=='gerente') q=q.where('sucursalId','==',CU.sucursalId||'');
+    if(CU.rol!=='superadmin'&&CU.rol!=='gerente') q=q.where('sucursalId','==',sid);
     const snap=await q.get();TURNOS=snap.docs.map(d=>({id:d.id,...d.data()}));
   }catch(e){console.error('Turnos:',e);}
 }
@@ -743,6 +1001,7 @@ function showSec(id,el){
   el?.classList.add('active');
   if(id==='ad-dash')renderDash();if(id==='ad-hist')renderHistorial();if(id==='ad-v'){renderVChart();renderVH();}
   if(id==='ad-caja')renderCaja();if(id==='ad-inv')renderInv();if(id==='ad-aj')renderAjustes();
+  if(id==='ad-rep')renderAnalisis();
   if(id==='sa-users')renderUsers();if(id==='sa-logs')renderLogs();
   if(id==='op-ci'){renderCiPosInputs();renderCiMovFromRet();ciGoTo(1);}
   closeSidebar();
@@ -774,7 +1033,7 @@ function renderApResumen(){
 }
 async function saveApertura(){
   AP.saved=true;AP.hora=timeNow();
-  try{await db.collection('aperturas').doc(`${CU.sucursalId}_${today()}_${CU.turno}`).set({...AP,uid:CU.uid,operador:CU.nombre,sucursalId:CU.sucursalId,sucursal:CU.sucursalNombre||'',turno:CU.turno||'',fecha:today(),timestamp:firebase.firestore.FieldValue.serverTimestamp()});await auditLog('apertura',{efectivo:totalBills(AP)});document.getElementById('apW4')?.classList.replace('active','done');toast('✅ Apertura guardada');}
+  try{await db.collection('aperturas').doc(`${CU.sucursalActiva||CU.sucursalId}_${today()}_${CU.turnoActivo||CU.turno}`).set({...AP,uid:CU.uid,operador:CU.nombre,sucursalId:CU.sucursalActiva||CU.sucursalId,sucursal:CU.sucursalActivaNombre||CU.sucursalNombre||'',turno:CU.turnoActivo||CU.turno||'',fecha:today(),timestamp:firebase.firestore.FieldValue.serverTimestamp()});await auditLog('apertura',{efectivo:totalBills(AP)});document.getElementById('apW4')?.classList.replace('active','done');toast('✅ Apertura guardada');}
   catch(e){toast('❌ Error: '+e.message);}
 }
 
@@ -803,7 +1062,7 @@ function reqPinRetiro(){
   if(!monto){toast('Ingresa un monto');return;}
   reqPin(`Autorizar ${tipo==='retiro'?'Retiro':'Abono'}`,`Ingresa tu contraseña para ${clp(monto)}`,async()=>{
     const motivo=document.getElementById('retMotivo').value;
-    const retiro={tipo,monto,categoria,motivo,operador:CU.nombre,uid:CU.uid,sucursalId:CU.sucursalId||'',sucursal:CU.sucursalNombre||'',turno:CU.turno||'',hora:timeNow(),fecha:today(),timestamp:firebase.firestore.FieldValue.serverTimestamp()};
+    const retiro={tipo,monto,categoria,motivo,operador:CU.nombre,uid:CU.uid,sucursalId:CU.sucursalActiva||CU.sucursalId||'',sucursal:CU.sucursalActivaNombre||CU.sucursalNombre||'',turno:CU.turnoActivo||CU.turno||'',hora:timeNow(),fecha:today(),timestamp:firebase.firestore.FieldValue.serverTimestamp()};
     try{const ref=await db.collection('retiros').add(retiro);RETIROS.push({id:ref.id,...retiro});document.getElementById('retMonto').value='';document.getElementById('retMotivo').value='';renderRetList();await auditLog('retiro',{tipo,monto,categoria});toast(`✅ ${tipo==='retiro'?'Retiro':'Abono'} registrado`);}
     catch(e){toast('❌ Error: '+e.message);}
   });
@@ -832,7 +1091,7 @@ function renderCiMovFromRet(){
 }
 function renderCiResumen(){
   const c=document.getElementById('ciResumen');if(!c)return;
-  const isOp=CU.rol==='operador';document.getElementById('ciResumenTitle').textContent=isOp?'✅ Confirmar':'📊 Resumen de Cierre';
+  const isOp=(CU.rolActivo||CU.rol)==='operador';document.getElementById('ciResumenTitle').textContent=isOp?'✅ Confirmar':'📊 Resumen de Cierre';
   const ef=totalBills(CI),posTotal=POS_TERMINALES.reduce((a,t)=>a+(CI.pos[t.id]||0),0),transf=parseFloat(document.getElementById('ciTransf')?.value)||0;
   const retHoy=RETIROS.filter(r=>r.fecha===today()&&r.tipo==='retiro').reduce((a,r)=>a+r.monto,0),abHoy=RETIROS.filter(r=>r.fecha===today()&&r.tipo==='abono').reduce((a,r)=>a+r.monto,0);
   const efAp=totalBills(AP),saldoEsp=efAp+abHoy-retHoy,diffEf=ef-saldoEsp;
@@ -856,7 +1115,7 @@ async function enviarCierre(){
   const retHoy=RETIROS.filter(r=>r.fecha===today()&&r.tipo==='retiro').reduce((a,r)=>a+r.monto,0),abHoy=RETIROS.filter(r=>r.fecha===today()&&r.tipo==='abono').reduce((a,r)=>a+r.monto,0);
   const efAp=totalBills(AP),saldoEsp=efAp+abHoy-retHoy,diffEf=ef-saldoEsp;
   const sis=CI.sis||{},sisTotal=(sis.ef||0)+(sis.tarj||0)+(sis.otros||0),totalReal=ef+posTotal+transf,diffSis=totalReal-sisTotal;
-  const turno={fecha:today(),horaAp:AP.hora,horaCi:CI.hora,operador:CU.nombre,uid:CU.uid,sucursal:CU.sucursalNombre||'',sucursalId:CU.sucursalId||'',turno:CU.turno||'',efAp,efCi:ef,posTotal,transf,totalReal,retiros:retHoy,abonos:abHoy,saldoEsp,diffEf,sisTotal,diffSis,sis:{...sis},pos:POS_TERMINALES.map(t=>({name:t.name,ap:AP.pos?.[t.id]||0,ci:CI.pos[t.id]||0})),cigarrosAp:[...(AP.cigarros||[])],cigarrosCi:[...(CI.cigarros||[])],timestamp:firebase.firestore.FieldValue.serverTimestamp()};
+  const turno={fecha:today(),horaAp:AP.hora,horaCi:CI.hora,operador:CU.nombre,uid:CU.uid,sucursal:CU.sucursalActivaNombre||CU.sucursalNombre||'',sucursalId:CU.sucursalActiva||CU.sucursalId||'',turno:CU.turnoActivo||CU.turno||'',efAp,efCi:ef,posTotal,transf,totalReal,retiros:retHoy,abonos:abHoy,saldoEsp,diffEf,sisTotal,diffSis,sis:{...sis},pos:POS_TERMINALES.map(t=>({name:t.name,ap:AP.pos?.[t.id]||0,ci:CI.pos[t.id]||0})),cigarrosAp:[...(AP.cigarros||[])],cigarrosCi:[...(CI.cigarros||[])],timestamp:firebase.firestore.FieldValue.serverTimestamp()};
   try{await db.collection('turnos').add(turno);TURNOS.unshift({id:'new',...turno});await auditLog('cierre',{diffEf,diffSis,totalReal});
     notificarGerentes(turno);
     confetti();
@@ -913,7 +1172,7 @@ function calcVenta(){const e=parseFloat(document.getElementById('vEf')?.value)||
 async function saveVenta(){
   const fecha=document.getElementById('vFecha').value,ef=parseFloat(document.getElementById('vEf').value)||0,pos=parseFloat(document.getElementById('vPos').value)||0,tr=parseFloat(document.getElementById('vTr').value)||0;
   if(!ef&&!pos&&!tr){toast('Ingresa al menos un monto');return;}
-  const v={fecha,ef,pos,tr,total:ef+pos+tr,obs:document.getElementById('vObs').value,sucursalId:CU.sucursalId||'',sucursal:CU.sucursalNombre||'',uid:CU.uid,timestamp:firebase.firestore.FieldValue.serverTimestamp()};
+  const v={fecha,ef,pos,tr,total:ef+pos+tr,obs:document.getElementById('vObs').value,sucursalId:CU.sucursalActiva||CU.sucursalId||'',sucursal:CU.sucursalActivaNombre||CU.sucursalNombre||'',uid:CU.uid,timestamp:firebase.firestore.FieldValue.serverTimestamp()};
   try{const snap=await db.collection('ventas').where('fecha','==',fecha).where('sucursalId','==',CU.sucursalId||'').get();if(!snap.empty)await snap.docs[0].ref.update(v);else await db.collection('ventas').add(v);await loadVentas();renderVChart();renderVH();['vEf','vPos','vTr','vObs'].forEach(id=>document.getElementById(id).value='');document.getElementById('vTotal').textContent='$0';await auditLog('venta',{fecha,total:ef+pos+tr});toast('✅ Ventas guardadas');}
   catch(e){toast('❌ Error: '+e.message);}
 }
@@ -936,6 +1195,195 @@ async function saveProduct(){
   catch(err){toast('❌ Error: '+err.message);}
 }
 async function delProd(id){if(!confirm('¿Eliminar?'))return;try{await db.collection('inventario').doc(id).delete();await loadInventario();renderInv();toast('Eliminado');}catch(e){toast('❌ '+e.message);}}
+
+/* ============ REPORT TABS ============ */
+function showRepTab(tab,el){
+  ['analisis','comparativa','envio'].forEach(t=>{
+    const el2=document.getElementById('repTab'+t.charAt(0).toUpperCase()+t.slice(1));
+    if(el2)el2.style.display=t===tab?'block':'none';
+  });
+  document.querySelectorAll('.rep-tab').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  if(tab==='analisis')renderAnalisis();
+  if(tab==='comparativa')renderComparativa();
+  if(tab==='envio'){document.getElementById('repFecha').value=today();if(CFG.gasUrl){const gi=document.getElementById('gasUrlInput');if(gi)gi.value=CFG.gasUrl;}}
+}
+
+/* ============ ANALYTICS ============ */
+function getVentasFiltradas(dias,sucId){
+  const desde=new Date();desde.setDate(desde.getDate()-parseInt(dias));
+  const desdeStr=desde.toISOString().slice(0,10);
+  let v=VENTAS.filter(x=>x.fecha>=desdeStr);
+  if(sucId)v=v.filter(x=>x.sucursalId===sucId);
+  return v;
+}
+function renderAnalisis(){
+  const dias=document.getElementById('anPeriodo')?.value||30;
+  const sucId=document.getElementById('anSucursal')?.value||'';
+  const sel=document.getElementById('anSucursal');
+  if(sel&&sel.children.length<=1)SUCURSALES.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.nombre;sel.appendChild(o);});
+  const ventas=getVentasFiltradas(dias,sucId);
+  renderAnKPIs(ventas,dias);renderAnTendencia(ventas);renderAnComposicion(ventas);renderAnDiaSemana(ventas);renderAnPorMes(ventas);renderAnMetricas(ventas);
+}
+function renderAnKPIs(ventas,dias){
+  const c=document.getElementById('anKPIs');if(!c)return;
+  const total=ventas.reduce((a,v)=>a+v.total,0);
+  const prom=ventas.length?Math.round(total/ventas.length):0;
+  const sorted=[...ventas].sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  const mid=Math.floor(sorted.length/2);
+  const p1=sorted.slice(0,mid).reduce((a,v)=>a+v.total,0);
+  const p2=sorted.slice(mid).reduce((a,v)=>a+v.total,0);
+  const tend=p1>0?Math.round(((p2-p1)/p1)*100):0;
+  c.innerHTML=[
+    {l:`Total (${dias}d)`,v:clp(total),sub:`${ventas.length} días`,col:'var(--a500)'},
+    {l:'Promedio diario',v:clp(prom),sub:'por día con venta',col:'var(--b500)'},
+    {l:'Mejor día',v:ventas.length?clp(Math.max(...ventas.map(v=>v.total))):'—',sub:'en el período',col:'var(--gr500)'},
+    {l:'Tendencia',v:(tend>=0?'+':'')+tend+'%',sub:'vs primera mitad',col:tend>=0?'var(--gr600)':'var(--r600)'},
+  ].map(x=>`<div class="sc"><div class="lbl">${x.l}</div><div class="val" style="color:${x.col}">${x.v}</div><div class="sub">${x.sub}</div></div>`).join('');
+}
+function renderAnTendencia(ventas){
+  const c=document.getElementById('anTendencia');if(!c)return;
+  const sorted=[...ventas].sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  if(!sorted.length){c.innerHTML='<p class="fs14 text-gray" style="padding:1rem">Sin datos</p>';return;}
+  const max=Math.max(...sorted.map(v=>v.total),1);
+  c.innerHTML=`<div class="cbars" style="height:160px;margin-top:.5rem">${sorted.map(v=>{const h=Math.max(Math.round(v.total/max*140),4);return`<div class="cbw" title="${fdate(v.fecha)}: ${clp(v.total)}"><div class="cvl" style="font-size:.55rem">${v.total>=1000?Math.round(v.total/1000)+'k':''}</div><div class="cbar ${v.fecha===today()?'today':''}" style="height:${h}px"></div><div class="cbl">${v.fecha.slice(8)}</div></div>`;}).join('')}</div>`;
+}
+function renderAnComposicion(ventas){
+  const c=document.getElementById('anComposicion');if(!c)return;c.innerHTML='';
+  const ef=ventas.reduce((a,v)=>a+(v.ef||0),0),pos=ventas.reduce((a,v)=>a+(v.pos||0),0),tr=ventas.reduce((a,v)=>a+(v.tr||0),0),total=ef+pos+tr||1;
+  if(!ef&&!pos&&!tr){c.innerHTML='<p class="fs14 text-gray" style="padding:1rem">Sin datos</p>';return;}
+  [['💵 Efectivo',ef,'var(--a500)'],['💳 POS/Tarjeta',pos,'var(--b500)'],['🔄 Transferencias',tr,'var(--gr500)']].forEach(([l,v,col])=>{
+    const pct=Math.round(v/total*100);
+    c.innerHTML+=`<div style="margin-bottom:.875rem"><div style="display:flex;justify-content:space-between;font-size:.8125rem;margin-bottom:.3rem"><span class="fw6">${l}</span><span class="mono text-gray">${clp(v)} <span style="color:${col};font-weight:700">(${pct}%)</span></span></div><div style="height:10px;background:var(--g100);border-radius:5px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${col};border-radius:5px"></div></div></div>`;
+  });
+}
+function renderAnDiaSemana(ventas){
+  const c=document.getElementById('anDiaSemana');if(!c)return;
+  const ds=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const tots=Array(7).fill(0),cnts=Array(7).fill(0);
+  ventas.forEach(v=>{const d=new Date(v.fecha+'T12:00').getDay();tots[d]+=v.total;cnts[d]++;});
+  const avgs=tots.map((t,i)=>cnts[i]?Math.round(t/cnts[i]):0);
+  const max=Math.max(...avgs,1);
+  c.innerHTML=avgs.map((avg,i)=>`<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.375rem"><div style="width:28px;font-size:.75rem;font-weight:600;color:var(--g500)">${ds[i]}</div><div style="flex:1;height:20px;background:var(--g100);border-radius:4px;overflow:hidden"><div style="height:100%;width:${Math.round(avg/max*100)}%;background:${i===0||i===6?'var(--b400)':'var(--a400)'};border-radius:4px"></div></div><div style="width:64px;font-size:.75rem;font-family:var(--mono);text-align:right;color:var(--g600)">${avg?clp(avg):'—'}</div></div>`).join('');
+}
+function renderAnPorMes(ventas){
+  const c=document.getElementById('anPorMes');if(!c)return;
+  const meses={};ventas.forEach(v=>{const m=v.fecha.slice(0,7);if(!meses[m])meses[m]={total:0,dias:0};meses[m].total+=v.total;meses[m].dias++;});
+  const sorted=Object.entries(meses).sort((a,b)=>a[0].localeCompare(b[0]));
+  if(!sorted.length){c.innerHTML='<p class="fs14 text-gray">Sin datos</p>';return;}
+  c.innerHTML=sorted.map(([m,d])=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:.375rem 0;border-bottom:1px solid var(--g100)"><div><div style="font-size:.8125rem;font-weight:600">${m}</div><div style="font-size:.75rem;color:var(--g400)">${d.dias} días</div></div><div style="font-family:var(--mono);font-weight:700;font-size:.875rem;color:var(--a600)">${clp(d.total)}</div></div>`).join('');
+}
+function renderAnMetricas(ventas){
+  const c=document.getElementById('anMetricas');if(!c)return;
+  if(!ventas.length){c.innerHTML='<p class="fs14 text-gray">Sin datos</p>';return;}
+  const tots=ventas.map(v=>v.total).sort((a,b)=>a-b);
+  const median=tots[Math.floor(tots.length/2)]||0;
+  const totalAll=ventas.reduce((a,v)=>a+v.total,1);
+  const efTotal=ventas.reduce((a,v)=>a+(v.ef||0),0);
+  const diasEf=ventas.filter(v=>v.ef>v.pos+v.tr).length;
+  const diasPos=ventas.filter(v=>v.pos>v.ef+v.tr).length;
+  [{l:'Mediana diaria',v:clp(median)},{l:'Días efectivo dominante',v:diasEf+' días'},{l:'Días POS dominante',v:diasPos+' días'},{l:'% efectivo prom.',v:Math.round(efTotal/totalAll*100)+'%'},{l:'Días sin datos',v:ventas.filter(v=>!v.total).length+' días'}].forEach(m=>{c.innerHTML+=`<div style="display:flex;justify-content:space-between;padding:.375rem 0;border-bottom:1px solid var(--g100)"><span style="font-size:.8125rem;color:var(--g600)">${m.l}</span><span style="font-size:.8125rem;font-weight:600;font-family:var(--mono)">${m.v}</span></div>`;});
+}
+
+/* ============ COMPARATIVA ============ */
+function renderComparativa(){
+  const c=document.getElementById('cmpContent');if(!c)return;
+  const dias=parseInt(document.getElementById('cmpPeriodo')?.value||30);
+  const desde=new Date();desde.setDate(desde.getDate()-dias);
+  const desdeStr=desde.toISOString().slice(0,10);
+  const vf=VENTAS.filter(v=>v.fecha>=desdeStr);
+  if(!vf.length){c.innerHTML='<div class="card"><p class="fs14 text-gray">Sin datos en el período.</p></div>';return;}
+  const bySuc={};
+  vf.forEach(v=>{const sid=v.sucursalId||'?';const snom=v.sucursal||SUCURSALES.find(s=>s.id===sid)?.nombre||'Sin nombre';if(!bySuc[sid])bySuc[sid]={nombre:snom,total:0,ef:0,pos:0,tr:0,dias:new Set()};bySuc[sid].total+=v.total;bySuc[sid].ef+=v.ef||0;bySuc[sid].pos+=v.pos||0;bySuc[sid].tr+=v.tr||0;bySuc[sid].dias.add(v.fecha);});
+  const entries=Object.values(bySuc).sort((a,b)=>b.total-a.total);
+  const maxT=entries[0]?.total||1;
+  const granTotal=vf.reduce((a,v)=>a+v.total,1);
+  c.innerHTML=`<div class="card" style="margin-bottom:1rem"><div class="ct">Total por sucursal — últimos ${dias} días</div>${entries.map(s=>`<div style="margin-bottom:1rem"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.375rem"><span class="fw6">🏬 ${s.nombre}</span><span class="mono fw7" style="color:var(--a600)">${clp(s.total)}</span></div><div style="height:12px;background:var(--g100);border-radius:6px;overflow:hidden"><div style="height:100%;width:${Math.round(s.total/maxT*100)}%;background:var(--a500);border-radius:6px"></div></div><div style="display:flex;gap:1rem;margin-top:.375rem"><span class="fs12 text-gray">Ef:${clp(s.ef)}</span><span class="fs12 text-gray">POS:${clp(s.pos)}</span><span class="fs12 text-gray">Transf:${clp(s.tr)}</span><span class="fs12 text-gray">Prom/día:${clp(Math.round(s.total/s.dias.size))}</span></div></div>`).join('')}</div><div class="card"><div class="ct">Tabla comparativa</div><div class="tw"><table><thead><tr><th>Sucursal</th><th style="text-align:right">Total</th><th style="text-align:right">Prom/día</th><th style="text-align:right">Ef.</th><th style="text-align:right">POS</th><th style="text-align:right">Transf.</th><th style="text-align:right">% total</th></tr></thead><tbody>${entries.map(s=>`<tr><td class="fw6">🏬 ${s.nombre}</td><td style="text-align:right;font-family:var(--mono);font-weight:700;color:var(--a600)">${clp(s.total)}</td><td style="text-align:right;font-family:var(--mono)">${clp(Math.round(s.total/s.dias.size))}</td><td style="text-align:right;font-family:var(--mono)">${clp(s.ef)}</td><td style="text-align:right;font-family:var(--mono)">${clp(s.pos)}</td><td style="text-align:right;font-family:var(--mono)">${clp(s.tr)}</td><td style="text-align:right"><span class="badge ba">${Math.round(s.total/granTotal*100)}%</span></td></tr>`).join('')}</tbody></table></div></div>`;
+}
+
+/* ============ REPORTE ANÁLISIS ============ */
+function generarReporteAnalisis(){
+  const dias=document.getElementById('anPeriodo')?.value||30;
+  const sucId=document.getElementById('anSucursal')?.value||'';
+  const ventas=getVentasFiltradas(dias,sucId);
+  const c=document.getElementById('repAnalisisPreview');if(!c)return;
+  c.classList.remove('hidden');
+  if(!ventas.length){c.innerHTML='<div class="card"><p class="fs14 text-gray">Sin datos</p></div>';return;}
+  const total=ventas.reduce((a,v)=>a+v.total,0),ef=ventas.reduce((a,v)=>a+(v.ef||0),0),pos=ventas.reduce((a,v)=>a+(v.pos||0),0),tr=ventas.reduce((a,v)=>a+(v.tr||0),0);
+  const prom=Math.round(total/ventas.length)||0;
+  const ds=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'],tots=Array(7).fill(0),cnts=Array(7).fill(0);
+  ventas.forEach(v=>{const d=new Date(v.fecha+'T12:00').getDay();tots[d]+=v.total;cnts[d]++;});
+  const avgs=tots.map((t,i)=>cnts[i]?Math.round(t/cnts[i]):0);
+  const mejorDia=ds[avgs.indexOf(Math.max(...avgs))];
+  const sorted=[...ventas].sort((a,b)=>b.total-a.total);
+  c.innerHTML=`<div class="card" style="font-family:var(--mono);font-size:.8125rem;white-space:pre-wrap;line-height:1.7;background:var(--g50)"><strong>${CFG.tienda?.nombre||'Kombi Store'} — Análisis ${dias} días</strong>\n\nRESUMEN\n  Total:    ${clp(total)}\n  Prom/día: ${clp(prom)}\n  Mejor:    ${clp(sorted[0]?.total||0)} (${fdate(sorted[0]?.fecha||'')})\n\nCOMPOSICIÓN\n  Efectivo: ${clp(ef)} (${Math.round(ef/total*100)||0}%)\n  POS:      ${clp(pos)} (${Math.round(pos/total*100)||0}%)\n  Transf.:  ${clp(tr)} (${Math.round(tr/total*100)||0}%)\n\nMEJOR DÍA: ${mejorDia} (${clp(Math.max(...avgs))} promedio)\n</div>`;
+}
+async function enviarReporteAnalisis(){
+  generarReporteAnalisis();
+  const dias=document.getElementById('anPeriodo')?.value||30;
+  const sucId=document.getElementById('anSucursal')?.value||'';
+  const ventas=getVentasFiltradas(dias,sucId);
+  const tienda=CFG.tienda?.nombre||'Kombi Store';
+  const total=ventas.reduce((a,v)=>a+v.total,0),ef=ventas.reduce((a,v)=>a+(v.ef||0),0),pos=ventas.reduce((a,v)=>a+(v.pos||0),0),tr=ventas.reduce((a,v)=>a+(v.tr||0),0);
+  const prom=Math.round(total/ventas.length)||0;
+  const rows=[{header:`ANÁLISIS ${dias} DÍAS — ${tienda}`},{label:'Total',value:clp(total),total:true},{label:'Promedio/día',value:clp(prom)},{label:'Días',value:ventas.length+''},{header:'MEDIOS DE PAGO'},{label:'Efectivo',value:`${clp(ef)} (${Math.round(ef/total*100)||0}%)`},{label:'POS',value:`${clp(pos)} (${Math.round(pos/total*100)||0}%)`},{label:'Transf.',value:`${clp(tr)} (${Math.round(tr/total*100)||0}%)`}];
+  await enviarEmail(`Análisis ${tienda} — ${dias}d`,`Análisis ${dias} días: ${clp(total)}`,buildHTMLTable(rows),'diario');
+}
+
+/* ============ IMPORTAR INVENTARIO ============ */
+let _importData=[];
+function handleInvDrop(e){e.preventDefault();document.getElementById('invDropZone').style.borderColor='var(--g300)';const f=e.dataTransfer.files[0];if(f)handleInvFile(f);}
+async function handleInvFile(file){
+  if(!file)return;const name=file.name.toLowerCase();toast('📂 Leyendo…',3000);
+  try{
+    if(name.endsWith('.csv')){const text=await file.text();_importData=parseCSVInv(text);}
+    else if(name.endsWith('.xlsx')||name.endsWith('.xls')){_importData=await parseXLSXInv(file);}
+    else{toast('❌ Usa .xlsx o .csv');return;}
+    showImportPreview(_importData);
+  }catch(e){toast('❌ Error: '+e.message);}
+}
+function parseCSVInv(text){
+  const lines=text.split('\n').filter(l=>l.trim());if(!lines.length)return[];
+  const sep=lines[0].includes(';')?';':',';
+  const headers=lines[0].split(sep).map(h=>h.trim().replace(/^["']|["']$/g,'').toLowerCase());
+  return lines.slice(1).map(line=>{const vals=line.split(sep).map(v=>v.trim().replace(/^["']|["']$/g,''));const obj={};headers.forEach((h,i)=>obj[h]=vals[i]||'');return obj;}).filter(r=>Object.values(r).some(v=>v));
+}
+async function parseXLSXInv(file){
+  if(!window.XLSX){await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
+  const buf=await file.arrayBuffer();const wb=XLSX.read(buf,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(ws,{defval:''}).map(row=>{const obj={};Object.entries(row).forEach(([k,v])=>obj[k.toLowerCase().trim()]=String(v).trim());return obj;});
+}
+const COL_MAP={nombre:['nombre','product','producto','name','descripcion','description','item'],sku:['sku','codigo','code','cod','barcode','ean','ref'],categoria:['categoria','cat','category','tipo','grupo','familia'],marca:['marca','brand','fabricante'],stock:['stock','cantidad','qty','quantity','existencia','unidades'],minimo:['minimo','min','stock_min','reorder'],precio:['precio','price','valor','pvp']};
+function mapColsInv(row){const out={};Object.entries(COL_MAP).forEach(([field,variants])=>{for(const v of variants){const key=Object.keys(row).find(k=>k.toLowerCase().includes(v));if(key){out[field]=row[key];break;}}if(!out[field])out[field]='';});return out;}
+function showImportPreview(data){
+  if(!data.length){toast('Sin datos');return;}
+  const mapped=data.map(mapColsInv).filter(r=>r.nombre);_importData=mapped;
+  const c=document.getElementById('invImportPreview');c.classList.remove('hidden');
+  document.getElementById('invImportSummary').innerHTML=`<span class="fw6">✅ ${mapped.length} productos detectados</span><span class="text-gray" style="margin-left:.75rem">${data.length-mapped.length} filas ignoradas</span><div class="fs12 text-gray mt2">Columnas: ${Object.keys(COL_MAP).filter(f=>mapped[0]?.[f]).join(', ')}</div>`;
+  document.getElementById('invImportHeaders').innerHTML=['Nombre','SKU','Categoría','Marca','Stock','Mín.','Precio'].map(h=>`<th>${h}</th>`).join('');
+  document.getElementById('invImportRows').innerHTML=mapped.slice(0,10).map(r=>`<tr><td class="fw6">${r.nombre||'—'}</td><td class="fs13 text-gray">${r.sku||'—'}</td><td class="fs13">${r.categoria||'—'}</td><td class="fs13">${r.marca||'—'}</td><td class="mono">${r.stock||'0'}</td><td class="mono">${r.minimo||'0'}</td><td class="mono">${r.precio?clp(parseInt(r.precio)||0):'—'}</td></tr>`).join('')+(mapped.length>10?`<tr><td colspan="7" class="fs13 text-gray" style="text-align:center">… y ${mapped.length-10} más</td></tr>`:'');
+}
+async function confirmarImportInv(){
+  const mode=document.getElementById('invImportMode').value;
+  const mapped=_importData.filter(r=>r.nombre);
+  if(!mapped.length){toast('Sin productos válidos');return;}
+  toast(`⏳ Importando ${mapped.length} productos…`,6000);
+  try{
+    const batch=db.batch();let added=0,updated=0;
+    if(mode==='replace'){const snap=await db.collection('inventario').get();snap.docs.filter(d=>d.data().cat!=='Cigarros').forEach(d=>batch.delete(d.ref));}
+    for(const r of mapped){
+      const nombre=r.nombre.trim();
+      const prod={nombre,sku:r.sku||'',cat:r.categoria||'General',marca:(r.marca||'').toUpperCase(),stock:parseInt(r.stock)||0,min:parseInt(r.minimo)||0,precio:parseInt(r.precio)||0};
+      const existing=INVENTARIO.find(i=>(r.sku&&i.sku&&i.sku===r.sku)||(i.nombre.toLowerCase()===nombre.toLowerCase()));
+      if(existing&&mode==='merge'){batch.update(db.collection('inventario').doc(existing.id),prod);updated++;}
+      else if(!existing||mode==='replace'){batch.set(db.collection('inventario').doc(),{...prod,creadoEn:firebase.firestore.FieldValue.serverTimestamp()});added++;}
+    }
+    await batch.commit();await loadInventario();renderInv();cancelarImportInv();
+    await auditLog('inventario',{accion:'importar',total:mapped.length,agregados:added,actualizados:updated});
+    toast(`✅ ${added} agregados, ${updated} actualizados`);
+  }catch(e){toast('❌ Error: '+e.message);}
+}
+function cancelarImportInv(){_importData=[];document.getElementById('invImportPreview')?.classList.add('hidden');document.getElementById('invImportCard')?.classList.add('hidden');const fi=document.getElementById('invFileInput');if(fi)fi.value='';}
 
 function getGasUrl(){return CFG.gasUrl||document.getElementById('gasUrlInput')?.value.trim()||'';}
 function saveGasUrl(){const url=document.getElementById('gasUrlInput')?.value.trim();if(!url||!url.startsWith('https://')){toast('URL inválida');return;}CFG.gasUrl=url;db.collection('config').doc('global').update({gasUrl:url});setGasStatus('✅ URL guardada','var(--gr600)');}
@@ -1009,18 +1457,23 @@ async function renderUsers(){
     const users=snap.docs.map(d=>({id:d.id,...d.data()})).filter(u=>!u.eliminado);
     const rc={superadmin:'role-superadmin',gerente:'role-gerente',admin:'role-admin',operador:'role-operador'};
     const rl={superadmin:'Super Admin',gerente:'Gerente',admin:'Admin',operador:'Operador'};
-    c.innerHTML=users.map(u=>`<tr>
-      <td class="fw6">${u.nombre||'—'}${u.mustChangePassword?'<span class="badge br" style="margin-left:.375rem;font-size:.65rem">clave pendiente</span>':''}</td>
-      <td class="fs13 text-gray">${u.email}</td>
-      <td><span class="badge ${rc[u.rol]||''}">${rl[u.rol]||u.rol}</span></td>
-      <td class="fs13">${u.rol==='gerente'||u.rol==='superadmin'?'Todas':(SUCURSALES.find(s=>s.id===u.sucursalId)?.nombre)||'—'}</td>
-      <td class="fs13">${u.turno||'—'}</td>
-      <td><span class="badge ${u.activo?'bg':'br'}">${u.activo?'Activo':'Inactivo'}</span></td>
-      <td><div style="display:flex;gap:.375rem">
-        <button class="btn btn-s sm" onclick="editUser('${u.id}')">✎ Editar</button>
-        <button class="btn ${u.activo?'btn-d':'btn-p'} sm" onclick="toggleUser('${u.id}',${u.activo})">${u.activo?'Desactivar':'Activar'}</button>
-      </div></td>
-    </tr>`).join('');}
+    c.innerHTML=users.map(u=>{
+      const roles=Array.isArray(u.roles)&&u.roles.length?u.roles:[u.rol||'operador'];
+      const rolesBadges=roles.map(r=>`<span class="badge ${rc[r]||''}" style="margin-right:.25rem">${rl[r]||r}</span>`).join('');
+      const isTodas=roles.some(r=>r==='gerente'||r==='superadmin');
+      return`<tr>
+        <td class="fw6">${u.nombre||'—'}${u.mustChangePassword?'<span class="badge br" style="margin-left:.375rem;font-size:.65rem">clave pendiente</span>':''}</td>
+        <td class="fs13 text-gray">${u.email}</td>
+        <td>${rolesBadges}</td>
+        <td class="fs13">${isTodas?'Todas':(SUCURSALES.find(s=>s.id===u.sucursalId)?.nombre)||'—'}</td>
+        <td class="fs13">${u.turno||'—'}</td>
+        <td><span class="badge ${u.activo?'bg':'br'}">${u.activo?'Activo':'Inactivo'}</span></td>
+        <td><div style="display:flex;gap:.375rem">
+          <button class="btn btn-s sm" onclick="editUser('${u.id}')">✎ Editar</button>
+          <button class="btn ${u.activo?'btn-d':'btn-p'} sm" onclick="toggleUser('${u.id}',${u.activo})">${u.activo?'Desactivar':'Activar'}</button>
+        </div></td>
+      </tr>`;
+    }).join('');}
   catch(e){c.innerHTML=`<tr><td colspan="7" class="text-gray">Error: ${e.message}</td></tr>`;}
 }
 async function toggleUser(id,activo){try{await db.collection('usuarios').doc(id).update({activo:!activo});await auditLog('usuario',{accion:activo?'desactivar':'activar',uid:id});toast(`Usuario ${activo?'desactivado':'activado'}`);renderUsers();}catch(e){toast('❌ '+e.message);}}
@@ -1029,6 +1482,8 @@ function openUserModal(){
   _editUserId=null;
   document.getElementById('userModalTitle').textContent='Nuevo Usuario';
   ['uNombre','uEmail','uPass','uResetPass'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['uRolOp','uRolAdm','uRolGer','uRolSA'].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=false;});
+  document.getElementById('uRolOp').checked=true; // default
   document.getElementById('uPassField').style.display='block';
   document.getElementById('uResetPassField').classList.add('hidden');
   document.getElementById('uDeleteBtn').classList.add('hidden');
@@ -1047,7 +1502,12 @@ function editUser(id){
     const d=doc.data();
     document.getElementById('uNombre').value=d.nombre||'';
     document.getElementById('uEmail').value=d.email||'';
-    document.getElementById('uRol').value=d.rol||'operador';
+    // Handle both old single role and new multi-role
+    const roles=Array.isArray(d.roles)&&d.roles.length?d.roles:[d.rol||'operador'];
+    ['uRolOp','uRolAdm','uRolGer','uRolSA'].forEach(cbId=>{
+      const el=document.getElementById(cbId);
+      if(el)el.checked=roles.includes(el.value);
+    });
     const sel=document.getElementById('uSucursal');
     if(sel)sel.innerHTML=SUCURSALES.map(s=>`<option value="${s.id}" ${s.id===d.sucursalId?'selected':''}>${s.nombre}</option>`).join('');
     document.getElementById('uTurno').value=d.turno||'';
@@ -1061,42 +1521,48 @@ async function saveUser(){
   const email=document.getElementById('uEmail').value.trim();
   const pass=document.getElementById('uPass').value;
   const resetPass=document.getElementById('uResetPass').value;
-  const rol=document.getElementById('uRol').value;
   const sucursalId=document.getElementById('uSucursal').value;
   const turno=document.getElementById('uTurno').value;
   const sucursalNombre=SUCURSALES.find(s=>s.id===sucursalId)?.nombre||'';
+  // Read multi-role checkboxes
+  const roles=['uRolOp','uRolAdm','uRolGer','uRolSA']
+    .filter(id=>document.getElementById(id)?.checked)
+    .map(id=>document.getElementById(id).value);
   if(!nombre||!email){toast('Completa nombre y email');return;}
+  if(!roles.length){toast('Selecciona al menos un rol');return;}
+  // Primary rol = highest privilege selected (for backward compat)
+  const PRIORITY=['superadmin','gerente','admin','operador'];
+  const rol=PRIORITY.find(r=>roles.includes(r))||roles[0];
+
   try{
     if(_editUserId){
-      // Update profile in Firestore
-      await db.collection('usuarios').doc(_editUserId).update({nombre,rol,sucursalId,sucursalNombre,turno});
-      // Reset password via Identity Toolkit if provided
+      await db.collection('usuarios').doc(_editUserId).update({nombre,rol,roles,sucursalId,sucursalNombre,turno});
       if(resetPass){
         if(resetPass.length<6){toast('La nueva contraseña debe tener al menos 6 caracteres');return;}
-        // Get uid from editUserId
-        const res=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:update?key=${firebaseConfig.apiKey}`,{
-          method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({idToken:await auth.currentUser.getIdToken(),localId:_editUserId,password:resetPass,returnSecureToken:false})
-        });
-        // Note: resetting another user's password requires admin SDK
-        // Workaround: store reset request in Firestore, user is prompted on next login
         await db.collection('usuarios').doc(_editUserId).update({resetPassword:resetPass,mustChangePassword:true});
         toast('✅ Usuario actualizado — clave reiniciada');
       } else {
         toast('✅ Usuario actualizado');
       }
-      await auditLog('usuario',{accion:'editar',uid:_editUserId,rol,resetPassword:!!resetPass});
+      await auditLog('usuario',{accion:'editar',uid:_editUserId,rol,roles:roles.join(','),resetPassword:!!resetPass});
     } else {
       if(!pass||pass.length<6){toast('La contraseña debe tener al menos 6 caracteres');return;}
+      toast('Creando usuario…',3000);
       const res=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`,{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({email,password:pass,returnSecureToken:true})
       });
       const data=await res.json();
-      if(data.error){toast('❌ '+data.error.message);return;}
-      await db.collection('usuarios').doc(data.localId).set({nombre,email,rol,sucursalId,sucursalNombre,turno,activo:true,creadoEn:firebase.firestore.FieldValue.serverTimestamp(),creadoPor:CU.uid});
-      await auditLog('usuario',{accion:'crear',email,rol});
-      toast('✅ Usuario creado');
+      if(data.error){
+        const errMsg={'EMAIL_EXISTS':'Este correo ya está registrado','INVALID_EMAIL':'El correo no es válido','OPERATION_NOT_ALLOWED':'Registro no habilitado en Firebase'};
+        toast('❌ '+(errMsg[data.error.message]||data.error.message));return;
+      }
+      await db.collection('usuarios').doc(data.localId).set({
+        nombre,email,rol,roles,sucursalId,sucursalNombre,turno,
+        activo:true,creadoEn:firebase.firestore.FieldValue.serverTimestamp(),creadoPor:CU.uid
+      });
+      await auditLog('usuario',{accion:'crear',email,rol,roles:roles.join(',')});
+      toast(`✅ Usuario ${nombre} creado — puede iniciar sesión con ${email}`);
     }
     closeUserModal();renderUsers();
   }catch(e){toast('❌ Error: '+e.message);}
