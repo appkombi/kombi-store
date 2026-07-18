@@ -1,0 +1,35 @@
+{
+  "name": "Kombi Store",
+  "short_name": "Kombi",
+  "description": "Gestión operativa de punto de venta",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFBEB",
+  "theme_color": "#B45309",
+  "orientation": "portrait-primary",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='80' fill='%23B45309'/><text y='380' font-size='380' x='60'>🛒</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Apertura",
+      "short_name": "Apertura",
+      "description": "Ir directo al arqueo de apertura",
+      "url": "/?sec=op-ap",
+      "icons": [{"src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><text y='.9em' font-size='96'>☀️</text></svg>", "sizes": "96x96"}]
+    },
+    {
+      "name": "Cierre",
+      "short_name": "Cierre",
+      "description": "Ir directo al arqueo de cierre",
+      "url": "/?sec=op-ci",
+      "icons": [{"src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><text y='.9em' font-size='96'>🌙</text></svg>", "sizes": "96x96"}]
+    }
+  ]
+}

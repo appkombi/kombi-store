@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="theme-color" content="#B45309"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Kombi Store"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23B45309'/><text y='.9em' font-size='80' x='10'>🛒</text></svg>"/>
 <title>Kombi Store</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"/>
 <style>
@@ -14,7 +20,33 @@
   --b100:#DBEAFE;--b500:#3B82F6;--b600:#2563EB;
   --mono:'JetBrains Mono',monospace;--rad:10px;
   --sh:0 1px 3px rgba(0,0,0,.1);--shm:0 4px 6px -1px rgba(0,0,0,.1);--shl:0 10px 15px -3px rgba(0,0,0,.1);
+  /* Dark mode overrides (applied via .dark class on html) */
+  --dm-bg:#111827;--dm-surf:#1F2937;--dm-surf2:#374151;--dm-border:#374151;--dm-text:#F9FAFB;--dm-text2:#9CA3AF;
 }
+/* Dark mode */
+html.dark{color-scheme:dark}
+html.dark body{background:var(--dm-bg);color:var(--dm-text)}
+html.dark .card,html.dark .sc,html.dark .modal,html.dark .pin-box{background:var(--dm-surf);border-color:var(--dm-border)}
+html.dark .topbar,html.dark .sidebar,html.dark .lr{background:var(--dm-surf);border-color:var(--dm-border)}
+html.dark .main{background:var(--dm-bg)}
+html.dark .inp,html.dark .sel{background:var(--dm-surf2);border-color:var(--dm-border);color:var(--dm-text)}
+html.dark .ni:hover{background:var(--dm-surf2)}
+html.dark .ni.active{background:#292524;color:var(--a400)}
+html.dark table thead{background:var(--dm-surf2)}
+html.dark td,html.dark th{border-color:var(--dm-border);color:var(--dm-text2)}
+html.dark td.fw6{color:var(--dm-text)}
+html.dark .tw{border-color:var(--dm-border)}
+html.dark .ar{border-color:var(--dm-border)}
+html.dark .mi{background:var(--dm-surf2);border-color:var(--dm-border)}
+html.dark .bg-grid .bi{background:var(--dm-surf2);border-color:var(--dm-border)}
+html.dark .wsd{background:var(--dm-surf2);color:var(--dm-text2)}
+html.dark #loadingScreen{background:var(--dm-bg)}
+html.dark .login-wrap .lr{background:var(--dm-surf)}
+html.dark .fg input{background:var(--dm-surf2);border-color:var(--dm-border);color:var(--dm-text)}
+html.dark .foto-slot{border-color:var(--dm-border)}
+html.dark .text-gray{color:var(--dm-text2)!important}
+html.dark .g50,.dark .g50{color:var(--dm-text)}
+html.dark .cbars .cbar{background:var(--dm-surf2)}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;font-family:'Inter',sans-serif;background:var(--g50);color:var(--g900)}
 button{cursor:pointer;font-family:inherit}
@@ -305,9 +337,13 @@ tr:hover td{background:var(--g50)}
         <strong id="uLabel">—</strong>
         <span class="badge" id="roleLabel" style="margin-left:.25rem">—</span>
       </div>
+      <button class="bti" onclick="toggleDarkMode()" id="darkBtn" title="Modo oscuro">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+      </button>
       <button class="bti" onclick="document.getElementById('changePassModal').classList.remove('hidden')" title="Cambiar contraseña">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
       </button>
+      <div class="fs12 text-gray" id="sessionTimer" style="font-family:var(--mono)"></div>
       <button class="bti" onclick="logout()" title="Cerrar sesión">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
       </button>
@@ -353,6 +389,8 @@ tr:hover td{background:var(--g50)}
 
       <div class="section" id="op-ap">
         <div class="ph"><h2>Arqueo de Apertura</h2><p>Inicio del turno</p></div>
+        <!-- ACCESO RÁPIDO: estado del turno -->
+        <div id="turnoStatusBar" style="margin-bottom:1rem"></div>
         <div class="wsteps">
           <div class="ws active" id="apW1"><div class="wsd">1</div><span>Efectivo</span></div><div class="wl"></div>
           <div class="ws" id="apW2"><div class="wsd">2</div><span>Cigarros</span></div><div class="wl"></div>
@@ -453,7 +491,7 @@ tr:hover td{background:var(--g50)}
       <div class="section" id="ad-dash">
         <div class="ph"><h2>Dashboard</h2><p>Análisis operativo</p></div>
 
-        <!-- PANEL OPERATIVO EN VIVO (gerente/superadmin) -->
+        <!-- PANEL OPERATIVO EN VIVO -->
         <div id="panelOperativo" class="hidden" style="margin-bottom:1.25rem">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.625rem">
             <div class="fw6 fs14">🟢 Estado en vivo de sucursales</div>
@@ -464,6 +502,22 @@ tr:hover td{background:var(--g50)}
 
         <!-- NOTIFICACIONES -->
         <div id="notifBanner" style="margin-bottom:1rem"></div>
+
+        <!-- META DE VENTAS -->
+        <div id="metaVentasCard" class="card" style="margin-bottom:1rem;display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.625rem">
+            <div class="fw7 fs14">🎯 Meta del mes</div>
+            <button class="btn btn-g sm" onclick="toggleMetaEdit()">✎</button>
+          </div>
+          <div id="metaContent"></div>
+          <div id="metaEditForm" class="hidden" style="margin-top:.75rem">
+            <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+              <select class="sel" id="metaSucursal" style="flex:1;min-width:140px"></select>
+              <input class="inp" type="number" id="metaMonto" placeholder="Meta mensual CLP" style="flex:2;min-width:160px"/>
+              <button class="btn btn-p" onclick="saveMeta()">Guardar</button>
+            </div>
+          </div>
+        </div>
 
         <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem">
           <button class="marca-tag active" onclick="setDashPeriod('dia',this)">Día</button>
@@ -481,6 +535,11 @@ tr:hover td{background:var(--g50)}
           <div class="card"><div class="ct">📦 Stock crítico</div><div id="dashStock"></div></div>
           <div class="card"><div class="ct">🕐 Actividad</div><div class="tl" id="dashTL"></div></div>
         </div>
+        <!-- RETIROS POR CATEGORÍA -->
+        <div class="g2 mt4">
+          <div class="card"><div class="ct">💸 Retiros por categoría</div><div id="dashRetirosCat"></div></div>
+          <div class="card"><div class="ct">🏬 Ventas por sucursal (mes)</div><div id="dashVentasSuc"></div></div>
+        </div>
       </div>
 
       <div class="section" id="ad-hist">
@@ -490,6 +549,7 @@ tr:hover td{background:var(--g50)}
           <select class="sel" id="histFiltroSuc" onchange="renderHistorial()"><option value="">Todas las sucursales</option></select>
           <select class="sel" id="histFiltroTurno" onchange="renderHistorial()"><option value="">Todos los turnos</option><option value="mañana">☀️ Mañana</option><option value="tarde">🌤 Tarde</option><option value="noche">🌙 Noche</option></select>
           <button class="btn btn-s sm" onclick="exportHistorialCSV()">⬇ CSV</button>
+          <button class="btn btn-s sm" onclick="exportHistorialExcel()">⬇ Excel</button>
         </div>
         <div id="histList"></div>
       </div>
@@ -521,19 +581,29 @@ tr:hover td{background:var(--g50)}
 
       <div class="section" id="ad-inv">
         <div class="ph"><h2>Inventario</h2><p>Gestión de stock y productos</p></div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-wrap:wrap;gap:.5rem">
-          <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
-            <input class="inp" type="search" placeholder="Buscar…" style="max-width:200px" oninput="filterInv(this.value)"/>
-            <div id="invCatTabs" style="display:flex;gap:.375rem;flex-wrap:wrap"></div>
-          </div>
-          <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-            <button class="btn btn-s" onclick="document.getElementById('invImportCard').classList.toggle('hidden')">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              Importar archivo
-            </button>
-            <button class="btn btn-p" onclick="openPM()">+ Nuevo Producto</button>
-          </div>
+        <!-- Tabs -->
+        <div style="display:flex;gap:.375rem;margin-bottom:1rem;border-bottom:2px solid var(--g200)">
+          <button class="rep-tab active" onclick="showInvTab('general',this)">📦 General</button>
+          <button class="rep-tab" onclick="showInvTab('sucursal',this)">🏬 Stock por Sucursal</button>
+          <button class="rep-tab" onclick="showInvTab('reposicion',this)">⚠️ Reposición</button>
         </div>
+
+        <!-- TAB GENERAL -->
+        <div id="invTabGeneral">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-wrap:wrap;gap:.5rem">
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+              <input class="inp" type="search" placeholder="Buscar…" style="max-width:200px" oninput="filterInv(this.value)"/>
+              <div id="invCatTabs" style="display:flex;gap:.375rem;flex-wrap:wrap"></div>
+            </div>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+              <button class="btn btn-s" onclick="document.getElementById('invImportCard').classList.toggle('hidden')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Importar
+              </button>
+              <button class="btn btn-s" onclick="exportInvExcel()">⬇ Excel</button>
+              <button class="btn btn-p" onclick="openPM()">+ Nuevo</button>
+            </div>
+          </div>
         <!-- Import card -->
         <div class="card hidden mb4" id="invImportCard">
           <div class="ct">📂 Importar Inventario desde archivo</div>
@@ -566,6 +636,32 @@ tr:hover td{background:var(--g50)}
           </div>
         </div>
         <div class="tw"><table><thead><tr><th>Producto</th><th>Marca</th><th>Cat.</th><th>Stock</th><th>Mín.</th><th>Precio</th><th></th></tr></thead><tbody id="invBody"></tbody></table></div>
+        </div><!-- /invTabGeneral -->
+
+        <!-- TAB STOCK POR SUCURSAL -->
+        <div id="invTabSucursal" style="display:none">
+          <p class="fs13 text-gray mb4">Registra el stock real de cada sucursal. Útil cuando cada local maneja su propio inventario.</p>
+          <div style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center">
+            <select class="sel" id="invSucFiltro" onchange="renderStockSucursal()">
+              <option value="">Selecciona sucursal</option>
+            </select>
+            <button class="btn btn-p sm" onclick="guardarStockSucursal()">💾 Guardar cambios</button>
+          </div>
+          <div id="invSucTable"></div>
+        </div>
+
+        <!-- TAB REPOSICIÓN -->
+        <div id="invTabReposicion" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">
+            <p class="fs13 text-gray" style="margin:0">Productos bajo su stock mínimo. Lista lista para enviar al proveedor.</p>
+            <div style="display:flex;gap:.5rem">
+              <button class="btn btn-s" onclick="exportReposicionExcel()">⬇ Excel</button>
+              <button class="btn btn-s" onclick="enviarReposicionEmail()">📧 Enviar</button>
+            </div>
+          </div>
+          <div id="invReposicionList"></div>
+        </div>
+
       </div>
 
       <div class="section" id="ad-rep">
@@ -664,11 +760,14 @@ tr:hover td{background:var(--g50)}
               <div style="display:flex;gap:.75rem"><button class="btn btn-p" onclick="generarReporteInv()">Ver</button><button class="btn btn-s" onclick="enviarReporteInv()">📧 Enviar</button></div>
               <div id="repInvPreview" class="hidden" style="margin-top:1rem"></div>
             </div>
+            <div class="card">
+              <div class="ct">💾 Backup a Google Sheets</div>
+              <p class="fs13 text-gray mb4">Exporta los últimos 100 turnos y ventas a una hoja de cálculo en Google Drive automáticamente.</p>
+              <button class="btn btn-p" onclick="backupToSheets()">📊 Enviar backup ahora</button>
+            </div>
           </div>
         </div>
       </div>
-
-      <div class="section" id="ad-aj">
         <div class="ph"><h2>Ajustes</h2></div>
         <div style="max-width:600px;display:flex;flex-direction:column;gap:1rem">
           <div class="card"><div class="ct">🏪 Tienda</div><div class="fld"><label class="lbl">Nombre</label><input class="inp" type="text" id="ajNombre"/></div><div class="fld"><label class="lbl">Dirección</label><input class="inp" type="text" id="ajDir"/></div><button class="btn btn-p" onclick="saveTienda()">Guardar</button></div>
@@ -720,7 +819,7 @@ tr:hover td{background:var(--g50)}
   </div>
 </div>
 
-<div class="mb hidden" id="changePassModal">
+<!-- CHANGE PASS MODAL -->
   <div class="modal" style="max-width:400px">
     <div class="mh"><span class="mt2-title">Cambiar contraseña</span><button class="btn btn-g sm" onclick="document.getElementById('changePassModal').classList.add('hidden')">✕</button></div>
     <div class="fld"><label class="lbl">Contraseña actual</label><input class="inp" type="password" id="cpActual" placeholder="Tu contraseña actual"/></div>
@@ -916,7 +1015,7 @@ async function confirmarSucursal(){
   document.getElementById('loginScreen').style.display='none';
   await showApp();
 }
-async function logout(){stopRealTimeListeners();await auditLog('logout');await auth.signOut();}
+async function logout(){stopRealTimeListeners();clearInterval(_sessionTimer);_sessionStart=null;await auditLog('logout');await auth.signOut();}
 
 async function loadConfig(){
   try{
@@ -961,9 +1060,13 @@ async function showApp(){
   document.getElementById('vFecha').value=today();document.getElementById('repFecha').value=today();
   if(CFG.gasUrl){const gi=document.getElementById('gasUrlInput');if(gi)gi.value=CFG.gasUrl;}
   if(isOp)showSec('op-ap',document.querySelector('#opNav .ni'));
-  else showSec('ad-dash',document.querySelector('#adNav .ni'));
+  else{ showSec('ad-dash',document.querySelector('#adNav .ni')); renderMetaVentas(); }
   // Start real-time listeners for admins
   startRealTimeListeners();
+  initDarkMode();
+  startSessionTimer();
+  registerSW();
+  if(isOp) renderTurnoStatus();
   if(CU.mustChangePassword){
     setTimeout(()=>{
       toast('⚠️ Tu contraseña fue reiniciada. Por favor cámbiala.',5000);
@@ -1227,6 +1330,7 @@ function renderDash(){
   const stk=INVENTARIO.filter(i=>i.stock<=i.min&&i.min>0).length,retH=RETIROS.filter(r=>r.fecha===today()&&r.tipo==='retiro').reduce((a,r)=>a+r.monto,0);
   s.innerHTML=[{l:'Ventas período',v:clp(total),sub:`${v.length} registros`,col:'var(--a500)'},{l:'Promedio diario',v:clp(avg),sub:'del período',col:'var(--b500)'},{l:'Stock crítico',v:stk,sub:'bajo mínimo',col:stk?'var(--r500)':'var(--gr500)'},{l:'Retiros hoy',v:clp(retH),sub:`${RETIROS.filter(r=>r.fecha===today()).length} mov.`,col:'var(--g500)'}].map(x=>`<div class="sc"><div class="lbl">${x.l}</div><div class="val" style="color:${x.col}">${x.v}</div><div class="sub">${x.sub}</div></div>`).join('');
   renderDashChart(v);renderDashCompo(v);renderDashCigs();renderDashStock();renderDashTL();
+  renderMetaVentas();renderDashRetirosCat();renderDashVentasSuc();
 }
 function renderDashChart(ventas){
   const c=document.getElementById('dashChart');if(!c)return;if(!ventas.length){c.innerHTML='<p class="fs14 text-gray" style="padding:1rem">Sin datos</p>';return;}
@@ -1242,6 +1346,152 @@ function renderDashCompo(ventas){
 function renderDashCigs(){const c=document.getElementById('dashCigs');if(!c)return;const t=TURNOS[0];if(!t){c.innerHTML='<p class="fs13 text-gray">Sin datos</p>';return;}const all=[...new Map([...(t.cigarrosAp||[]),...(t.cigarrosCi||[])].map(x=>[x.id,x])).values()];if(!all.length){c.innerHTML='<p class="fs13 text-gray">Sin datos</p>';return;}c.innerHTML=`<table class="cig-table"><thead><tr><th>Prod.</th><th style="text-align:center">Ap</th><th style="text-align:center">Ci</th><th style="text-align:center">Dif</th></tr></thead><tbody>${all.map(cg=>{const ap=(t.cigarrosAp||[]).find(x=>x.id===cg.id),ci=(t.cigarrosCi||[]).find(x=>x.id===cg.id),diff=ap?.stock!=null&&ci?.stock!=null?ci.stock-ap.stock:null;return`<tr><td class="fs13">${cg.nombre}</td><td style="text-align:center">${ap?.stock??'—'}</td><td style="text-align:center">${ci?.stock??'—'}</td><td style="text-align:center">${diff!==null?`<span class="badge ${diff<0?'br':diff>0?'bg':'ba'}">${diff>0?'+':''}${diff}</span>`:'—'}</td></tr>`;}).join('')}</tbody></table>`;}
 function renderDashStock(){const c=document.getElementById('dashStock');if(!c)return;const bajo=INVENTARIO.filter(i=>i.stock<=i.min&&i.min>0);if(!bajo.length){c.innerHTML='<p class="fs13 text-green">✓ Todo OK</p>';return;}c.innerHTML=`<table class="cig-table"><thead><tr><th>Producto</th><th style="text-align:center">Stock</th><th style="text-align:center">Mín</th></tr></thead><tbody>${bajo.map(i=>`<tr><td class="fs13">${i.nombre}</td><td style="text-align:center"><span class="badge br">${i.stock}</span></td><td style="text-align:center;color:var(--g400)">${i.min}</td></tr>`).join('')}</tbody></table>`;}
 function renderDashTL(){const tl=document.getElementById('dashTL');if(!tl)return;const ev=[];if(AP.saved)ev.push({t:'Apertura',h:AP.hora,c:'g'});RETIROS.filter(r=>r.fecha===today()).forEach(r=>ev.push({t:`${r.tipo==='retiro'?'Retiro':'Abono'}: ${clp(r.monto)}`,h:r.hora,c:r.tipo==='retiro'?'r':'g'}));if(CI.saved)ev.push({t:'Cierre enviado',h:CI.hora,c:'g'});tl.innerHTML=ev.length?ev.map(e=>`<div class="tli"><div class="tld ${e.c}"></div><div><div class="tlt">${e.t}</div><div class="tltime">${e.h}</div></div></div>`).join(''):'<p class="fs13 text-gray">Sin actividad</p>';}
+
+/* ============ 9. PWA ============ */
+function registerSW(){
+  if('serviceWorker' in navigator){
+    // Inline SW as blob — no external sw.js needed
+    const swCode=`
+const CACHE='kombi-v1';
+const ASSETS=['/'];
+self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS))));
+self.addEventListener('fetch',e=>{
+  if(e.request.url.includes('firebaseapp')||e.request.url.includes('googleapis')||e.request.url.includes('gstatic'))return;
+  e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).catch(()=>caches.match('/'))));
+});`;
+    const blob=new Blob([swCode],{type:'application/javascript'});
+    const url=URL.createObjectURL(blob);
+    navigator.serviceWorker.register(url).then(()=>{
+      console.log('SW registered');
+    }).catch(e=>console.log('SW:',e));
+  }
+}
+// PWA install prompt
+let _deferredInstall=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();_deferredInstall=e;showInstallBanner();});
+function showInstallBanner(){
+  const b=document.createElement('div');
+  b.id='installBanner';
+  b.style.cssText='position:fixed;bottom:5rem;right:1rem;background:var(--a500);color:#fff;padding:.75rem 1rem;border-radius:10px;font-size:.875rem;font-weight:500;box-shadow:var(--shl);z-index:996;display:flex;align-items:center;gap:.75rem;cursor:pointer';
+  b.innerHTML='<span>📱 Instalar Kombi Store como app</span><button onclick="installPWA()" style="background:rgba(255,255,255,.25);border:none;color:#fff;border-radius:6px;padding:.25rem .625rem;font-weight:700;cursor:pointer">Instalar</button><button onclick="this.parentElement.remove()" style="background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer">✕</button>';
+  document.body.appendChild(b);
+  setTimeout(()=>b.remove(),20000);
+}
+async function installPWA(){
+  if(!_deferredInstall)return;
+  _deferredInstall.prompt();
+  const{outcome}=await _deferredInstall.userChoice;
+  if(outcome==='accepted')document.getElementById('installBanner')?.remove();
+  _deferredInstall=null;
+}
+
+/* ============ 10. MODO OSCURO ============ */
+function toggleDarkMode(){
+  const isDark=document.documentElement.classList.toggle('dark');
+  localStorage.setItem('kombi-dark',isDark?'1':'0');
+  const btn=document.getElementById('darkBtn');
+  if(btn)btn.innerHTML=isDark
+    ?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>'
+    :'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>';
+}
+function initDarkMode(){
+  const saved=localStorage.getItem('kombi-dark');
+  const prefersDark=window.matchMedia('(prefers-color-scheme:dark)').matches;
+  if(saved==='1'||(saved===null&&prefersDark)){
+    document.documentElement.classList.add('dark');
+    const btn=document.getElementById('darkBtn');
+    if(btn)btn.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+  }
+}
+
+/* ============ 11. ACCESO RÁPIDO TURNO ============ */
+function renderTurnoStatus(){
+  const c=document.getElementById('turnoStatusBar');if(!c)return;
+  const hora=CU.turnoActivo||'—';
+  const retH=RETIROS.filter(r=>r.fecha===today());
+  const totRet=retH.filter(r=>r.tipo==='retiro').reduce((a,r)=>a+r.monto,0);
+  const items=[
+    {icon:'🌅',label:'Apertura',val:AP.saved?AP.hora:'Pendiente',ok:AP.saved},
+    {icon:'💵',label:'Efectivo apertura',val:clp(totalBills(AP)),ok:AP.saved},
+    {icon:'↕️',label:'Movimientos',val:`${retH.length} (${clp(totRet)})`,ok:true},
+    {icon:'✅',label:'Cierre',val:CI.saved?CI.hora:'Pendiente',ok:CI.saved},
+  ];
+  c.innerHTML=`<div style="display:flex;gap:.5rem;flex-wrap:wrap;padding:.75rem;background:var(--a50);border:1px solid var(--a200);border-radius:10px;align-items:center">
+    <span class="fw7 fs13 text-amber" style="margin-right:.25rem">${hora==='mañana'?'☀️':hora==='tarde'?'🌤':'🌙'} ${hora} · ${new Date().toLocaleDateString('es-CL',{weekday:'short',day:'numeric',month:'short'})}</span>
+    ${items.map(it=>`<div style="display:flex;align-items:center;gap:.375rem;background:#fff;border:1px solid var(--a200);border-radius:8px;padding:.375rem .625rem">
+      <span>${it.icon}</span>
+      <span class="fs12 text-gray">${it.label}:</span>
+      <span class="fs12 fw6 ${it.ok?'text-green':'text-gray'}">${it.val}</span>
+    </div>`).join('')}
+    ${CI.saved?'<span class="badge bg">Turno cerrado</span>':AP.saved?'<span class="badge ba">En turno</span>':'<span class="badge br">Sin apertura</span>'}
+  </div>`;
+}
+
+/* ============ 13. SESIÓN CON TIEMPO LÍMITE ============ */
+const SESSION_LIMIT_HOURS=12;
+let _sessionStart=null,_sessionTimer=null,_warnShown=false;
+
+function startSessionTimer(){
+  _sessionStart=Date.now();
+  _warnShown=false;
+  clearInterval(_sessionTimer);
+  _sessionTimer=setInterval(checkSession,60000); // check every minute
+  updateSessionDisplay();
+  setInterval(updateSessionDisplay,60000);
+}
+
+function updateSessionDisplay(){
+  const el=document.getElementById('sessionTimer');if(!el||!_sessionStart)return;
+  const elapsed=Math.floor((Date.now()-_sessionStart)/1000/60);
+  const h=Math.floor(elapsed/60),m=elapsed%60;
+  el.textContent=`${h>0?h+'h ':''  }${m}m`;
+  el.title=`Sesión iniciada a las ${new Date(_sessionStart).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})}`;
+  el.style.color=elapsed>=(SESSION_LIMIT_HOURS*60-30)?'var(--r500)':'';
+}
+
+async function checkSession(){
+  if(!_sessionStart)return;
+  const elapsed=(Date.now()-_sessionStart)/1000/3600; // hours
+  // Warn at 30 min before limit
+  if(elapsed>=(SESSION_LIMIT_HOURS-0.5)&&!_warnShown){
+    _warnShown=true;
+    const d=document.createElement('div');
+    d.style.cssText='position:fixed;top:64px;left:50%;transform:translateX(-50%);background:var(--a500);color:#fff;padding:.875rem 1.5rem;border-radius:10px;font-weight:700;font-size:.875rem;box-shadow:var(--shl);z-index:997;display:flex;align-items:center;gap:.75rem';
+    d.innerHTML='⏰ Tu sesión cerrará en 30 minutos por inactividad. <button onclick="resetSession();this.parentElement.remove()" style="background:rgba(255,255,255,.25);border:none;color:#fff;border-radius:6px;padding:.2rem .5rem;cursor:pointer;font-weight:700;margin-left:.5rem">Extender</button>';
+    document.body.appendChild(d);
+    setTimeout(()=>d.remove(),15000);
+  }
+  // Auto logout at limit
+  if(elapsed>=SESSION_LIMIT_HOURS){
+    clearInterval(_sessionTimer);
+    toast('⏰ Sesión cerrada por tiempo límite ('+SESSION_LIMIT_HOURS+'h)',5000);
+    await auditLog('logout',{motivo:'sesion_expirada'});
+    setTimeout(()=>logout(),2000);
+  }
+}
+function resetSession(){_sessionStart=Date.now();_warnShown=false;toast('✅ Sesión extendida');}
+
+/* ============ 14. REGLAS FIRESTORE (archivo) ============ */
+// Las reglas se configuran en Firebase Console — ver comentario abajo
+
+/* ============ 15. BACKUP A GOOGLE SHEETS ============ */
+async function backupToSheets(){
+  const url=getGasUrl();if(!url){toast('Configura la URL del script primero');return;}
+  toast('📊 Enviando backup a Sheets…',8000);
+  // Send turnos data to GAS which saves to Sheets
+  const data={
+    accion:'backup',
+    turnos:JSON.stringify(TURNOS.slice(0,100)),
+    ventas:JSON.stringify(VENTAS.slice(0,100)),
+    fecha:today()
+  };
+  let iframe=document.getElementById('gas_backup_iframe');
+  if(!iframe){iframe=document.createElement('iframe');iframe.name='gas_backup_iframe';iframe.id='gas_backup_iframe';iframe.style.display='none';document.body.appendChild(iframe);}
+  const form=document.createElement('form');form.method='POST';form.action=url;form.target='gas_backup_iframe';form.style.display='none';
+  Object.entries(data).forEach(([k,v])=>{const i=document.createElement('input');i.type='hidden';i.name=k;i.value=v;form.appendChild(i);});
+  document.body.appendChild(form);form.submit();form.remove();
+  setTimeout(()=>toast('✅ Backup enviado a Google Sheets',3000),2000);
+}
 
 function renderHistorial(){
   const c=document.getElementById('histList');if(!c)return;
@@ -1298,6 +1548,257 @@ function renderCaja(){const c=document.getElementById('cajaContent');if(!c)retur
 
 let _invCat='TODOS',_invSearch='';
 function renderInv(search){if(search!==undefined)_invSearch=search;const cats=['TODOS',...new Set(INVENTARIO.map(i=>i.cat).filter(Boolean))];const tabs=document.getElementById('invCatTabs');if(tabs)tabs.innerHTML=cats.map(cat=>`<button class="marca-tag ${_invCat===cat?'active':''}" onclick="_invCat='${cat}';renderInv()">${cat}</button>`).join('');const b=document.getElementById('invBody');if(!b)return;let items=INVENTARIO;if(_invCat!=='TODOS')items=items.filter(i=>i.cat===_invCat);if(_invSearch)items=items.filter(i=>i.nombre.toLowerCase().includes(_invSearch.toLowerCase())||(i.marca||'').toLowerCase().includes(_invSearch.toLowerCase()));b.innerHTML=items.map(i=>`<tr><td class="fw6">${i.nombre}</td><td class="text-gray fs13">${i.marca||'—'}</td><td><span class="badge ${i.cat==='Cigarros'?'ba':''}" style="${i.cat!=='Cigarros'?'background:var(--g100);color:var(--g600)':''}">${i.cat}</span></td><td><span class="badge ${i.stock<=i.min&&i.min>0?'br':'bg'}">${i.stock}</span></td><td class="text-gray fs13">${i.min}</td><td class="mono">${clp(i.precio)}</td><td><div style="display:flex;gap:.375rem"><button class="btn btn-s sm" onclick="editProd('${i.id}')">✎</button><button class="btn btn-d sm" onclick="delProd('${i.id}')">✕</button></div></td></tr>`).join('');}
+function filterInv(v){renderInv(v);}
+
+/* ============ INV TABS ============ */
+function showInvTab(tab,el){
+  ['general','sucursal','reposicion'].forEach(t=>{
+    const d=document.getElementById('invTab'+t.charAt(0).toUpperCase()+t.slice(1));
+    if(d)d.style.display=t===tab?'block':'none';
+  });
+  document.querySelectorAll('.rep-tab').forEach(b=>b.classList.remove('active'));
+  el?.classList.add('active');
+  if(tab==='sucursal') initStockSucursal();
+  if(tab==='reposicion') renderReposicion();
+  if(tab==='general'){_invCat='TODOS';renderInv();}
+}
+
+/* ============ STOCK POR SUCURSAL ============ */
+let _stockSucursal={};
+async function initStockSucursal(){
+  // Populate sucursal selector
+  const sel=document.getElementById('invSucFiltro');
+  if(sel&&sel.children.length<=1){
+    SUCURSALES.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.nombre;sel.appendChild(o);});
+    if(SUCURSALES.length) sel.value=SUCURSALES[0].id;
+  }
+  // Load existing stock data
+  try{
+    const snap=await db.collection('stockSucursal').get();
+    _stockSucursal={};
+    snap.docs.forEach(d=>{_stockSucursal[d.id]={...d.data()};});
+  }catch(e){console.warn('Stock suc:',e);}
+  renderStockSucursal();
+}
+function renderStockSucursal(){
+  const sucId=document.getElementById('invSucFiltro')?.value;
+  const c=document.getElementById('invSucTable');if(!c)return;
+  if(!sucId){c.innerHTML='<p class="fs14 text-gray">Selecciona una sucursal</p>';return;}
+  const sucStock=_stockSucursal[sucId]||{};
+  const cats=[...new Set(INVENTARIO.map(i=>i.cat))];
+  c.innerHTML=cats.map(cat=>`
+    <div style="margin-bottom:1.25rem">
+      <div style="font-size:.75rem;font-weight:700;color:var(--a700);text-transform:uppercase;letter-spacing:.06em;padding:.375rem 0;margin-bottom:.25rem;border-bottom:2px solid var(--a200)">${cat}</div>
+      <table class="cig-table"><thead><tr><th>Producto</th><th style="text-align:center">Stock Global</th><th style="text-align:center;width:110px">Stock Sucursal</th><th style="text-align:center">Mín.</th></tr></thead>
+      <tbody>${INVENTARIO.filter(i=>i.cat===cat).map(prod=>{
+        const val=sucStock[prod.id]??prod.stock;
+        const bajo=val<=prod.min&&prod.min>0;
+        return`<tr>
+          <td class="fw6 fs13">${prod.nombre}</td>
+          <td style="text-align:center;font-family:var(--mono);color:var(--g400)">${prod.stock}</td>
+          <td style="text-align:center"><input class="cig-inp" type="number" min="0" value="${val}" style="width:80px;text-align:center${bajo?';border-color:var(--r500);background:var(--r100)':''}" oninput="setSucStock('${sucId}','${prod.id}',this.value)"/></td>
+          <td style="text-align:center;color:var(--g400)">${prod.min}</td>
+        </tr>`;
+      }).join('')}</tbody></table>
+    </div>`).join('');
+}
+function setSucStock(sucId,prodId,val){
+  if(!_stockSucursal[sucId])_stockSucursal[sucId]={};
+  _stockSucursal[sucId][prodId]=parseInt(val)||0;
+}
+async function guardarStockSucursal(){
+  const sucId=document.getElementById('invSucFiltro')?.value;
+  if(!sucId){toast('Selecciona una sucursal');return;}
+  try{
+    await db.collection('stockSucursal').doc(sucId).set(_stockSucursal[sucId]||{},{merge:true});
+    await auditLog('inventario',{accion:'stock_sucursal',sucursalId:sucId});
+    toast('✅ Stock de sucursal guardado');
+  }catch(e){toast('❌ Error: '+e.message);}
+}
+
+/* ============ REPOSICIÓN ============ */
+function renderReposicion(){
+  const c=document.getElementById('invReposicionList');if(!c)return;
+  const bajo=INVENTARIO.filter(i=>i.stock<=i.min&&i.min>0).sort((a,b)=>a.stock-b.stock);
+  if(!bajo.length){c.innerHTML='<div class="card"><p class="fs14 text-green">✓ Todos los productos sobre el mínimo</p></div>';return;}
+  const cats=[...new Set(bajo.map(i=>i.cat))];
+  c.innerHTML=cats.map(cat=>`
+    <div class="card mb4">
+      <div class="ct">${cat} <span class="badge br" style="font-size:.75rem">${bajo.filter(i=>i.cat===cat).length} bajo mínimo</span></div>
+      <div class="tw"><table><thead><tr><th>Producto</th><th>Marca</th><th style="text-align:center">Stock</th><th style="text-align:center">Mínimo</th><th style="text-align:center">Faltan</th><th style="text-align:right">Precio unit.</th></tr></thead>
+      <tbody>${bajo.filter(i=>i.cat===cat).map(i=>`<tr>
+        <td class="fw6">${i.nombre}</td>
+        <td class="fs13 text-gray">${i.marca||'—'}</td>
+        <td style="text-align:center"><span class="badge br">${i.stock}</span></td>
+        <td style="text-align:center;color:var(--g400)">${i.min}</td>
+        <td style="text-align:center;font-weight:700;color:var(--r600)">${i.min-i.stock}</td>
+        <td style="text-align:right;font-family:var(--mono)">${clp(i.precio)}</td>
+      </tr>`).join('')}</tbody></table></div>
+    </div>`).join('');
+}
+async function exportReposicionExcel(){
+  const bajo=INVENTARIO.filter(i=>i.stock<=i.min&&i.min>0).sort((a,b)=>a.stock-b.stock);
+  if(!bajo.length){toast('Sin productos para reponer');return;}
+  await loadXLSX();
+  const data=[['Producto','Marca','Categoría','Stock Actual','Mínimo','Unidades a Pedir','Precio Unit.','Total Estimado'],
+    ...bajo.map(i=>[i.nombre,i.marca||'',i.cat,i.stock,i.min,i.min-i.stock,i.precio,(i.min-i.stock)*i.precio])];
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  ws['!cols']=[{wch:30},{wch:12},{wch:14},{wch:12},{wch:10},{wch:16},{wch:14},{wch:14}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Reposición');
+  XLSX.writeFile(wb,`reposicion_${today()}.xlsx`);
+  toast('✅ Excel descargado');
+}
+async function enviarReposicionEmail(){
+  const bajo=INVENTARIO.filter(i=>i.stock<=i.min&&i.min>0);
+  if(!bajo.length){toast('Sin productos para reponer');return;}
+  const tienda=CFG.tienda?.nombre||'Kombi Store';
+  const rows=[{header:`LISTA DE REPOSICIÓN — ${tienda} — ${today()}`},
+    ...bajo.map(i=>({label:`${i.nombre} (${i.marca||'—'})`,value:`${i.stock}/${i.min} — Pedir: ${i.min-i.stock}`,neg:true}))];
+  await enviarEmail(`Reposición ${tienda}`,`${bajo.length} productos bajo mínimo`,buildHTMLTable(rows),'inventario');
+}
+
+/* ============ METAS DE VENTA ============ */
+function toggleMetaEdit(){
+  document.getElementById('metaEditForm')?.classList.toggle('hidden');
+  // Populate sucursal select
+  const sel=document.getElementById('metaSucursal');
+  if(sel&&sel.children.length<=1)SUCURSALES.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.nombre;sel.appendChild(o);});
+}
+async function saveMeta(){
+  const sucId=document.getElementById('metaSucursal')?.value;
+  const monto=parseInt(document.getElementById('metaMonto')?.value)||0;
+  if(!sucId||!monto){toast('Completa sucursal y monto');return;}
+  const mes=today().slice(0,7);
+  if(!CFG.metas)CFG.metas={};
+  if(!CFG.metas[mes])CFG.metas[mes]={};
+  CFG.metas[mes][sucId]=monto;
+  await db.collection('config').doc('global').update({metas:CFG.metas});
+  document.getElementById('metaEditForm')?.classList.add('hidden');
+  renderMetaVentas();
+  toast('✅ Meta guardada');
+}
+function renderMetaVentas(){
+  const card=document.getElementById('metaVentasCard');
+  const c=document.getElementById('metaContent');
+  if(!c)return;
+  const mes=today().slice(0,7);
+  const metas=CFG.metas?.[mes]||{};
+  if(!Object.keys(metas).length){card.style.display='none';return;}
+  card.style.display='block';
+  const ventasMes=VENTAS.filter(v=>v.fecha.slice(0,7)===mes);
+  // Days elapsed and total in month
+  const hoy=new Date(),diasMes=new Date(hoy.getFullYear(),hoy.getMonth()+1,0).getDate(),diasElap=hoy.getDate();
+  c.innerHTML=SUCURSALES.filter(s=>metas[s.id]).map(s=>{
+    const meta=metas[s.id];
+    const actual=ventasMes.filter(v=>v.sucursalId===s.id).reduce((a,v)=>a+v.total,0);
+    const pct=Math.min(Math.round(actual/meta*100),100);
+    const proyeccion=diasElap>0?Math.round(actual/diasElap*diasMes):0;
+    const col=pct>=100?'var(--gr500)':pct>=70?'var(--a500)':'var(--r500)';
+    return`<div style="margin-bottom:.875rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.375rem">
+        <span class="fw6 fs13">🏬 ${s.nombre}</span>
+        <span class="fs13 mono">${clp(actual)} / ${clp(meta)} <span style="color:${col};font-weight:700">(${pct}%)</span></span>
+      </div>
+      <div style="height:10px;background:var(--g200);border-radius:5px;overflow:hidden;margin-bottom:.25rem">
+        <div style="height:100%;width:${pct}%;background:${col};border-radius:5px;transition:width .5s"></div>
+      </div>
+      <div class="fs12 text-gray">Proyección al cierre del mes: <strong>${clp(proyeccion)}</strong> ${proyeccion>=meta?'✅':'📉'}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ============ RETIROS POR CATEGORÍA (dashboard) ============ */
+function renderDashRetirosCat(){
+  const c=document.getElementById('dashRetirosCat');if(!c)return;
+  const mes=today().slice(0,7);
+  // Load all retiros for this month across sucursales
+  db.collection('retiros').where('fecha','>=',mes+'-01').where('fecha','<=',mes+'-31').where('tipo','==','retiro').get().then(snap=>{
+    const retiros=snap.docs.map(d=>d.data());
+    if(!retiros.length){c.innerHTML='<p class="fs13 text-gray">Sin retiros este mes</p>';return;}
+    const byCat={};
+    retiros.forEach(r=>{const cat=r.categoria||'Sin categoría';if(!byCat[cat])byCat[cat]=0;byCat[cat]+=r.monto;});
+    const sorted=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+    const max=sorted[0][1]||1;
+    const total=sorted.reduce((a,[,v])=>a+v,0);
+    c.innerHTML=sorted.map(([cat,monto])=>`
+      <div style="margin-bottom:.75rem">
+        <div style="display:flex;justify-content:space-between;font-size:.8125rem;margin-bottom:.25rem">
+          <span class="fw6">${cat}</span><span class="mono text-gray">${clp(monto)} (${Math.round(monto/total*100)}%)</span>
+        </div>
+        <div style="height:8px;background:var(--g100);border-radius:4px;overflow:hidden">
+          <div style="height:100%;width:${Math.round(monto/max*100)}%;background:var(--r400);border-radius:4px"></div>
+        </div>
+      </div>`).join('');
+  }).catch(()=>c.innerHTML='<p class="fs13 text-gray">Sin datos</p>');
+}
+function renderDashVentasSuc(){
+  const c=document.getElementById('dashVentasSuc');if(!c)return;
+  const mes=today().slice(0,7);
+  const vMes=VENTAS.filter(v=>v.fecha.slice(0,7)===mes);
+  if(!vMes.length){c.innerHTML='<p class="fs13 text-gray">Sin ventas este mes</p>';return;}
+  const bySuc={};
+  vMes.forEach(v=>{const k=v.sucursalId||'?';const nom=v.sucursal||SUCURSALES.find(s=>s.id===k)?.nombre||'—';if(!bySuc[k])bySuc[k]={nom,total:0};bySuc[k].total+=v.total;});
+  const entries=Object.values(bySuc).sort((a,b)=>b.total-a.total);
+  const max=entries[0]?.total||1;
+  const grand=entries.reduce((a,x)=>a+x.total,1);
+  c.innerHTML=entries.map(s=>`
+    <div style="margin-bottom:.75rem">
+      <div style="display:flex;justify-content:space-between;font-size:.8125rem;margin-bottom:.25rem">
+        <span class="fw6">🏬 ${s.nom}</span><span class="mono text-gray">${clp(s.total)} (${Math.round(s.total/grand*100)}%)</span>
+      </div>
+      <div style="height:8px;background:var(--g100);border-radius:4px;overflow:hidden">
+        <div style="height:100%;width:${Math.round(s.total/max*100)}%;background:var(--a500);border-radius:4px"></div>
+      </div>
+    </div>`).join('');
+}
+
+/* ============ EXPORT EXCEL ============ */
+async function loadXLSX(){
+  if(window.XLSX)return;
+  await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+}
+async function exportHistorialExcel(){
+  if(!TURNOS.length){toast('Sin turnos');return;}
+  await loadXLSX();
+  const wb=XLSX.utils.book_new();
+  // Sheet 1: Resumen
+  const data=[
+    ['Fecha','Sucursal','Turno','Operador','Ef. Apertura','Ef. Cierre','Retiros','Abonos','Saldo Esperado','Dif. Efectivo','POS Total','Transferencias','Total Contado','Total Sistema','Dif. Sistema','Comentario'],
+    ...TURNOS.map(t=>[t.fecha,t.sucursal,t.turno,t.operador,t.efAp,t.efCi,t.retiros,t.abonos,t.saldoEsp,t.diffEf,t.posTotal,t.transf||0,t.totalReal,t.sisTotal,t.diffSis,t.comentario||''])
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  // Column widths
+  ws['!cols']=[{wch:12},{wch:16},{wch:10},{wch:16},{wch:12},{wch:12},{wch:10},{wch:10},{wch:14},{wch:12},{wch:10},{wch:12},{wch:12},{wch:12},{wch:12},{wch:30}];
+  // Highlight diff rows
+  TURNOS.forEach((t,i)=>{
+    if(t.diffEf!==0||t.diffSis!==0){
+      const row=i+2;
+      ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P'].forEach(col=>{
+        const cell=ws[col+row];
+        if(cell&&!cell.s)cell.s={fill:{fgColor:{rgb:'FEE2E2'}}};
+      });
+    }
+  });
+  XLSX.utils.book_append_sheet(wb,ws,'Historial Turnos');
+  // Sheet 2: solo diferencias
+  const diffs=TURNOS.filter(t=>t.diffEf!==0||t.diffSis!==0);
+  if(diffs.length){
+    const ws2=XLSX.utils.aoa_to_sheet([data[0],...diffs.map(t=>data[TURNOS.indexOf(t)+1])]);
+    XLSX.utils.book_append_sheet(wb,ws2,'⚠ Con Diferencias');
+  }
+  XLSX.writeFile(wb,`historial_turnos_${today()}.xlsx`);
+  toast('✅ Excel descargado');
+}
+async function exportInvExcel(){
+  await loadXLSX();
+  const data=[['Producto','SKU','Categoría','Marca','Stock','Mínimo','Precio','Estado'],
+    ...INVENTARIO.map(i=>[i.nombre,i.sku||'',i.cat,i.marca||'',i.stock,i.min,i.precio,i.stock<=i.min&&i.min>0?'BAJO MÍNIMO':'OK'])];
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  ws['!cols']=[{wch:30},{wch:12},{wch:14},{wch:12},{wch:8},{wch:8},{wch:12},{wch:14}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Inventario');
+  XLSX.writeFile(wb,`inventario_${today()}.xlsx`);
+  toast('✅ Excel descargado');
+}
 function filterInv(v){renderInv(v);}
 function openPM(){_editPid=null;document.getElementById('pmTitle').textContent='Nuevo Producto';['pN','pS','pC','pMarca','pSt','pMn','pPr'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});document.getElementById('pm').classList.remove('hidden');}
 function closePM(){document.getElementById('pm').classList.add('hidden');}
