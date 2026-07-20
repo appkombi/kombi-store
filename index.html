@@ -285,11 +285,36 @@ tr:hover td{background:var(--g50)}
       <!-- PASO 1: Credenciales -->
       <div id="loginStep1">
         <h2>Iniciar Sesión</h2>
-        <p class="sub">Accede con tu correo y contraseña</p>
-        <div class="fg"><label>Correo electrónico</label><input type="email" id="lEmail" placeholder="tu@correo.com" onkeydown="if(event.key==='Enter')document.getElementById('lPass').focus()"/></div>
-        <div class="fg"><label>Contraseña</label><input type="password" id="lPass" placeholder="••••••••" onkeydown="if(event.key==='Enter')login()"/></div>
+        <p class="sub">Ingresa con tu nombre de usuario</p>
+        <div class="fg">
+          <label>Usuario</label>
+          <input type="text" id="lUsername" placeholder="ej: maria.gonzalez"
+            autocomplete="username" autocapitalize="none" spellcheck="false"
+            onkeydown="if(event.key==='Enter')document.getElementById('lPass').focus()"/>
+        </div>
+        <div class="fg">
+          <label>Contraseña</label>
+          <input type="password" id="lPass" placeholder="••••••••"
+            autocomplete="current-password"
+            onkeydown="if(event.key==='Enter')login()"/>
+        </div>
         <button class="btn-login" onclick="login()">Ingresar</button>
-        <div class="login-err hidden" id="lErr">Correo o contraseña incorrectos</div>
+        <div class="login-err hidden" id="lErr">Usuario o contraseña incorrectos</div>
+        <button type="button" onclick="showForgotPass()" style="width:100%;margin-top:.875rem;background:none;border:none;color:var(--g400);font-size:.875rem;cursor:pointer;text-align:center">¿Olvidaste tu contraseña?</button>
+      </div>
+
+      <!-- RECUPERAR CONTRASEÑA -->
+      <div id="loginForgot" style="display:none">
+        <h2>Recuperar contraseña</h2>
+        <p class="sub">Te enviaremos un enlace a tu correo registrado</p>
+        <div class="fg">
+          <label>Usuario o correo electrónico</label>
+          <input type="text" id="lForgotInput" placeholder="tu.usuario o tu@correo.com"/>
+        </div>
+        <button class="btn-login" onclick="sendPasswordReset()">Enviar enlace</button>
+        <div class="login-err hidden" id="lForgotErr"></div>
+        <div class="hidden" id="lForgotOk" style="background:var(--gr100);color:var(--gr600);padding:.75rem 1rem;border-radius:var(--rad);font-size:.875rem;font-weight:500;margin-top:.75rem;text-align:center"></div>
+        <button type="button" onclick="showLoginForm()" style="width:100%;margin-top:.875rem;background:none;border:none;color:var(--g400);font-size:.875rem;cursor:pointer">← Volver al login</button>
       </div>
 
       <!-- PASO 2: Selección de sucursal y turno -->
@@ -783,7 +808,7 @@ tr:hover td{background:var(--g50)}
       <div class="section" id="sa-users">
         <div class="ph"><h2>Gestión de Usuarios</h2><p>+20 usuarios con roles y sucursales</p></div>
         <div style="display:flex;justify-content:flex-end;margin-bottom:1rem"><button class="btn btn-p" onclick="openUserModal()">+ Nuevo Usuario</button></div>
-        <div class="tw"><table><thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Sucursal</th><th>Turno</th><th>Estado</th><th></th></tr></thead><tbody id="usersBody"></tbody></table></div>
+        <div class="tw"><table><thead><tr><th>Nombre</th><th>Usuario</th><th>Email</th><th>Rol</th><th>Sucursal</th><th>Turno</th><th>Estado</th><th></th></tr></thead><tbody id="usersBody"></tbody></table></div>
       </div>
 
       <div class="section" id="sa-logs">
@@ -836,8 +861,15 @@ tr:hover td{background:var(--g50)}
 <div class="mb hidden" id="userModal">
   <div class="modal">
     <div class="mh"><span class="mt2-title" id="userModalTitle">Nuevo Usuario</span><button class="btn btn-g sm" onclick="closeUserModal()">✕</button></div>
-    <div class="fld"><label class="lbl">Nombre</label><input class="inp" id="uNombre"/></div>
-    <div class="fld"><label class="lbl">Email</label><input class="inp" type="email" id="uEmail"/></div>
+    <div class="fld"><label class="lbl">Nombre completo</label><input class="inp" id="uNombre"/></div>
+    <div class="g2">
+      <div class="fld">
+        <label class="lbl">Nombre de usuario</label>
+        <input class="inp" id="uUsername" placeholder="ej: maria.gonzalez" autocapitalize="none" spellcheck="false"/>
+        <div class="fs12 text-gray mt2">Sin espacios ni caracteres especiales. Se usa para iniciar sesión.</div>
+      </div>
+      <div class="fld"><label class="lbl">Email (para recuperar clave)</label><input class="inp" type="email" id="uEmail"/></div>
+    </div>
     <div class="fld" id="uPassField"><label class="lbl">Contraseña (mín. 6 caracteres)</label><input class="inp" type="password" id="uPass"/></div>
     <div class="fld hidden" id="uResetPassField">
       <label class="lbl">Nueva contraseña (dejar vacío para no cambiar)</label>
@@ -897,8 +929,10 @@ auth.onAuthStateChanged(async user=>{
     try{
       const doc=await db.collection('usuarios').doc(user.uid).get();
       if(!doc.exists){
-        CU={uid:user.uid,email:user.email,nombre:user.email,rol:'superadmin',roles:['superadmin'],rolActivo:'superadmin',sucursalId:'',sucursalNombre:'',turno:''};
+        const defaultUsername=user.email.split('@')[0].toLowerCase().replace(/[^a-z0-9._-]/g,'');
+        CU={uid:user.uid,email:user.email,nombre:user.email,username:defaultUsername,rol:'superadmin',roles:['superadmin'],rolActivo:'superadmin',sucursalId:'',sucursalNombre:'',turno:''};
         await db.collection('usuarios').doc(user.uid).set({...CU,activo:true,creadoEn:firebase.firestore.FieldValue.serverTimestamp()});
+        await db.collection('usernames').doc(defaultUsername).set({email:user.email,uid:user.uid,nombre:user.email});
       } else {
         const d=doc.data();
         if(!d.activo){await auth.signOut();showLogin('Tu cuenta está desactivada');return;}
@@ -945,16 +979,59 @@ function volverLogin(){
   auth.signOut();
 }
 
-async function login(){
-  const email=document.getElementById('lEmail').value.trim(),pass=document.getElementById('lPass').value;
-  const err=document.getElementById('lErr');err.classList.add('hidden');
-  if(!email||!pass){err.textContent='Completa todos los campos';err.classList.remove('hidden');return;}
+function showForgotPass(){
+  document.getElementById('loginStep1').style.display='none';
+  document.getElementById('loginForgot').style.display='block';
+  document.getElementById('lForgotErr').classList.add('hidden');
+  document.getElementById('lForgotOk').classList.add('hidden');
+  document.getElementById('lForgotInput').value='';
+}
+function showLoginForm(){
+  document.getElementById('loginForgot').style.display='none';
+  document.getElementById('loginStep1').style.display='block';
+}
+
+async function sendPasswordReset(){
+  const input=document.getElementById('lForgotInput').value.trim();
+  const err=document.getElementById('lForgotErr');
+  const ok=document.getElementById('lForgotOk');
+  err.classList.add('hidden');ok.classList.add('hidden');
+  if(!input){err.textContent='Ingresa tu usuario o correo';err.classList.remove('hidden');return;}
   try{
     showLoading(true);
-    await auth.signInWithEmailAndPassword(email,pass);
-    // Auth listener will load profile — then we show step 2
+    let email=input;
+    if(!input.includes('@')){
+      const snap=await db.collection('usernames').doc(input.toLowerCase()).get();
+      if(!snap.exists){showLoading(false);err.textContent='Usuario no encontrado';err.classList.remove('hidden');return;}
+      email=snap.data().email;
+    }
+    await auth.sendPasswordResetEmail(email);
+    showLoading(false);
+    ok.textContent='✅ Enlace enviado a '+email.replace(/(.{2}).*(@.*)/,'$1***$2')+'. Revisa tu correo.';
+    ok.classList.remove('hidden');
   }catch(e){
-    showLoading(false);err.textContent='Correo o contraseña incorrectos';err.classList.remove('hidden');
+    showLoading(false);err.textContent='Error: '+e.message;err.classList.remove('hidden');
+  }
+}
+
+async function login(){
+  const username=document.getElementById('lUsername').value.trim().toLowerCase();
+  const pass=document.getElementById('lPass').value;
+  const err=document.getElementById('lErr');err.classList.add('hidden');
+  if(!username||!pass){err.textContent='Completa todos los campos';err.classList.remove('hidden');return;}
+  try{
+    showLoading(true);
+    let email=username;
+    if(!username.includes('@')){
+      const snap=await db.collection('usernames').doc(username).get();
+      if(!snap.exists){showLoading(false);err.textContent='Usuario no encontrado';err.classList.remove('hidden');return;}
+      email=snap.data().email;
+    }
+    await auth.signInWithEmailAndPassword(email,pass);
+  }catch(e){
+    showLoading(false);
+    const msgs={'auth/wrong-password':'Contraseña incorrecta','auth/user-not-found':'Usuario no encontrado','auth/too-many-requests':'Demasiados intentos. Espera unos minutos.','auth/user-disabled':'Cuenta desactivada'};
+    err.textContent=msgs[e.code]||'Usuario o contraseña incorrectos';err.classList.remove('hidden');
   }
 }
 
@@ -2263,6 +2340,7 @@ async function renderUsers(){
       const isTodas=roles.some(r=>r==='gerente'||r==='superadmin');
       return`<tr>
         <td class="fw6">${u.nombre||'—'}${u.mustChangePassword?'<span class="badge br" style="margin-left:.375rem;font-size:.65rem">clave pendiente</span>':''}</td>
+        <td class="fs13" style="font-family:var(--mono)">${u.username||'—'}</td>
         <td class="fs13 text-gray">${u.email}</td>
         <td>${rolesBadges}</td>
         <td class="fs13">${isTodas?'Todas':(SUCURSALES.find(s=>s.id===u.sucursalId)?.nombre)||'—'}</td>
@@ -2281,7 +2359,7 @@ let _editUserId=null;
 function openUserModal(){
   _editUserId=null;
   document.getElementById('userModalTitle').textContent='Nuevo Usuario';
-  ['uNombre','uEmail','uPass','uResetPass'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['uNombre','uUsername','uEmail','uPass','uResetPass'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   ['uRolOp','uRolAdm','uRolGer','uRolSA'].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=false;});
   document.getElementById('uRolOp').checked=true; // default
   document.getElementById('uPassField').style.display='block';
@@ -2301,6 +2379,7 @@ function editUser(id){
   db.collection('usuarios').doc(id).get().then(doc=>{
     const d=doc.data();
     document.getElementById('uNombre').value=d.nombre||'';
+    document.getElementById('uUsername').value=d.username||'';
     document.getElementById('uEmail').value=d.email||'';
     // Handle both old single role and new multi-role
     const roles=Array.isArray(d.roles)&&d.roles.length?d.roles:[d.rol||'operador'];
@@ -2318,6 +2397,7 @@ function closeUserModal(){document.getElementById('userModal').classList.add('hi
 
 async function saveUser(){
   const nombre=document.getElementById('uNombre').value.trim();
+  const username=document.getElementById('uUsername').value.trim().toLowerCase().replace(/[^a-z0-9._-]/g,'');
   const email=document.getElementById('uEmail').value.trim();
   const pass=document.getElementById('uPass').value;
   const resetPass=document.getElementById('uResetPass').value;
@@ -2329,6 +2409,7 @@ async function saveUser(){
     .filter(id=>document.getElementById(id)?.checked)
     .map(id=>document.getElementById(id).value);
   if(!nombre||!email){toast('Completa nombre y email');return;}
+  if(!username){toast('El nombre de usuario es obligatorio');return;}
   if(!roles.length){toast('Selecciona al menos un rol');return;}
   // Primary rol = highest privilege selected (for backward compat)
   const PRIORITY=['superadmin','gerente','admin','operador'];
@@ -2336,7 +2417,9 @@ async function saveUser(){
 
   try{
     if(_editUserId){
-      await db.collection('usuarios').doc(_editUserId).update({nombre,rol,roles,sucursalId,sucursalNombre,turno});
+      await db.collection('usuarios').doc(_editUserId).update({nombre,username,rol,roles,sucursalId,sucursalNombre,turno});
+      // Update username index
+      await db.collection('usernames').doc(username).set({email,uid:_editUserId,nombre});
       if(resetPass){
         if(resetPass.length<6){toast('La nueva contraseña debe tener al menos 6 caracteres');return;}
         await db.collection('usuarios').doc(_editUserId).update({resetPassword:resetPass,mustChangePassword:true});
@@ -2358,9 +2441,11 @@ async function saveUser(){
         toast('❌ '+(errMsg[data.error.message]||data.error.message));return;
       }
       await db.collection('usuarios').doc(data.localId).set({
-        nombre,email,rol,roles,sucursalId,sucursalNombre,turno,
+        nombre,username,email,rol,roles,sucursalId,sucursalNombre,turno,
         activo:true,creadoEn:firebase.firestore.FieldValue.serverTimestamp(),creadoPor:CU.uid
       });
+      // Save username index for login lookup
+      await db.collection('usernames').doc(username).set({email,uid:data.localId,nombre});
       await auditLog('usuario',{accion:'crear',email,rol,roles:roles.join(',')});
       toast(`✅ Usuario ${nombre} creado — puede iniciar sesión con ${email}`);
     }
