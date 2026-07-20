@@ -846,6 +846,7 @@ tr:hover td{background:var(--g50)}
 </div>
 
 <!-- CHANGE PASS MODAL -->
+<div class="mb hidden" id="changePassModal">
   <div class="modal" style="max-width:400px">
     <div class="mh"><span class="mt2-title">Cambiar contraseña</span><button class="btn btn-g sm" onclick="document.getElementById('changePassModal').classList.add('hidden')">✕</button></div>
     <div class="fld"><label class="lbl">Contraseña actual</label><input class="inp" type="password" id="cpActual" placeholder="Tu contraseña actual"/></div>
@@ -1173,14 +1174,6 @@ async function showApp(){
   startSessionTimer();
   registerSW();
   if(isOp) renderTurnoStatus();
-  if(CU.mustChangePassword){
-    setTimeout(()=>{
-      toast('⚠️ Tu contraseña fue reiniciada por el administrador. Cámbiala pronto.',6000);
-      // Show change password button highlighted but don't block the app
-      const btn=document.getElementById('darkBtn')?.nextElementSibling;
-      if(btn) btn.style.outline='2px solid var(--a500)';
-    },1500);
-  }
   await auditLog('login',{sucursal:sucNombre,turno});
 }
 
@@ -1457,20 +1450,10 @@ function renderDashTL(){const tl=document.getElementById('dashTL');if(!tl)return
 /* ============ 9. PWA ============ */
 function registerSW(){
   if('serviceWorker' in navigator){
-    // Inline SW as blob — no external sw.js needed
-    const swCode=`
-const CACHE='kombi-v1';
-const ASSETS=['/'];
-self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS))));
-self.addEventListener('fetch',e=>{
-  if(e.request.url.includes('firebaseapp')||e.request.url.includes('googleapis')||e.request.url.includes('gstatic'))return;
-  e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).catch(()=>caches.match('/'))));
-});`;
-    const blob=new Blob([swCode],{type:'application/javascript'});
-    const url=URL.createObjectURL(blob);
-    navigator.serviceWorker.register(url).then(()=>{
-      console.log('SW registered');
-    }).catch(e=>console.log('SW:',e));
+    // Must use external file — blob URLs not supported in GitHub Pages
+    navigator.serviceWorker.register('/kombi-store/sw.js')
+      .then(()=>console.log('SW registered'))
+      .catch(e=>console.log('SW skip:',e.message));
   }
 }
 // PWA install prompt
@@ -1989,7 +1972,19 @@ function startRealTimeListeners(){
     .onSnapshot(snap=>{
       const notifs=snap.docs.map(d=>({id:d.id,...d.data()}));
       renderNotifBanner(notifs);
-    }, e=>console.warn('Notif listener:',e));
+    }, e=>{
+      if(e.code==='failed-precondition'){
+        // Index not created yet — try without orderBy
+        console.warn('Notif index missing — create it in Firebase Console');
+        _unsubNotif=db.collection('notificaciones')
+          .where('leida','==',false)
+          .limit(20)
+          .onSnapshot(snap=>{
+            const notifs=snap.docs.map(d=>({id:d.id,...d.data()}));
+            renderNotifBanner(notifs);
+          },()=>{});
+      }
+    });
 
   // 2. Panel operativo: estado en tiempo real de aperturas de hoy
   if(rol==='gerente'||rol==='superadmin'){
