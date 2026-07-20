@@ -904,6 +904,12 @@ const firebaseConfig={apiKey:"AIzaSyCat-wevUXz8RK6OUmSkxdilitEGMbGi1g",authDomai
 firebase.initializeApp(firebaseConfig);
 const auth=firebase.auth(),db=firebase.firestore();
 
+// Enable offline persistence
+db.enablePersistence({synchronizeTabs:true}).catch(e=>{
+  if(e.code==='failed-precondition'){console.warn('Multiple tabs open');}
+  else if(e.code==='unimplemented'){console.warn('Browser does not support persistence');}
+});
+
 // STATE
 let CU=null,CFG={},SUCURSALES=[],POS_TERMINALES=[{id:'gn1',name:'GetNet 1'},{id:'gn2',name:'GetNet 2'},{id:'tb',name:'Transbank'}];
 let INVENTARIO=[],VENTAS=[],TURNOS=[],CK_APERTURA=[],CK_CIERRE=[],RETIROS=[];
@@ -936,22 +942,44 @@ auth.onAuthStateChanged(async user=>{
       } else {
         const d=doc.data();
         if(!d.activo){await auth.signOut();showLogin('Tu cuenta está desactivada');return;}
-        // Normalize: ensure roles array exists
-        if(!Array.isArray(d.roles)||!d.roles.length){
-          d.roles=[d.rol||'operador'];
-        }
+        if(!Array.isArray(d.roles)||!d.roles.length){d.roles=[d.rol||'operador'];}
         CU={uid:user.uid,...d};
       }
       await loadConfig();
       showSucursalStep();
-    }catch(e){console.error(e);showLogin('Error al cargar perfil');}
-  } else {CU=null;showLoading(false);showLogin();}
+    }catch(e){
+      console.error('Auth error:',e);
+      // No hacer signOut — solo mostrar error y detener el loop
+      showLoading(false);
+      document.getElementById('loginScreen').style.display='flex';
+      document.getElementById('app').classList.remove('v');
+      const errEl=document.getElementById('lErr');
+      if(errEl){errEl.textContent='Error de conexión: '+e.message;errEl.classList.remove('hidden');}
+    }
+  } else {
+    CU=null;
+    showLoading(false);
+    document.getElementById('loginScreen').style.display='flex';
+    document.getElementById('app').classList.remove('v');
+    // Reset login form to step 1
+    document.getElementById('loginStep1').style.display='block';
+    document.getElementById('loginStep2').style.display='none';
+    const fp=document.getElementById('loginForgot');if(fp)fp.style.display='none';
+  }
 });
 
 function showLoading(s=true){document.getElementById('loadingScreen').style.display=s?'flex':'none';}
 function showLogin(err=''){
-  showLoading(false);document.getElementById('loginScreen').style.display='flex';document.getElementById('app').classList.remove('v');
-  if(err){const e=document.getElementById('lErr');e.textContent=err;e.classList.remove('hidden');}
+  showLoading(false);
+  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('app').classList.remove('v');
+  document.getElementById('loginStep1').style.display='block';
+  document.getElementById('loginStep2').style.display='none';
+  const fp=document.getElementById('loginForgot');if(fp)fp.style.display='none';
+  if(err){
+    const e=document.getElementById('lErr');
+    if(e){e.textContent=err;e.classList.remove('hidden');}
+  }
 }
 let _turnoSeleccionado='mañana';
 let _rolSeleccionado='operador';
