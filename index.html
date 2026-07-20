@@ -1175,9 +1175,11 @@ async function showApp(){
   if(isOp) renderTurnoStatus();
   if(CU.mustChangePassword){
     setTimeout(()=>{
-      toast('⚠️ Tu contraseña fue reiniciada. Por favor cámbiala.',5000);
-      document.getElementById('changePassModal').classList.remove('hidden');
-    },1000);
+      toast('⚠️ Tu contraseña fue reiniciada por el administrador. Cámbiala pronto.',6000);
+      // Show change password button highlighted but don't block the app
+      const btn=document.getElementById('darkBtn')?.nextElementSibling;
+      if(btn) btn.style.outline='2px solid var(--a500)';
+    },1500);
   }
   await auditLog('login',{sucursal:sucNombre,turno});
 }
