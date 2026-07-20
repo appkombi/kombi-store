@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta name="theme-color" content="#B45309"/>
+<meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="Kombi Store"/>
@@ -1422,7 +1423,6 @@ async function enviarCierre(){
       toast('✅ Cierre enviado — caja cuadra perfectamente',4000);
     }
   }catch(e){toast('❌ Error al guardar cierre: '+e.message,5000);}
-}
 }
 function showDiffAlert(msg,isNeg){const d=document.createElement('div');d.style.cssText=`position:fixed;top:64px;left:50%;transform:translateX(-50%);background:${isNeg?'var(--r500)':'var(--b500)'};color:#fff;padding:.875rem 1.5rem;border-radius:10px;font-weight:700;font-size:.9375rem;box-shadow:var(--shl);z-index:997;display:flex;align-items:center;gap:.75rem;max-width:calc(100vw - 2rem)`;d.innerHTML=`<span>${isNeg?'⚠️':'ℹ️'}</span><span>${msg}</span><button onclick="this.parentElement.remove()" style="background:rgba(255,255,255,.25);border:none;color:#fff;border-radius:6px;padding:.25rem .5rem;cursor:pointer;font-weight:700;margin-left:.5rem">✕</button>`;document.body.appendChild(d);setTimeout(()=>d.remove(),10000);}
 
