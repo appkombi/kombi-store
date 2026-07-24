@@ -908,12 +908,6 @@ const firebaseConfig={apiKey:"AIzaSyCat-wevUXz8RK6OUmSkxdilitEGMbGi1g",authDomai
 firebase.initializeApp(firebaseConfig);
 const auth=firebase.auth(),db=firebase.firestore();
 
-// Enable offline persistence
-db.enablePersistence({synchronizeTabs:true}).catch(e=>{
-  if(e.code==='failed-precondition'){console.warn('Multiple tabs open');}
-  else if(e.code==='unimplemented'){console.warn('Browser does not support persistence');}
-});
-
 // STATE
 let CU=null,CFG={},SUCURSALES=[],POS_TERMINALES=[{id:'gn1',name:'GetNet 1'},{id:'gn2',name:'GetNet 2'},{id:'tb',name:'Transbank'}];
 let INVENTARIO=[],VENTAS=[],TURNOS=[],CK_APERTURA=[],CK_CIERRE=[],RETIROS=[];
@@ -1168,7 +1162,13 @@ async function showApp(){
   renderBills('apBills','AP');renderBills('ciBills','CI');renderCiPosInputs();renderAjustes();
   document.getElementById('vFecha').value=today();document.getElementById('repFecha').value=today();
   if(CFG.gasUrl){const gi=document.getElementById('gasUrlInput');if(gi)gi.value=CFG.gasUrl;}
-  if(isOp)showSec('op-ap',document.querySelector('#opNav .ni'));
+  if(isOp){
+    showSec('op-ap',document.querySelector('#opNav .ni'));
+    const apId=`${CU.sucursalActiva||CU.sucursalId}_${today()}_${CU.turnoActivo||CU.turno}`;
+    db.collection('aperturas').doc(apId).get().then(doc=>{
+      if(doc.exists){AP={...doc.data(),saved:true};lockApertura();}
+    }).catch(()=>{});
+  }
   else{ showSec('ad-dash',document.querySelector('#adNav .ni')); renderMetaVentas(); }
   // Start real-time listeners for admins
   startRealTimeListeners();
@@ -1258,8 +1258,42 @@ function renderApResumen(){
 }
 async function saveApertura(){
   AP.saved=true;AP.hora=timeNow();
-  try{await db.collection('aperturas').doc(`${CU.sucursalActiva||CU.sucursalId}_${today()}_${CU.turnoActivo||CU.turno}`).set({...AP,uid:CU.uid,operador:CU.nombre,sucursalId:CU.sucursalActiva||CU.sucursalId,sucursal:CU.sucursalActivaNombre||CU.sucursalNombre||'',turno:CU.turnoActivo||CU.turno||'',fecha:today(),timestamp:firebase.firestore.FieldValue.serverTimestamp()});await auditLog('apertura',{efectivo:totalBills(AP)});document.getElementById('apW4')?.classList.replace('active','done');toast('✅ Apertura guardada');}
-  catch(e){toast('❌ Error: '+e.message);}
+  try{
+    await db.collection('aperturas').doc(`${CU.sucursalActiva||CU.sucursalId}_${today()}_${CU.turnoActivo||CU.turno}`).set({...AP,uid:CU.uid,operador:CU.nombre,sucursalId:CU.sucursalActiva||CU.sucursalId,sucursal:CU.sucursalActivaNombre||CU.sucursalNombre||'',turno:CU.turnoActivo||CU.turno||'',fecha:today(),timestamp:firebase.firestore.FieldValue.serverTimestamp()});
+    await auditLog('apertura',{efectivo:totalBills(AP)});
+    document.getElementById('apW4')?.classList.replace('active','done');
+    toast('✅ Apertura guardada');
+    renderTurnoStatus();
+    // Block apertura section — show locked state
+    setTimeout(()=>lockApertura(),800);
+  }catch(e){toast('❌ Error: '+e.message);}
+}
+
+function lockApertura(){
+  const sec=document.getElementById('op-ap');if(!sec)return;
+  const emoji={'mañana':'☀️','tarde':'🌤','noche':'🌙'};
+  const turno=CU.turnoActivo||CU.turno||'';
+  sec.innerHTML=`
+    <div class="ph"><h2>Arqueo de Apertura</h2><p>Inicio del turno</p></div>
+    <div id="turnoStatusBar" style="margin-bottom:1rem"></div>
+    <div style="text-align:center;padding:3rem 1rem">
+      <div style="font-size:3rem;margin-bottom:1rem">✅</div>
+      <div style="font-size:1.25rem;font-weight:700;color:var(--gr600);margin-bottom:.5rem">Apertura registrada</div>
+      <div style="font-size:.9375rem;color:var(--g500);margin-bottom:.25rem">
+        ${emoji[turno]||''} Turno ${turno} · ${AP.hora}
+      </div>
+      <div style="font-size:.875rem;color:var(--g400);margin-bottom:2rem">
+        Efectivo apertura: <strong style="font-family:var(--mono);color:var(--g700)">${clp(totalBills(AP))}</strong>
+      </div>
+      <div style="background:var(--a50);border:1px solid var(--a200);border-radius:12px;padding:1.25rem;max-width:360px;margin:0 auto 1.5rem">
+        <div class="fw6 fs14" style="color:var(--a700);margin-bottom:.75rem">Resumen apertura</div>
+        ${AP.cigarros?.length?`<div class="fs13 text-gray">🚬 ${AP.cigarros.length} tipos de cigarros registrados</div>`:''}
+        <div class="fs13 text-gray">📋 Checklist completado</div>
+      </div>
+      <p style="font-size:.8125rem;color:var(--g400)">Este módulo se desbloquea mañana con un nuevo turno.</p>
+      <button class="btn btn-s" style="margin-top:1rem" onclick="showSec('op-ret',document.querySelector('#opNav .ni:nth-child(2)'))">Ir a Retiros →</button>
+    </div>`;
+  renderTurnoStatus();
 }
 
 function renderCigCatalog(containerId,tgt){
