@@ -599,15 +599,49 @@ tr:hover td{background:var(--g50)}
           <div class="card"><div class="ct">🏬 Ventas por sucursal (mes)</div><div id="dashVentasSuc"></div></div>
         </div>
         <!-- POS SYNC PANEL -->
-        <div class="card mt4" id="posSyncPanel" style="display:none">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
-            <div class="fw7 fs14">🖥️ POS-XPRESS — Libertad</div>
-            <div style="display:flex;gap:.5rem;align-items:center">
+        <div class="card mt4" id="posSyncPanel">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">
+            <div class="fw7 fs14">🖥️ POS-XPRESS — Datos en tiempo real</div>
+            <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
               <span class="fs12 text-gray" id="posSyncTime"></span>
-              <button class="btn btn-s sm" onclick="syncPOS('sync_ventas')">🔄 Sincronizar</button>
+              <button class="btn btn-s sm" onclick="syncPOS('sync_all')">🔄 Sync ahora</button>
             </div>
           </div>
-          <div id="posSyncData" class="g3"></div>
+          <!-- Filtros temporales -->
+          <div style="display:flex;gap:.375rem;flex-wrap:wrap;margin-bottom:1rem;border-bottom:2px solid var(--g200);padding-bottom:.5rem">
+            <button class="rep-tab active" onclick="setPOSPeriod('dia',this)">Hoy</button>
+            <button class="rep-tab" onclick="setPOSPeriod('semana',this)">Semana</button>
+            <button class="rep-tab" onclick="setPOSPeriod('15dias',this)">15 días</button>
+            <button class="rep-tab" onclick="setPOSPeriod('mes',this)">Mes</button>
+            <button class="rep-tab" onclick="setPOSPeriod('ano',this)">Año</button>
+            <select class="sel sm" id="posSucFiltro" onchange="loadPOSData()" style="font-size:.8125rem;padding:.25rem .5rem">
+              <option value="">Todas las sucursales</option>
+            </select>
+          </div>
+          <!-- KPIs -->
+          <div class="g4 mb4" id="posKPIs"></div>
+          <!-- Gráficos -->
+          <div class="g2 mb4">
+            <div class="card" style="padding:.875rem">
+              <div class="ct" style="padding:0;margin-bottom:.75rem">📈 Ventas por día</div>
+              <div id="posTendencia"></div>
+            </div>
+            <div class="card" style="padding:.875rem">
+              <div class="ct" style="padding:0;margin-bottom:.75rem">💰 Medios de pago</div>
+              <div id="posMedios"></div>
+            </div>
+          </div>
+          <!-- Departamentos -->
+          <div class="g2">
+            <div class="card" style="padding:.875rem">
+              <div class="ct" style="padding:0;margin-bottom:.75rem">🏪 Ventas por departamento</div>
+              <div id="posDeptos"></div>
+            </div>
+            <div class="card" style="padding:.875rem">
+              <div class="ct" style="padding:0;margin-bottom:.75rem">🏬 Comparativa sucursales</div>
+              <div id="posSucursales"></div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1540,6 +1574,10 @@ function renderDash(){
   renderDashChart(v);renderDashCompo(v);renderDashCigs();renderDashStock();renderDashTL();
   renderMetaVentas();renderDashRetirosCat();renderDashVentasSuc();
   loadPOSData();
+  // Auto-refresh POS data every 15 min
+  if(!window._posRefreshTimer){
+    window._posRefreshTimer=setInterval(()=>loadPOSData(),15*60*1000);
+  }
 }
 function renderDashChart(ventas){
   const c=document.getElementById('dashChart');if(!c)return;if(!ventas.length){c.innerHTML='<p class="fs14 text-gray" style="padding:1rem">Sin datos</p>';return;}
@@ -2755,43 +2793,197 @@ async function syncPOS(accion='sync_ventas'){
   }
 }
 
+let _posPeriod='dia';
+
+function setPOSPeriod(p,el){
+  _posPeriod=p;
+  document.querySelectorAll('#posSyncPanel .rep-tab').forEach(b=>b.classList.remove('active'));
+  el?.classList.add('active');
+  loadPOSData();
+}
+
 async function loadPOSData(){
-  const panel=document.getElementById('posSyncPanel');
-  const dataEl=document.getElementById('posSyncData');
-  const timeEl=document.getElementById('posSyncTime');
-  if(!panel||!dataEl)return;
+  const panel=document.getElementById('posSyncPanel');if(!panel)return;
+
+  // Populate sucursal filter
+  const sel=document.getElementById('posSucFiltro');
+  if(sel&&sel.children.length<=1){
+    SUCURSALES.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.nombre;sel.appendChild(o);});
+  }
+  const sucFiltro=sel?.value||'';
+
+  // Calculate date range
+  const hoy=new Date();
+  const fechas=[];
+  let dias=1;
+  if(_posPeriod==='dia') dias=1;
+  else if(_posPeriod==='semana') dias=7;
+  else if(_posPeriod==='15dias') dias=15;
+  else if(_posPeriod==='mes') dias=30;
+  else if(_posPeriod==='ano') dias=365;
+
+  for(let i=dias-1;i>=0;i--){
+    const d=new Date(hoy);d.setDate(d.getDate()-i);
+    fechas.push(d.toISOString().slice(0,10));
+  }
+
+  // Load all POS data for the period
   try{
-    const fecha=today();
-    const snap=await db.collection('ventasPOS').doc(fecha+'_libertad').get();
-    if(!snap.exists){panel.style.display='none';return;}
-    panel.style.display='block';
-    const d=snap.data();
-    if(timeEl)timeEl.textContent='Sync: '+(d.syncAt?new Date(d.syncAt).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}):'—');
-    dataEl.innerHTML=[
-      {l:'Total ventas POS',v:clp(d.totalVenta||0),col:'var(--a600)'},
-      {l:'Boletas emitidas',v:(d.totalBoletas||0)+' doc.',col:'var(--b600)'},
-      {l:'Efectivo POS',v:clp(d.efectivo||0),col:'var(--gr600)'},
-      {l:'Débito/Crédito',v:clp((d.debito||0)+(d.credito||0)),col:'var(--g600)'},
-    ].map(x=>`<div class="sc"><div class="lbl">${x.l}</div><div class="val" style="color:${x.col};font-size:1.125rem">${x.v}</div></div>`).join('');
-    // Also load categorias
-    const catSnap=await db.collection('ventasCategorias').doc(fecha+'_libertad').get();
-    if(catSnap.exists){
-      const cats=JSON.parse(catSnap.data().categorias||'[]');
-      if(cats.length){
-        const max=Math.max(...cats.map(c=>c.monto),1);
-        dataEl.innerHTML+=`<div style="grid-column:1/-1;margin-top:.75rem">
-          <div class="ct" style="padding:0;margin-bottom:.5rem">Ventas por categoría hoy</div>
-          ${cats.slice(0,6).map(c=>`<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.375rem">
-            <div style="width:120px;font-size:.75rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.nombre}</div>
-            <div style="flex:1;height:8px;background:var(--g100);border-radius:4px;overflow:hidden">
-              <div style="height:100%;width:${Math.round(c.monto/max*100)}%;background:var(--a400);border-radius:4px"></div>
-            </div>
-            <div style="width:80px;font-size:.75rem;font-family:var(--mono);text-align:right">${clp(c.monto)}</div>
-          </div>`).join('')}
-        </div>`;
+    // Get all sucursales to query
+    const sucs=sucFiltro?[sucFiltro]:SUCURSALES.map(s=>s.id);
+    const allDocs=[];
+
+    for(const sucId of sucs){
+      for(const fecha of fechas){
+        const docId=fecha+'_'+sucId;
+        try{
+          const snap=await db.collection('ventasPOS').doc(docId).get();
+          if(snap.exists) allDocs.push({fecha,sucId,...snap.data()});
+        }catch(e){}
       }
     }
-  }catch(e){console.warn('POS data:',e);panel.style.display='none';}
+
+    // Update sync time from latest doc
+    const latest=allDocs.sort((a,b)=>b.syncAt?.localeCompare(a.syncAt||'')||0)[0];
+    const timeEl=document.getElementById('posSyncTime');
+    if(timeEl&&latest?.syncAt){
+      timeEl.textContent='Último sync: '+new Date(latest.syncAt).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+    }
+
+    renderPOSKPIs(allDocs,dias);
+    renderPOSTendencia(allDocs,fechas,sucs);
+    renderPOSMedios(allDocs);
+    renderPOSDeptos(allDocs);
+    renderPOSSucursales(allDocs);
+
+  }catch(e){console.warn('POS data:',e);}
+}
+
+function renderPOSKPIs(docs,dias){
+  const c=document.getElementById('posKPIs');if(!c)return;
+  const total=docs.reduce((a,d)=>a+d.totalVenta,0);
+  const boletas=docs.reduce((a,d)=>a+d.totalBoletas,0);
+  const prom=dias>1&&docs.length?Math.round(total/Math.max(docs.length,1)):total;
+  const ef=docs.reduce((a,d)=>a+(d.efectivo||0),0);
+  const deb=docs.reduce((a,d)=>a+(d.debito||0),0);
+  const cred=docs.reduce((a,d)=>a+(d.credito||0),0);
+  const otros=docs.reduce((a,d)=>a+(d.otros||0),0);
+  c.innerHTML=[
+    {l:'Total ventas',v:clp(total),sub:boletas+' boletas',col:'var(--a500)'},
+    {l:'Promedio diario',v:clp(prom),sub:'por día con datos',col:'var(--b500)'},
+    {l:'Efectivo',v:clp(ef),sub:total?Math.round(ef/total*100)+'% del total':'—',col:'var(--gr500)'},
+    {l:'Débito + Crédito',v:clp(deb+cred),sub:total?Math.round((deb+cred)/total*100)+'% del total':'—',col:'var(--g500)'},
+  ].map(x=>`<div class="sc"><div class="lbl">${x.l}</div><div class="val" style="color:${x.col}">${x.v}</div><div class="sub">${x.sub}</div></div>`).join('');
+}
+
+function renderPOSTendencia(docs,fechas,sucs){
+  const c=document.getElementById('posTendencia');if(!c)return;
+  if(!docs.length){c.innerHTML='<p class="fs13 text-gray">Sin datos</p>';return;}
+
+  // Group by fecha
+  const byFecha={};
+  fechas.forEach(f=>byFecha[f]=0);
+  docs.forEach(d=>byFecha[d.fecha]=(byFecha[d.fecha]||0)+d.totalVenta);
+
+  const vals=fechas.map(f=>byFecha[f]||0);
+  const max=Math.max(...vals,1);
+
+  // Show fewer labels if many days
+  const step=fechas.length>30?7:fechas.length>14?3:1;
+
+  c.innerHTML=`<div class="cbars" style="height:140px">${vals.map((v,i)=>{
+    const h=Math.max(Math.round(v/max*120),v>0?4:0);
+    const showLabel=i%step===0;
+    const f=fechas[i];
+    const label=fechas.length<=7?f.slice(5):fechas.length<=30?f.slice(8):f.slice(5,7);
+    return`<div class="cbw" title="${f}: ${clp(v)}">
+      <div class="cvl" style="font-size:.5rem">${v>=1000?Math.round(v/1000)+'k':''}</div>
+      <div class="cbar ${f===today()?'today':''}" style="height:${h}px;background:${v>0?'var(--a400)':'var(--g100)'}"></div>
+      <div class="cbl" style="font-size:.55rem">${showLabel?label:''}</div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function renderPOSMedios(docs){
+  const c=document.getElementById('posMedios');if(!c)return;
+  const ef=docs.reduce((a,d)=>a+(d.efectivo||0),0);
+  const deb=docs.reduce((a,d)=>a+(d.debito||0),0);
+  const cred=docs.reduce((a,d)=>a+(d.credito||0),0);
+  const otros=docs.reduce((a,d)=>a+(d.otros||0),0);
+  const total=ef+deb+cred+otros||1;
+  if(!ef&&!deb&&!cred&&!otros){c.innerHTML='<p class="fs13 text-gray">Sin datos</p>';return;}
+  [['💵 Efectivo',ef,'var(--a500)'],['💳 Débito',deb,'var(--b500)'],['🏦 Crédito',cred,'var(--gr500)'],['🎟 Otros',otros,'var(--g400)']].forEach(([l,v,col])=>{
+    const pct=Math.round(v/total*100);
+    c.innerHTML+=`<div style="margin-bottom:.625rem">
+      <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:.25rem">
+        <span class="fw6">${l}</span>
+        <span class="mono">${clp(v)} <span style="color:${col}">(${pct}%)</span></span>
+      </div>
+      <div style="height:8px;background:var(--g100);border-radius:4px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${col};border-radius:4px"></div>
+      </div>
+    </div>`;
+  });
+}
+
+function renderPOSDeptos(docs){
+  const c=document.getElementById('posDeptos');if(!c)return;
+  // Aggregate departamentos across all docs
+  const byDepto={};
+  docs.forEach(d=>{
+    let deptos=[];
+    try{deptos=JSON.parse(d.departamentos||'[]');}catch(e){}
+    deptos.forEach(dep=>{
+      if(!byDepto[dep.nombre])byDepto[dep.nombre]={monto:0,cantidad:0};
+      byDepto[dep.nombre].monto+=dep.monto;
+      byDepto[dep.nombre].cantidad+=dep.cantidad;
+    });
+  });
+  const sorted=Object.entries(byDepto).sort((a,b)=>b[1].monto-a[1].monto);
+  if(!sorted.length){c.innerHTML='<p class="fs13 text-gray">Sin datos</p>';return;}
+  const max=sorted[0][1].monto||1;
+  c.innerHTML=sorted.map(([nom,d])=>`
+    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
+      <div style="width:120px;font-size:.75rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${nom}">${nom}</div>
+      <div style="flex:1;height:10px;background:var(--g100);border-radius:5px;overflow:hidden">
+        <div style="height:100%;width:${Math.round(d.monto/max*100)}%;background:var(--a400);border-radius:5px"></div>
+      </div>
+      <div style="width:70px;font-size:.75rem;font-family:var(--mono);text-align:right">${clp(d.monto)}</div>
+    </div>`).join('');
+}
+
+function renderPOSSucursales(docs){
+  const c=document.getElementById('posSucursales');if(!c)return;
+  const bySuc={};
+  docs.forEach(d=>{
+    const nom=d.sucursal||d.sucursalId||'—';
+    if(!bySuc[nom])bySuc[nom]={total:0,boletas:0,ef:0,deb:0,cred:0};
+    bySuc[nom].total+=d.totalVenta||0;
+    bySuc[nom].boletas+=d.totalBoletas||0;
+    bySuc[nom].ef+=d.efectivo||0;
+    bySuc[nom].deb+=d.debito||0;
+    bySuc[nom].cred+=d.credito||0;
+  });
+  const sorted=Object.entries(bySuc).sort((a,b)=>b[1].total-a[1].total);
+  if(!sorted.length){c.innerHTML='<p class="fs13 text-gray">Sin datos</p>';return;}
+  const max=sorted[0][1].total||1;
+  const grand=sorted.reduce((a,[,d])=>a+d.total,0)||1;
+  c.innerHTML=sorted.map(([nom,d])=>`
+    <div style="margin-bottom:.875rem">
+      <div style="display:flex;justify-content:space-between;margin-bottom:.25rem">
+        <span class="fw7 fs13">🏬 ${nom}</span>
+        <span class="mono fw7" style="color:var(--a600)">${clp(d.total)}</span>
+      </div>
+      <div style="height:10px;background:var(--g100);border-radius:5px;overflow:hidden;margin-bottom:.25rem">
+        <div style="height:100%;width:${Math.round(d.total/max*100)}%;background:var(--a500);border-radius:5px"></div>
+      </div>
+      <div style="display:flex;gap:.75rem;font-size:.72rem;color:var(--g500)">
+        <span>${d.boletas} boletas</span>
+        <span>Ef:${clp(d.ef)}</span>
+        <span>Deb:${clp(d.deb)}</span>
+        <span>${Math.round(d.total/grand*100)}% total</span>
+      </div>
+    </div>`).join('');
 }function setGasStatus(m,col){const el=document.getElementById('gasStatus');if(el){el.textContent=m;el.style.color=col;}}
 async function enviarEmail(asunto,cuerpoTexto,htmlBody,tipo='general'){
   const url=getGasUrl();if(!url){toast('⚠ Configura la URL del script');return false;}
