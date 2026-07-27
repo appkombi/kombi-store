@@ -382,6 +382,7 @@ tr:hover td{background:var(--g50)}
         <div class="ss">
           <div class="ssl">Turno</div>
           <button class="ni active" data-sec="op-ap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>Apertura</button>
+          <button class="ni" data-sec="op-rep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>Reponer Stock</button>
           <button class="ni" data-sec="op-ret"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 5 5 12"/></svg>Retiros / Abonos</button>
           <button class="ni" data-sec="op-ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Cierre</button>
         </div>
@@ -444,6 +445,37 @@ tr:hover td{background:var(--g50)}
             <div class="card"><div class="ct">📊 Resumen</div><div id="apResumen"></div></div>
             <div class="wnav"><button class="btn btn-s" onclick="apGoTo(3)">← Atrás</button><button class="btn btn-p" onclick="saveApertura()">✅ Guardar Apertura</button></div>
           </div>
+        </div>
+      </div>
+
+      <div class="section" id="op-rep">
+        <div class="ph"><h2>📦 Reponer Stock</h2><p>Mueve unidades de bodega a exhibición</p></div>
+
+        <!-- Filtros -->
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
+          <input class="inp" type="search" id="repBuscar" placeholder="Buscar producto…" style="max-width:220px" oninput="filterReponer(this.value)"/>
+          <select class="sel" id="repCatFiltro" onchange="renderReponer()">
+            <option value="">Todas las categorías</option>
+          </select>
+          <button class="btn btn-s sm" onclick="toggleRepSoloBajos()">⚠️ Solo bajo mínimo</button>
+        </div>
+
+        <!-- Lista -->
+        <div id="reponerList"></div>
+
+        <!-- Botón confirmar -->
+        <div id="reponerConfirmBar" class="hidden" style="position:sticky;bottom:1rem;background:var(--a500);color:#fff;border-radius:12px;padding:.875rem 1.25rem;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shl);margin-top:1rem">
+          <span id="reponerConfirmMsg" class="fw6"></span>
+          <div style="display:flex;gap:.5rem">
+            <button class="btn" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="cancelarReposicion()">Cancelar</button>
+            <button class="btn" style="background:#fff;color:var(--a700);font-weight:700" onclick="confirmarReposicion()">✅ Confirmar reposición</button>
+          </div>
+        </div>
+
+        <!-- Historial del día -->
+        <div style="margin-top:2rem">
+          <div class="ct" style="padding:0;margin-bottom:.75rem">📋 Reposiciones de hoy</div>
+          <div id="reponerHistHoy"></div>
         </div>
       </div>
 
@@ -566,6 +598,17 @@ tr:hover td{background:var(--g50)}
           <div class="card"><div class="ct">💸 Retiros por categoría</div><div id="dashRetirosCat"></div></div>
           <div class="card"><div class="ct">🏬 Ventas por sucursal (mes)</div><div id="dashVentasSuc"></div></div>
         </div>
+        <!-- POS SYNC PANEL -->
+        <div class="card mt4" id="posSyncPanel" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+            <div class="fw7 fs14">🖥️ POS-XPRESS — Libertad</div>
+            <div style="display:flex;gap:.5rem;align-items:center">
+              <span class="fs12 text-gray" id="posSyncTime"></span>
+              <button class="btn btn-s sm" onclick="syncPOS('sync_ventas')">🔄 Sincronizar</button>
+            </div>
+          </div>
+          <div id="posSyncData" class="g3"></div>
+        </div>
       </div>
 
       <div class="section" id="ad-hist">
@@ -610,8 +653,9 @@ tr:hover td{background:var(--g50)}
         <!-- Tabs -->
         <div style="display:flex;gap:.375rem;margin-bottom:1rem;border-bottom:2px solid var(--g200)">
           <button class="rep-tab active" onclick="showInvTab('general',this)">📦 General</button>
-          <button class="rep-tab" onclick="showInvTab('sucursal',this)">🏬 Stock por Sucursal</button>
+          <button class="rep-tab" onclick="showInvTab('sucursal',this)">🏬 Stock Sucursales</button>
           <button class="rep-tab" onclick="showInvTab('reposicion',this)">⚠️ Reposición</button>
+          <button class="rep-tab" onclick="showInvTab('historial',this)">📋 Historial</button>
         </div>
 
         <!-- TAB GENERAL -->
@@ -664,16 +708,29 @@ tr:hover td{background:var(--g50)}
         <div class="tw"><table><thead><tr><th>Producto</th><th>Marca</th><th>Cat.</th><th>Stock</th><th>Mín.</th><th>Precio</th><th></th></tr></thead><tbody id="invBody"></tbody></table></div>
         </div><!-- /invTabGeneral -->
 
-        <!-- TAB STOCK POR SUCURSAL -->
+        <!-- TAB STOCK SUCURSALES -->
         <div id="invTabSucursal" style="display:none">
-          <p class="fs13 text-gray mb4">Registra el stock real de cada sucursal. Útil cuando cada local maneja su propio inventario.</p>
           <div style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center">
             <select class="sel" id="invSucFiltro" onchange="renderStockSucursal()">
               <option value="">Selecciona sucursal</option>
             </select>
             <button class="btn btn-p sm" onclick="guardarStockSucursal()">💾 Guardar cambios</button>
+            <button class="btn btn-s sm" onclick="exportStockSucExcel()">⬇ Excel</button>
           </div>
+          <p class="fs13 text-gray mb4">Gestiona el stock de <strong>Exhibición</strong> (en tienda) y <strong>Bodega</strong> (reserva) por sucursal. El operador puede mover unidades de bodega a exhibición desde su módulo "Reponer Stock".</p>
           <div id="invSucTable"></div>
+        </div>
+
+        <!-- TAB HISTORIAL REPOSICIONES -->
+        <div id="invTabHistorial" style="display:none">
+          <div style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center">
+            <select class="sel" id="histRepSuc" onchange="renderHistorialReposiciones()">
+              <option value="">Todas las sucursales</option>
+            </select>
+            <input class="inp" type="date" id="histRepFecha" style="max-width:160px" onchange="renderHistorialReposiciones()"/>
+            <button class="btn btn-s sm" onclick="exportReposicionesExcel()">⬇ Excel</button>
+          </div>
+          <div id="histRepList"></div>
         </div>
 
         <!-- TAB REPOSICIÓN -->
@@ -763,11 +820,25 @@ tr:hover td{background:var(--g50)}
         <div id="repTabEnvio" style="display:none;max-width:640px">
           <div style="display:flex;flex-direction:column;gap:1rem">
             <div class="card">
-              <div class="ct">🔗 Google Apps Script</div>
+              <div class="ct">🔗 Google Apps Script — Correos y fotos</div>
               <p class="fs13 text-gray mb4">URL para envío de correos a appkombi@gmail.com</p>
               <div class="fld"><label class="lbl">URL Web App</label><input class="inp" type="url" id="gasUrlInput" placeholder="https://script.google.com/macros/s/…/exec"/></div>
               <div style="display:flex;gap:.75rem"><button class="btn btn-p" onclick="saveGasUrl()">Guardar</button><button class="btn btn-s" onclick="testGasUrl()">🧪 Probar</button></div>
               <div id="gasStatus" style="margin-top:.75rem;font-size:.8125rem"></div>
+            </div>
+
+            <div class="card">
+              <div class="ct">🔄 Kombi Sync — POS-XPRESS</div>
+              <p class="fs13 text-gray mb4">Sincroniza ventas e inventario desde el sistema POS automáticamente.</p>
+              <div class="fld"><label class="lbl">URL Kombi Sync</label><input class="inp" type="url" id="syncUrlInput" placeholder="https://script.google.com/macros/s/…/exec" value="https://script.google.com/macros/s/AKfycbw-7SgCUVx2PdI1BvWnd3ev0oV5LJQJg2QM0CHmQK0mdW0u8QKcWJgA5cdM41kPnjKf/exec"/></div>
+              <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+                <button class="btn btn-p" onclick="saveSyncUrl()">Guardar</button>
+                <button class="btn btn-s" onclick="syncPOS('status')">🔍 Verificar</button>
+                <button class="btn btn-s" onclick="syncPOS('sync_ventas')">📊 Sync Ventas</button>
+                <button class="btn btn-s" onclick="syncPOS('sync_all')">🔄 Sync Todo</button>
+              </div>
+              <div id="syncStatus" style="margin-top:.75rem;font-size:.8125rem"></div>
+              <div id="syncResult" class="hidden" style="margin-top:.75rem;background:var(--g50);border-radius:8px;padding:.75rem;font-size:.8125rem;font-family:var(--mono)"></div>
             </div>
             <div class="card">
               <div class="ct">📊 Reporte Diario</div>
@@ -1227,6 +1298,7 @@ function showSec(id,el){
   if(id==='ad-dash')renderDash();if(id==='ad-hist')renderHistorial();if(id==='ad-v'){renderVChart();renderVH();}
   if(id==='ad-caja')renderCaja();if(id==='ad-inv')renderInv();if(id==='ad-aj')renderAjustes();
   if(id==='ad-rep')renderAnalisis();
+  if(id==='op-rep')initReponer();
   if(id==='sa-users')renderUsers();if(id==='sa-logs')renderLogs();
   if(id==='op-ci'){renderCiPosInputs();renderCiMovFromRet();ciGoTo(1);}
   closeSidebar();
@@ -1467,6 +1539,7 @@ function renderDash(){
   s.innerHTML=[{l:'Ventas período',v:clp(total),sub:`${v.length} registros`,col:'var(--a500)'},{l:'Promedio diario',v:clp(avg),sub:'del período',col:'var(--b500)'},{l:'Stock crítico',v:stk,sub:'bajo mínimo',col:stk?'var(--r500)':'var(--gr500)'},{l:'Retiros hoy',v:clp(retH),sub:`${RETIROS.filter(r=>r.fecha===today()).length} mov.`,col:'var(--g500)'}].map(x=>`<div class="sc"><div class="lbl">${x.l}</div><div class="val" style="color:${x.col}">${x.v}</div><div class="sub">${x.sub}</div></div>`).join('');
   renderDashChart(v);renderDashCompo(v);renderDashCigs();renderDashStock();renderDashTL();
   renderMetaVentas();renderDashRetirosCat();renderDashVentasSuc();
+  loadPOSData();
 }
 function renderDashChart(ventas){
   const c=document.getElementById('dashChart');if(!c)return;if(!ventas.length){c.innerHTML='<p class="fs14 text-gray" style="padding:1rem">Sin datos</p>';return;}
@@ -1678,27 +1751,27 @@ function filterInv(v){renderInv(v);}
 
 /* ============ INV TABS ============ */
 function showInvTab(tab,el){
-  ['general','sucursal','reposicion'].forEach(t=>{
+  ['general','sucursal','reposicion','historial'].forEach(t=>{
     const d=document.getElementById('invTab'+t.charAt(0).toUpperCase()+t.slice(1));
     if(d)d.style.display=t===tab?'block':'none';
   });
-  document.querySelectorAll('.rep-tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('#ad-inv .rep-tab').forEach(b=>b.classList.remove('active'));
   el?.classList.add('active');
   if(tab==='sucursal') initStockSucursal();
   if(tab==='reposicion') renderReposicion();
+  if(tab==='historial') initHistorialRep();
   if(tab==='general'){_invCat='TODOS';renderInv();}
 }
 
-/* ============ STOCK POR SUCURSAL ============ */
+/* ============ STOCK POR SUCURSAL (admin) ============ */
 let _stockSucursal={};
+
 async function initStockSucursal(){
-  // Populate sucursal selector
   const sel=document.getElementById('invSucFiltro');
   if(sel&&sel.children.length<=1){
     SUCURSALES.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.nombre;sel.appendChild(o);});
-    if(SUCURSALES.length) sel.value=SUCURSALES[0].id;
+    if(SUCURSALES.length)sel.value=SUCURSALES[0].id;
   }
-  // Load existing stock data
   try{
     const snap=await db.collection('stockSucursal').get();
     _stockSucursal={};
@@ -1706,6 +1779,7 @@ async function initStockSucursal(){
   }catch(e){console.warn('Stock suc:',e);}
   renderStockSucursal();
 }
+
 function renderStockSucursal(){
   const sucId=document.getElementById('invSucFiltro')?.value;
   const c=document.getElementById('invSucTable');if(!c)return;
@@ -1713,34 +1787,317 @@ function renderStockSucursal(){
   const sucStock=_stockSucursal[sucId]||{};
   const cats=[...new Set(INVENTARIO.map(i=>i.cat))];
   c.innerHTML=cats.map(cat=>`
-    <div style="margin-bottom:1.25rem">
+    <div style="margin-bottom:1.5rem">
       <div style="font-size:.75rem;font-weight:700;color:var(--a700);text-transform:uppercase;letter-spacing:.06em;padding:.375rem 0;margin-bottom:.25rem;border-bottom:2px solid var(--a200)">${cat}</div>
-      <table class="cig-table"><thead><tr><th>Producto</th><th style="text-align:center">Stock Global</th><th style="text-align:center;width:110px">Stock Sucursal</th><th style="text-align:center">Mín.</th></tr></thead>
-      <tbody>${INVENTARIO.filter(i=>i.cat===cat).map(prod=>{
-        const val=sucStock[prod.id]??prod.stock;
-        const bajo=val<=prod.min&&prod.min>0;
-        return`<tr>
-          <td class="fw6 fs13">${prod.nombre}</td>
-          <td style="text-align:center;font-family:var(--mono);color:var(--g400)">${prod.stock}</td>
-          <td style="text-align:center"><input class="cig-inp" type="number" min="0" value="${val}" style="width:80px;text-align:center${bajo?';border-color:var(--r500);background:var(--r100)':''}" oninput="setSucStock('${sucId}','${prod.id}',this.value)"/></td>
-          <td style="text-align:center;color:var(--g400)">${prod.min}</td>
-        </tr>`;
-      }).join('')}</tbody></table>
+      <div class="tw"><table>
+        <thead><tr><th>Producto</th><th style="text-align:center">Exhibición</th><th style="text-align:center">Bodega</th><th style="text-align:center">Total</th><th style="text-align:center">Mín. exhib.</th></tr></thead>
+        <tbody>${INVENTARIO.filter(i=>i.cat===cat).map(prod=>{
+          const d=sucStock[prod.id]||{exhibicion:0,bodega:0,min:prod.min||0};
+          const total=(d.exhibicion||0)+(d.bodega||0);
+          const bajo=(d.exhibicion||0)<=(d.min||prod.min||0)&&(d.min||prod.min||0)>0;
+          return`<tr>
+            <td class="fw6 fs13">${prod.nombre}</td>
+            <td style="text-align:center">
+              <input class="cig-inp" type="number" min="0" value="${d.exhibicion||0}"
+                style="width:70px;text-align:center${bajo?';border-color:var(--r500);background:var(--r100)':''}"
+                oninput="setSucStockField('${sucId}','${prod.id}','exhibicion',this.value)"/>
+            </td>
+            <td style="text-align:center">
+              <input class="cig-inp" type="number" min="0" value="${d.bodega||0}"
+                style="width:70px;text-align:center"
+                oninput="setSucStockField('${sucId}','${prod.id}','bodega',this.value)"/>
+            </td>
+            <td style="text-align:center;font-family:var(--mono);font-weight:700;color:${bajo?'var(--r600)':'var(--gr600)'}">${total}</td>
+            <td style="text-align:center">
+              <input class="cig-inp" type="number" min="0" value="${d.min||prod.min||0}"
+                style="width:55px;text-align:center;color:var(--g400)"
+                oninput="setSucStockField('${sucId}','${prod.id}','min',this.value)"/>
+            </td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>
     </div>`).join('');
 }
-function setSucStock(sucId,prodId,val){
+
+function setSucStockField(sucId,prodId,field,val){
   if(!_stockSucursal[sucId])_stockSucursal[sucId]={};
-  _stockSucursal[sucId][prodId]=parseInt(val)||0;
+  if(!_stockSucursal[sucId][prodId])_stockSucursal[sucId][prodId]={exhibicion:0,bodega:0,min:0};
+  _stockSucursal[sucId][prodId][field]=parseInt(val)||0;
 }
+
 async function guardarStockSucursal(){
   const sucId=document.getElementById('invSucFiltro')?.value;
   if(!sucId){toast('Selecciona una sucursal');return;}
   try{
-    await db.collection('stockSucursal').doc(sucId).set(_stockSucursal[sucId]||{},{merge:true});
-    await auditLog('inventario',{accion:'stock_sucursal',sucursalId:sucId});
-    toast('✅ Stock de sucursal guardado');
+    await db.collection('stockSucursal').doc(sucId).set(_stockSucursal[sucId]||{});
+    await auditLog('inventario',{accion:'ajuste_stock_sucursal',sucursalId:sucId});
+    toast('✅ Stock guardado');
+    // Check for alerts
+    const stock=_stockSucursal[sucId]||{};
+    const alertas=INVENTARIO.filter(p=>{const d=stock[p.id]||{};return(d.exhibicion||0)<=(d.min||p.min||0)&&(d.min||p.min||0)>0;});
+    if(alertas.length) toast(`⚠️ ${alertas.length} productos bajo mínimo en exhibición`,5000);
   }catch(e){toast('❌ Error: '+e.message);}
 }
+
+async function exportStockSucExcel(){
+  const sucId=document.getElementById('invSucFiltro')?.value;
+  if(!sucId){toast('Selecciona una sucursal');return;}
+  await loadXLSX();
+  const suc=SUCURSALES.find(s=>s.id===sucId);
+  const stock=_stockSucursal[sucId]||{};
+  const data=[['Producto','Categoría','Exhibición','Bodega','Total','Mín. Exhib.','Estado'],
+    ...INVENTARIO.map(p=>{
+      const d=stock[p.id]||{exhibicion:0,bodega:0,min:p.min||0};
+      const bajo=(d.exhibicion||0)<=(d.min||p.min||0)&&(d.min||p.min||0)>0;
+      return[p.nombre,p.cat,d.exhibicion||0,d.bodega||0,(d.exhibicion||0)+(d.bodega||0),d.min||p.min||0,bajo?'BAJO MÍNIMO':'OK'];
+    })];
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  ws['!cols']=[{wch:30},{wch:14},{wch:12},{wch:10},{wch:10},{wch:14},{wch:14}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,suc?.nombre||'Stock');
+  XLSX.writeFile(wb,`stock_${suc?.nombre||sucId}_${today()}.xlsx`);
+  toast('✅ Excel descargado');
+}
+
+/* ============ REPONER STOCK (operador) ============ */
+let _repPendientes={};  // {prodId: cantidad a reponer}
+let _repSoloBajos=false;
+let _repBuscar='';
+let _repStockSuc={};
+
+async function initReponer(){
+  const sucId=CU.sucursalActiva||CU.sucursalId||'';
+  try{
+    const doc=await db.collection('stockSucursal').doc(sucId).get();
+    _repStockSuc=doc.exists?doc.data():{};
+  }catch(e){_repStockSuc={};}
+  // Populate category filter
+  const sel=document.getElementById('repCatFiltro');
+  if(sel&&sel.children.length<=1){
+    [...new Set(INVENTARIO.map(i=>i.cat))].forEach(cat=>{
+      const o=document.createElement('option');o.value=cat;o.textContent=cat;sel.appendChild(o);
+    });
+  }
+  _repPendientes={};
+  renderReponer();
+  renderHistorialHoy();
+}
+
+function toggleRepSoloBajos(){_repSoloBajos=!_repSoloBajos;renderReponer();}
+function filterReponer(v){_repBuscar=v;renderReponer();}
+
+function renderReponer(){
+  const c=document.getElementById('reponerList');if(!c)return;
+  const cat=document.getElementById('repCatFiltro')?.value||'';
+  let prods=INVENTARIO;
+  if(cat) prods=prods.filter(p=>p.cat===cat);
+  if(_repBuscar) prods=prods.filter(p=>p.nombre.toLowerCase().includes(_repBuscar.toLowerCase()));
+  if(_repSoloBajos) prods=prods.filter(p=>{
+    const d=_repStockSuc[p.id]||{exhibicion:0};
+    const min=d.min||p.min||0;
+    return (d.exhibicion||0)<=min&&min>0;
+  });
+  if(!prods.length){c.innerHTML='<div class="card"><p class="fs14 text-gray">Sin productos.</p></div>';return;}
+  const cats=[...new Set(prods.map(p=>p.cat))];
+  c.innerHTML=cats.map(cat=>`
+    <div style="margin-bottom:1.25rem">
+      <div style="font-size:.75rem;font-weight:700;color:var(--a700);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem;padding-bottom:.25rem;border-bottom:2px solid var(--a200)">${cat}</div>
+      ${prods.filter(p=>p.cat===cat).map(p=>{
+        const d=_repStockSuc[p.id]||{exhibicion:0,bodega:0,min:p.min||0};
+        const exhibicion=d.exhibicion||0;
+        const bodega=d.bodega||0;
+        const min=d.min||p.min||0;
+        const bajo=exhibicion<=min&&min>0;
+        const pendiente=_repPendientes[p.id]||0;
+        return`<div style="display:flex;align-items:center;gap:.75rem;padding:.75rem;border:1.5px solid ${bajo?'var(--r200)':'var(--g200)'};border-radius:10px;margin-bottom:.5rem;background:${bajo?'var(--r50)':'#fff'}">
+          <div style="flex:1;min-width:0">
+            <div class="fw6 fs13">${p.nombre}</div>
+            <div style="display:flex;gap:.75rem;margin-top:.25rem;flex-wrap:wrap">
+              <span class="fs12" style="color:${bajo?'var(--r600)':'var(--gr600)'}">🏪 Exhibición: <strong>${exhibicion}</strong>${bajo?` ⚠️ bajo mín.(${min})`:''}  </span>
+              <span class="fs12 text-gray">📦 Bodega: <strong>${bodega}</strong></span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:.5rem;flex-shrink:0">
+            <button onclick="adjRep('${p.id}',-1)" style="width:32px;height:32px;border:1.5px solid var(--g300);border-radius:8px;background:#fff;font-size:1.125rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center">−</button>
+            <input type="number" min="0" max="${bodega}" value="${pendiente}"
+              style="width:56px;text-align:center;font-family:var(--mono);font-weight:700;font-size:1rem;border:1.5px solid ${pendiente>0?'var(--a500)':'var(--g300)'};border-radius:8px;padding:.375rem;background:${pendiente>0?'var(--a50)':'#fff'}"
+              oninput="setRep('${p.id}',this.value,${bodega})" id="repInp_${p.id}"/>
+            <button onclick="adjRep('${p.id}',1,${bodega})" style="width:32px;height:32px;border:1.5px solid var(--g300);border-radius:8px;background:#fff;font-size:1.125rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>
+            <span class="fs12 text-gray" style="min-width:40px">→ ${exhibicion+pendiente} exhib.</span>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`).join('');
+  updateRepBar();
+}
+
+function setRep(prodId,val,maxBodega){
+  const n=Math.min(Math.max(parseInt(val)||0,0),maxBodega);
+  if(n>0)_repPendientes[prodId]=n;else delete _repPendientes[prodId];
+  const inp=document.getElementById('repInp_'+prodId);
+  if(inp){inp.value=n;inp.style.borderColor=n>0?'var(--a500)':'var(--g300)';inp.style.background=n>0?'var(--a50)':'#fff';}
+  updateRepBar();
+}
+
+function adjRep(prodId,delta,maxBodega=999){
+  const cur=_repPendientes[prodId]||0;
+  setRep(prodId,cur+delta,maxBodega);
+  renderReponer();
+}
+
+function updateRepBar(){
+  const bar=document.getElementById('reponerConfirmBar');
+  const msg=document.getElementById('reponerConfirmMsg');
+  if(!bar||!msg)return;
+  const total=Object.keys(_repPendientes).length;
+  const unidades=Object.values(_repPendientes).reduce((a,v)=>a+v,0);
+  if(total>0){
+    bar.classList.remove('hidden');
+    msg.textContent=`${total} producto${total>1?'s':''} · ${unidades} unidad${unidades>1?'es':''} a mover de bodega a exhibición`;
+  } else {
+    bar.classList.add('hidden');
+  }
+}
+
+function cancelarReposicion(){
+  _repPendientes={};
+  renderReponer();
+}
+
+async function confirmarReposicion(){
+  const sucId=CU.sucursalActiva||CU.sucursalId||'';
+  if(!Object.keys(_repPendientes).length){toast('Sin movimientos pendientes');return;}
+  try{
+    const batch=db.batch();
+    const sucRef=db.collection('stockSucursal').doc(sucId);
+    const updates={};
+    const movimientos=[];
+    for(const[prodId,cantidad] of Object.entries(_repPendientes)){
+      const d=_repStockSuc[prodId]||{exhibicion:0,bodega:0};
+      const nuevaExhib=Math.max(0,(d.exhibicion||0)+cantidad);
+      const nuevaBodega=Math.max(0,(d.bodega||0)-cantidad);
+      updates[`${prodId}.exhibicion`]=nuevaExhib;
+      updates[`${prodId}.bodega`]=nuevaBodega;
+      // Update local cache
+      if(!_repStockSuc[prodId])_repStockSuc[prodId]={exhibicion:0,bodega:0,min:0};
+      _repStockSuc[prodId].exhibicion=nuevaExhib;
+      _repStockSuc[prodId].bodega=nuevaBodega;
+      const prod=INVENTARIO.find(p=>p.id===prodId);
+      movimientos.push({prodId,nombre:prod?.nombre||prodId,cantidad,exhibicionAntes:d.exhibicion||0,exhibicionDespues:nuevaExhib,bodegaAntes:d.bodega||0,bodegaDespues:nuevaBodega});
+    }
+    batch.update(sucRef,updates);
+    // Save reposicion record
+    const repRef=db.collection('reposiciones').doc();
+    batch.set(repRef,{
+      sucursalId:sucId,
+      sucursal:CU.sucursalActivaNombre||CU.sucursalNombre||'',
+      operador:CU.nombre,uid:CU.uid,
+      movimientos,fecha:today(),hora:timeNow(),
+      timestamp:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    await batch.commit();
+    await auditLog('inventario',{accion:'reposicion',sucursalId:sucId,productos:movimientos.length});
+    _repPendientes={};
+    toast(`✅ Reposición confirmada — ${movimientos.length} producto${movimientos.length>1?'s':''} actualizados`);
+    renderReponer();
+    renderHistorialHoy();
+  }catch(e){toast('❌ Error: '+e.message);}
+}
+
+async function renderHistorialHoy(){
+  const c=document.getElementById('reponerHistHoy');if(!c)return;
+  const sucId=CU.sucursalActiva||CU.sucursalId||'';
+  try{
+    const snap=await db.collection('reposiciones')
+      .where('sucursalId','==',sucId)
+      .where('fecha','==',today())
+      .orderBy('timestamp','desc').get();
+    if(snap.empty){c.innerHTML='<p class="fs13 text-gray">Sin reposiciones hoy.</p>';return;}
+    c.innerHTML=snap.docs.map(d=>{
+      const r=d.data();
+      return`<div class="card mb4">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+          <span class="fw6 fs13">👤 ${r.operador}</span>
+          <span class="fs12 text-gray">${r.hora||''}</span>
+        </div>
+        ${r.movimientos.map(m=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:.25rem 0;border-bottom:1px solid var(--g100)">
+            <span class="fs13">${m.nombre}</span>
+            <span class="fs12 mono text-gray">${m.exhibicionAntes}→<strong style="color:var(--gr600)">${m.exhibicionDespues}</strong> exhib. | bodega: ${m.bodegaAntes}→${m.bodegaDespues}</span>
+          </div>`).join('')}
+      </div>`;
+    }).join('');
+  }catch(e){c.innerHTML='<p class="fs13 text-gray">Sin datos.</p>';}
+}
+
+/* ============ HISTORIAL REPOSICIONES (admin) ============ */
+async function initHistorialRep(){
+  const sel=document.getElementById('histRepSuc');
+  if(sel&&sel.children.length<=1){
+    SUCURSALES.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.nombre;sel.appendChild(o);});
+  }
+  document.getElementById('histRepFecha').value=today();
+  renderHistorialReposiciones();
+}
+
+async function renderHistorialReposiciones(){
+  const c=document.getElementById('histRepList');if(!c)return;
+  c.innerHTML='<p class="fs13 text-gray">Cargando…</p>';
+  const sucId=document.getElementById('histRepSuc')?.value||'';
+  const fecha=document.getElementById('histRepFecha')?.value||today();
+  try{
+    let q=db.collection('reposiciones').where('fecha','==',fecha).orderBy('timestamp','desc');
+    if(sucId) q=q.where('sucursalId','==',sucId);
+    const snap=await q.get();
+    if(snap.empty){c.innerHTML='<div class="card"><p class="fs14 text-gray">Sin reposiciones en este período.</p></div>';return;}
+    c.innerHTML=snap.docs.map(d=>{
+      const r=d.data();
+      const total=r.movimientos.reduce((a,m)=>a+m.cantidad,0);
+      return`<div class="card mb4">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+          <div>
+            <div class="fw7 fs14">👤 ${r.operador} <span class="fs12 text-gray">· 🏬 ${r.sucursal}</span></div>
+            <div class="fs12 text-gray">${r.hora||''} · ${total} unidades en ${r.movimientos.length} productos</div>
+          </div>
+          <span class="badge bg">${r.movimientos.length} mov.</span>
+        </div>
+        <div class="tw"><table>
+          <thead><tr><th>Producto</th><th style="text-align:center">Cant.</th><th style="text-align:center">Exhib. antes</th><th style="text-align:center">Exhib. después</th><th style="text-align:center">Bodega antes</th><th style="text-align:center">Bodega después</th></tr></thead>
+          <tbody>${r.movimientos.map(m=>`<tr>
+            <td class="fw6 fs13">${m.nombre}</td>
+            <td style="text-align:center;font-weight:700;color:var(--a600)">+${m.cantidad}</td>
+            <td style="text-align:center;font-family:var(--mono)">${m.exhibicionAntes}</td>
+            <td style="text-align:center;font-family:var(--mono);color:var(--gr600);font-weight:700">${m.exhibicionDespues}</td>
+            <td style="text-align:center;font-family:var(--mono)">${m.bodegaAntes}</td>
+            <td style="text-align:center;font-family:var(--mono)">${m.bodegaDespues}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>
+      </div>`;
+    }).join('');
+  }catch(e){c.innerHTML='<div class="card"><p class="fs13 text-gray">Error al cargar.</p></div>';}
+}
+
+async function exportReposicionesExcel(){
+  await loadXLSX();
+  const sucId=document.getElementById('histRepSuc')?.value||'';
+  const fecha=document.getElementById('histRepFecha')?.value||today();
+  let q=db.collection('reposiciones').where('fecha','==',fecha);
+  if(sucId) q=q.where('sucursalId','==',sucId);
+  const snap=await q.get();
+  const rows=[['Fecha','Hora','Sucursal','Operador','Producto','Cantidad','Exhib. Antes','Exhib. Después','Bodega Antes','Bodega Después']];
+  snap.docs.forEach(d=>{
+    const r=d.data();
+    r.movimientos.forEach(m=>{
+      rows.push([r.fecha,r.hora||'',r.sucursal,r.operador,m.nombre,m.cantidad,m.exhibicionAntes,m.exhibicionDespues,m.bodegaAntes,m.bodegaDespues]);
+    });
+  });
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:12},{wch:8},{wch:16},{wch:16},{wch:30},{wch:10},{wch:12},{wch:14},{wch:12},{wch:14}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Reposiciones');
+  XLSX.writeFile(wb,`reposiciones_${fecha}.xlsx`);
+  toast('✅ Excel descargado');
+}
+
 
 /* ============ REPOSICIÓN ============ */
 function renderReposicion(){
@@ -2326,7 +2683,116 @@ function cancelarImportInv(){_importData=[];document.getElementById('invImportPr
 function getGasUrl(){return CFG.gasUrl||document.getElementById('gasUrlInput')?.value.trim()||'';}
 function saveGasUrl(){const url=document.getElementById('gasUrlInput')?.value.trim();if(!url||!url.startsWith('https://')){toast('URL inválida');return;}CFG.gasUrl=url;db.collection('config').doc('global').update({gasUrl:url});setGasStatus('✅ URL guardada','var(--gr600)');}
 async function testGasUrl(){const url=getGasUrl();if(!url){toast('Guarda la URL primero');return;}setGasStatus('🔄 Probando…','var(--g500)');try{await fetch(url,{method:'GET',mode:'no-cors'});setGasStatus('✅ URL alcanzable','var(--gr600)');}catch(e){setGasStatus('❌ Error','var(--r600)');}}
-function setGasStatus(m,col){const el=document.getElementById('gasStatus');if(el){el.textContent=m;el.style.color=col;}}
+
+/* ============ POS SYNC ============ */
+const SYNC_URL='https://script.google.com/macros/s/AKfycbxFAOVkqdXFthJvUiGSMgHk8IiDJc2J2N7R4_xrVsJaF9nRDXSNrhDKKMLDenFvQeAR/exec';
+
+function getSyncUrl(){return document.getElementById('syncUrlInput')?.value.trim()||CFG.syncUrl||SYNC_URL;}
+
+function saveSyncUrl(){
+  const url=document.getElementById('syncUrlInput')?.value.trim();
+  if(!url||!url.startsWith('https://')){toast('URL inválida');return;}
+  CFG.syncUrl=url;
+  db.collection('config').doc('global').update({syncUrl:url});
+  toast('✅ URL de sync guardada');
+}
+
+async function syncPOS(accion='sync_ventas'){
+  const url=getSyncUrl();
+  if(!url){toast('Configura la URL de Kombi Sync primero');return;}
+  const st=document.getElementById('syncStatus');
+  const res=document.getElementById('syncResult');
+  if(st)st.innerHTML='<span style="color:var(--a600)">🔄 Conectando con POS…</span>';
+  if(res)res.classList.add('hidden');
+  try{
+    // Use iframe POST to avoid CORS
+    await new Promise((resolve,reject)=>{
+      const iframeId='pos_sync_iframe';
+      let iframe=document.getElementById(iframeId);
+      if(!iframe){
+        iframe=document.createElement('iframe');
+        iframe.id=iframeId;iframe.name=iframeId;
+        iframe.style.display='none';document.body.appendChild(iframe);
+      }
+      const handler=e=>{
+        if(e.data?.posSync){
+          window.removeEventListener('message',handler);
+          resolve(e.data);
+        }
+      };
+      window.addEventListener('message',handler);
+      // Try fetch first
+      fetch(url+'?accion='+accion)
+        .then(r=>r.json())
+        .then(data=>{
+          window.removeEventListener('message',handler);
+          resolve(data);
+        })
+        .catch(()=>{
+          // Fallback: no-cors (won't get response but triggers script)
+          fetch(url+'?accion='+accion,{mode:'no-cors'})
+            .then(()=>resolve({ok:true,nota:'Ejecutado sin respuesta (CORS)'}))
+            .catch(reject);
+        });
+      setTimeout(()=>{window.removeEventListener('message',handler);resolve({ok:true,timeout:true});},8000);
+    }).then(data=>{
+      if(st){
+        if(data.ok!==false){
+          st.innerHTML='<span style="color:var(--gr600)">✅ Sync ejecutado — '+new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})+'</span>';
+        } else {
+          st.innerHTML='<span style="color:var(--r600)">❌ '+( data.error||'Error')+'</span>';
+        }
+      }
+      if(res&&data){
+        res.classList.remove('hidden');
+        res.textContent=JSON.stringify(data,null,2);
+      }
+      // Load POS data from Firestore
+      loadPOSData();
+    });
+  }catch(e){
+    if(st)st.innerHTML='<span style="color:var(--r600)">❌ '+e.message+'</span>';
+  }
+}
+
+async function loadPOSData(){
+  const panel=document.getElementById('posSyncPanel');
+  const dataEl=document.getElementById('posSyncData');
+  const timeEl=document.getElementById('posSyncTime');
+  if(!panel||!dataEl)return;
+  try{
+    const fecha=today();
+    const snap=await db.collection('ventasPOS').doc(fecha+'_libertad').get();
+    if(!snap.exists){panel.style.display='none';return;}
+    panel.style.display='block';
+    const d=snap.data();
+    if(timeEl)timeEl.textContent='Sync: '+(d.syncAt?new Date(d.syncAt).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}):'—');
+    dataEl.innerHTML=[
+      {l:'Total ventas POS',v:clp(d.totalVenta||0),col:'var(--a600)'},
+      {l:'Boletas emitidas',v:(d.totalBoletas||0)+' doc.',col:'var(--b600)'},
+      {l:'Efectivo POS',v:clp(d.efectivo||0),col:'var(--gr600)'},
+      {l:'Débito/Crédito',v:clp((d.debito||0)+(d.credito||0)),col:'var(--g600)'},
+    ].map(x=>`<div class="sc"><div class="lbl">${x.l}</div><div class="val" style="color:${x.col};font-size:1.125rem">${x.v}</div></div>`).join('');
+    // Also load categorias
+    const catSnap=await db.collection('ventasCategorias').doc(fecha+'_libertad').get();
+    if(catSnap.exists){
+      const cats=JSON.parse(catSnap.data().categorias||'[]');
+      if(cats.length){
+        const max=Math.max(...cats.map(c=>c.monto),1);
+        dataEl.innerHTML+=`<div style="grid-column:1/-1;margin-top:.75rem">
+          <div class="ct" style="padding:0;margin-bottom:.5rem">Ventas por categoría hoy</div>
+          ${cats.slice(0,6).map(c=>`<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.375rem">
+            <div style="width:120px;font-size:.75rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.nombre}</div>
+            <div style="flex:1;height:8px;background:var(--g100);border-radius:4px;overflow:hidden">
+              <div style="height:100%;width:${Math.round(c.monto/max*100)}%;background:var(--a400);border-radius:4px"></div>
+            </div>
+            <div style="width:80px;font-size:.75rem;font-family:var(--mono);text-align:right">${clp(c.monto)}</div>
+          </div>`).join('')}
+        </div>`;
+      }
+    }
+  }catch(e){console.warn('POS data:',e);panel.style.display='none';}
+}function setGasStatus(m,col){const el=document.getElementById('gasStatus');if(el){el.textContent=m;el.style.color=col;}}
 async function enviarEmail(asunto,cuerpoTexto,htmlBody,tipo='general'){
   const url=getGasUrl();if(!url){toast('⚠ Configura la URL del script');return false;}
   try{toast('📤 Enviando…',6000);let iframe=document.getElementById('gas_iframe');if(!iframe){iframe=document.createElement('iframe');iframe.name='gas_iframe';iframe.id='gas_iframe';iframe.style.display='none';document.body.appendChild(iframe);}
