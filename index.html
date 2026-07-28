@@ -1164,10 +1164,59 @@ async function auditLog(action,details={}){
   try{await db.collection('logs').add({uid:CU.uid,nombre:CU.nombre,email:CU.email,rol:CU.rolActivo||CU.rol,sucursal:(CU.sucursalActivaNombre||CU.sucursalNombre)||'—',sucursalId:(CU.sucursalActiva||CU.sucursalId)||'—',turno:(CU.turnoActivo||CU.turno)||'—',action,details,timestamp:firebase.firestore.FieldValue.serverTimestamp(),fecha:today(),hora:timeNow()});}catch(e){console.warn('Log:',e);}
 }
 
+// Failsafe global: si en 12s no cargó nada, mostrar login con opción de reset
+let _bootTimer=setTimeout(()=>{
+  const ls=document.getElementById('loadingScreen');
+  if(ls&&ls.style.display!=='none'){
+    console.warn('Boot timeout — forzando login');
+    showLogin('La carga tardó demasiado. Revisa tu conexión e intenta de nuevo.');
+    mostrarBotonReset();
+  }
+},12000);
+
+function clearBootTimer(){if(_bootTimer){clearTimeout(_bootTimer);_bootTimer=null;}}
+
+function mostrarBotonReset(){
+  if(document.getElementById('resetAppBtn'))return;
+  const cont=document.getElementById('loginStep1');
+  if(!cont)return;
+  const b=document.createElement('button');
+  b.id='resetAppBtn';
+  b.type='button';
+  b.textContent='🔄 Reiniciar aplicación';
+  b.style.cssText='width:100%;margin-top:.75rem;padding:.625rem;background:none;border:1px solid var(--g300);border-radius:8px;color:var(--g600);font-size:.8125rem;cursor:pointer';
+  b.onclick=resetApp;
+  cont.appendChild(b);
+}
+
+async function resetApp(){
+  try{
+    if('serviceWorker' in navigator){
+      const regs=await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r=>r.unregister()));
+    }
+    if(window.caches){
+      const keys=await caches.keys();
+      await Promise.all(keys.map(k=>caches.delete(k)));
+    }
+    try{localStorage.removeItem('firebase:previous_websocket_failure');}catch(e){}
+    try{await db.clearPersistence();}catch(e){}
+  }catch(e){console.warn('reset:',e);}
+  location.reload(true);
+}
+
+// Timeout helper para promesas de Firestore
+function withTimeout(promise,ms=8000,msg='Tiempo de espera agotado'){
+  return Promise.race([
+    promise,
+    new Promise((_,rej)=>setTimeout(()=>rej(new Error(msg)),ms))
+  ]);
+}
+
 auth.onAuthStateChanged(async user=>{
   if(user){
     try{
-      const doc=await db.collection('usuarios').doc(user.uid).get();
+      const doc=await withTimeout(db.collection('usuarios').doc(user.uid).get(),8000,'No se pudo leer el perfil');
       if(!doc.exists){
         const defaultUsername=user.email.split('@')[0].toLowerCase().replace(/[^a-z0-9._-]/g,'');
         CU={uid:user.uid,email:user.email,nombre:user.email,username:defaultUsername,rol:'superadmin',roles:['superadmin'],rolActivo:'superadmin',sucursalId:'',sucursalNombre:'',turno:''};
@@ -1179,19 +1228,18 @@ auth.onAuthStateChanged(async user=>{
         if(!Array.isArray(d.roles)||!d.roles.length){d.roles=[d.rol||'operador'];}
         CU={uid:user.uid,...d};
       }
-      await loadConfig();
+      await withTimeout(loadConfig(),8000,'No se pudo cargar la configuración');
+      clearBootTimer();
       showSucursalStep();
     }catch(e){
       console.error('Auth error:',e);
-      // No hacer signOut — solo mostrar error y detener el loop
-      showLoading(false);
-      document.getElementById('loginScreen').style.display='flex';
-      document.getElementById('app').classList.remove('v');
-      const errEl=document.getElementById('lErr');
-      if(errEl){errEl.textContent='Error de conexión: '+e.message;errEl.classList.remove('hidden');}
+      clearBootTimer();
+      showLogin('Error de conexión: '+e.message);
+      mostrarBotonReset();
     }
   } else {
     CU=null;
+    clearBootTimer();
     showLoading(false);
     document.getElementById('loginScreen').style.display='flex';
     document.getElementById('app').classList.remove('v');
@@ -1373,6 +1421,7 @@ async function loadConfig(){
 }
 
 async function showApp(){
+  clearBootTimer();
   showLoading(false);document.getElementById('loginScreen').style.display='none';document.getElementById('app').classList.add('v');
   const sucId=CU.sucursalActiva||CU.sucursalId||'';
   const sucNombre=CU.sucursalActivaNombre||(SUCURSALES.find(s=>s.id===sucId)?.nombre)||'';
@@ -2269,11 +2318,15 @@ function renderDashTL(){const tl=document.getElementById('dashTL');if(!tl)return
 
 /* ============ 9. PWA ============ */
 function registerSW(){
+  // Service Worker desactivado — causaba cache de versiones rotas.
+  // Desregistra cualquier SW previo y limpia todos los caches.
   if('serviceWorker' in navigator){
-    // Must use external file — blob URLs not supported in GitHub Pages
-    navigator.serviceWorker.register('/kombi-store/sw.js')
-      .then(()=>console.log('SW registered'))
-      .catch(e=>console.log('SW skip:',e.message));
+    navigator.serviceWorker.getRegistrations()
+      .then(regs=>regs.forEach(r=>r.unregister()))
+      .catch(()=>{});
+  }
+  if(window.caches){
+    caches.keys().then(keys=>keys.forEach(k=>caches.delete(k))).catch(()=>{});
   }
 }
 // PWA install prompt
