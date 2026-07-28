@@ -513,7 +513,18 @@ tr:hover td{background:var(--g50)}
         </div>
         <div style="max-width:680px">
           <div class="wp active" id="ciP1">
-            <div class="card"><div class="ct">🖥️ Ventas según Sistema</div><div class="fld"><label class="lbl" id="ciSisLblEf">Efectivo</label><input class="inp" type="number" id="ciSisEf" placeholder="0" oninput="refreshCiSisTotal()"/></div><div class="fld"><label class="lbl" id="ciSisLblTarj">Tarjetas / POS</label><input class="inp" type="number" id="ciSisTarj" placeholder="0" oninput="refreshCiSisTotal()"/></div><div class="fld"><label class="lbl" id="ciSisLblOtros">Otros</label><input class="inp" type="number" id="ciSisOtros" placeholder="0" oninput="refreshCiSisTotal()"/></div><div class="div"></div><div class="flex jcb aic"><span class="fs14 fw6 text-gray">Total Sistema</span><span style="font-size:1.25rem;font-weight:800;font-family:var(--mono);color:var(--a600)" id="ciSisTotal">$0</span></div></div>
+            <div class="card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+                <div class="ct" style="padding:0;margin:0">🖥️ Ventas según Sistema</div>
+                <button class="btn btn-s sm" onclick="traerDatosPOS()">📥 Traer del POS</button>
+              </div>
+              <div id="posAutoStatus" class="hidden" style="background:var(--gr100);border:1px solid var(--gr500);border-radius:8px;padding:.625rem .875rem;margin-bottom:.75rem;font-size:.8125rem;color:var(--gr600)"></div>
+              <div class="fld"><label class="lbl" id="ciSisLblEf">Efectivo</label><input class="inp" type="number" id="ciSisEf" placeholder="0" oninput="refreshCiSisTotal()"/></div>
+              <div class="fld"><label class="lbl" id="ciSisLblTarj">Tarjetas / POS</label><input class="inp" type="number" id="ciSisTarj" placeholder="0" oninput="refreshCiSisTotal()"/></div>
+              <div class="fld"><label class="lbl" id="ciSisLblOtros">Otros</label><input class="inp" type="number" id="ciSisOtros" placeholder="0" oninput="refreshCiSisTotal()"/></div>
+              <div class="div"></div>
+              <div class="flex jcb aic"><span class="fs14 fw6 text-gray">Total Sistema</span><span style="font-size:1.25rem;font-weight:800;font-family:var(--mono);color:var(--a600)" id="ciSisTotal">$0</span></div>
+            </div>
             <div class="wnav"><div></div><button class="btn btn-p" onclick="saveCiSis();ciGoTo(2)">Siguiente →</button></div>
           </div>
           <div class="wp" id="ciP2">
@@ -688,8 +699,10 @@ tr:hover td{background:var(--g50)}
         <div style="display:flex;gap:.375rem;margin-bottom:1rem;border-bottom:2px solid var(--g200)">
           <button class="rep-tab active" onclick="showInvTab('general',this)">📦 General</button>
           <button class="rep-tab" onclick="showInvTab('sucursal',this)">🏬 Stock Sucursales</button>
+          <button class="rep-tab" onclick="showInvTab('vencimientos',this)">📅 Vencimientos</button>
+          <button class="rep-tab" onclick="showInvTab('movimientos',this)">📋 Movimientos</button>
           <button class="rep-tab" onclick="showInvTab('reposicion',this)">⚠️ Reposición</button>
-          <button class="rep-tab" onclick="showInvTab('historial',this)">📋 Historial</button>
+          <button class="rep-tab" onclick="showInvTab('historial',this)">🔄 Historial</button>
         </div>
 
         <!-- TAB GENERAL -->
@@ -704,6 +717,7 @@ tr:hover td{background:var(--g50)}
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 Importar
               </button>
+              <button class="btn btn-s" onclick="importarCatalogoPOS()">🖥️ Desde POS</button>
               <button class="btn btn-s" onclick="exportInvExcel()">⬇ Excel</button>
               <button class="btn btn-p" onclick="openPM()">+ Nuevo</button>
             </div>
@@ -765,6 +779,50 @@ tr:hover td{background:var(--g50)}
             <button class="btn btn-s sm" onclick="exportReposicionesExcel()">⬇ Excel</button>
           </div>
           <div id="histRepList"></div>
+        </div>
+
+        <!-- TAB VENCIMIENTOS -->
+        <div id="invTabVencimientos" style="display:none">
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
+            <select class="sel" id="vtoSucFiltro" onchange="renderVencimientos()">
+              <option value="">Todas las sucursales</option>
+            </select>
+            <select class="sel" id="vtoEstadoFiltro" onchange="renderVencimientos()">
+              <option value="">Todos</option>
+              <option value="vencido">🔴 Vencidos</option>
+              <option value="critico">🟠 Por vencer (≤7 días)</option>
+              <option value="proximo">🟡 Próximos (≤30 días)</option>
+              <option value="ok">🟢 Vigentes</option>
+            </select>
+            <button class="btn btn-p sm" onclick="openLoteModal()">+ Registrar lote</button>
+            <button class="btn btn-s sm" onclick="exportVencimientosExcel()">⬇ Excel</button>
+          </div>
+          <div class="g4 mb4" id="vtoKPIs"></div>
+          <div id="vtoList"></div>
+        </div>
+
+        <!-- TAB MOVIMIENTOS (KARDEX) -->
+        <div id="invTabMovimientos" style="display:none">
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
+            <input class="inp" type="search" id="movBuscar" placeholder="Buscar producto…" style="max-width:200px" oninput="renderMovimientos()"/>
+            <select class="sel" id="movSucFiltro" onchange="renderMovimientos()">
+              <option value="">Todas las sucursales</option>
+            </select>
+            <select class="sel" id="movTipoFiltro" onchange="renderMovimientos()">
+              <option value="">Todos los tipos</option>
+              <option value="entrada">📥 Entrada</option>
+              <option value="salida">📤 Salida</option>
+              <option value="reposicion">🔄 Reposición</option>
+              <option value="merma">🗑 Merma</option>
+              <option value="vencimiento">📅 Vencimiento</option>
+              <option value="ajuste">✏️ Ajuste</option>
+            </select>
+            <input class="inp" type="date" id="movDesde" style="max-width:150px" onchange="renderMovimientos()"/>
+            <input class="inp" type="date" id="movHasta" style="max-width:150px" onchange="renderMovimientos()"/>
+            <button class="btn btn-p sm" onclick="openMovModal()">+ Registrar</button>
+            <button class="btn btn-s sm" onclick="exportMovimientosExcel()">⬇ Excel</button>
+          </div>
+          <div id="movList"></div>
         </div>
 
         <!-- TAB REPOSICIÓN -->
@@ -864,7 +922,7 @@ tr:hover td{background:var(--g50)}
             <div class="card">
               <div class="ct">🔄 Kombi Sync — POS-XPRESS</div>
               <p class="fs13 text-gray mb4">Sincroniza ventas e inventario desde el sistema POS automáticamente.</p>
-              <div class="fld"><label class="lbl">URL Kombi Sync</label><input class="inp" type="url" id="syncUrlInput" placeholder="https://script.google.com/macros/s/…/exec" value="https://script.google.com/macros/s/AKfycbw-7SgCUVx2PdI1BvWnd3ev0oV5LJQJg2QM0CHmQK0mdW0u8QKcWJgA5cdM41kPnjKf/exec"/></div>
+              <div class="fld"><label class="lbl">URL Kombi Sync</label><input class="inp" type="url" id="syncUrlInput" placeholder="https://script.google.com/macros/s/…/exec" value="https://script.google.com/macros/s/AKfycbwxI3jdz9-cvetpD1ceYWdp7jUE8_DvgdgTEwCDTY92wvIjNpnNDFmW6pnO671TNuHt/exec"/></div>
               <div style="display:flex;gap:.5rem;flex-wrap:wrap">
                 <button class="btn btn-p" onclick="saveSyncUrl()">Guardar</button>
                 <button class="btn btn-s" onclick="syncPOS('status')">🔍 Verificar</button>
@@ -948,7 +1006,80 @@ tr:hover td{background:var(--g50)}
     <div class="g2"><div class="fld"><label class="lbl">SKU</label><input class="inp" id="pS"/></div><div class="fld"><label class="lbl">Categoría</label><input class="inp" id="pC" list="catList"/><datalist id="catList"></datalist></div></div>
     <div class="g2"><div class="fld"><label class="lbl">Marca</label><input class="inp" id="pMarca"/></div><div class="fld"><label class="lbl">Precio</label><input class="inp" type="number" id="pPr" min="0"/></div></div>
     <div class="g2"><div class="fld"><label class="lbl">Stock</label><input class="inp" type="number" id="pSt" min="0"/></div><div class="fld"><label class="lbl">Stock Mín.</label><input class="inp" type="number" id="pMn" min="0"/></div></div>
+    <div style="border-top:1px solid var(--g200);padding-top:.875rem;margin-top:.25rem">
+      <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;margin-bottom:.625rem">
+        <input type="checkbox" id="pPerecible" onchange="togglePerecible()"/>
+        <span class="fw6 fs14">📅 Producto perecible (controla vencimiento)</span>
+      </label>
+      <div id="pPerecibleFields" class="hidden">
+        <div class="fld" style="margin-bottom:0">
+          <label class="lbl">Avisar cuántos días antes de vencer</label>
+          <input class="inp" type="number" id="pDiasAlerta" min="1" value="7" placeholder="7"/>
+          <div class="fs12 text-gray mt2">Los lotes con fecha de vencimiento se registran en la pestaña Vencimientos.</div>
+        </div>
+      </div>
+    </div>
     <div class="mf"><button class="btn btn-s" onclick="closePM()">Cancelar</button><button class="btn btn-p" onclick="saveProduct()">Guardar</button></div>
+  </div>
+</div>
+
+<!-- LOTE MODAL -->
+<div class="mb hidden" id="loteModal">
+  <div class="modal" style="max-width:460px">
+    <div class="mh"><span class="mt2-title" id="loteModalTitle">Registrar lote</span><button class="btn btn-g sm" onclick="closeLoteModal()">✕</button></div>
+    <div class="fld">
+      <label class="lbl">Producto</label>
+      <input class="inp" id="loteProducto" list="loteProdList" placeholder="Buscar producto…"/>
+      <datalist id="loteProdList"></datalist>
+    </div>
+    <div class="g2">
+      <div class="fld"><label class="lbl">Sucursal</label><select class="sel w100" id="loteSucursal"></select></div>
+      <div class="fld"><label class="lbl">Cantidad</label><input class="inp" type="number" id="loteCantidad" min="1" placeholder="0"/></div>
+    </div>
+    <div class="g2">
+      <div class="fld"><label class="lbl">Fecha de vencimiento</label><input class="inp" type="date" id="loteVence"/></div>
+      <div class="fld"><label class="lbl">N° de lote (opcional)</label><input class="inp" id="loteCodigo" placeholder="Ej: L-2026-04"/></div>
+    </div>
+    <div class="fld"><label class="lbl">Ubicación</label><select class="sel w100" id="loteUbicacion"><option value="exhibicion">🏪 Exhibición</option><option value="bodega">📦 Bodega</option></select></div>
+    <div class="mf">
+      <button class="btn btn-s" onclick="closeLoteModal()">Cancelar</button>
+      <button class="btn btn-d hidden" id="loteDeleteBtn" onclick="eliminarLote()">🗑 Eliminar</button>
+      <button class="btn btn-p" onclick="saveLote()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MOVIMIENTO MODAL -->
+<div class="mb hidden" id="movModal">
+  <div class="modal" style="max-width:460px">
+    <div class="mh"><span class="mt2-title">Registrar movimiento</span><button class="btn btn-g sm" onclick="closeMovModal()">✕</button></div>
+    <div class="fld">
+      <label class="lbl">Producto</label>
+      <input class="inp" id="movProducto" list="movProdList" placeholder="Buscar producto…"/>
+      <datalist id="movProdList"></datalist>
+    </div>
+    <div class="g2">
+      <div class="fld"><label class="lbl">Sucursal</label><select class="sel w100" id="movSucursal"></select></div>
+      <div class="fld"><label class="lbl">Ubicación</label><select class="sel w100" id="movUbicacion"><option value="exhibicion">🏪 Exhibición</option><option value="bodega">📦 Bodega</option></select></div>
+    </div>
+    <div class="g2">
+      <div class="fld">
+        <label class="lbl">Tipo</label>
+        <select class="sel w100" id="movTipo">
+          <option value="entrada">📥 Entrada (compra/recepción)</option>
+          <option value="salida">📤 Salida</option>
+          <option value="merma">🗑 Merma (daño/pérdida)</option>
+          <option value="vencimiento">📅 Baja por vencimiento</option>
+          <option value="ajuste">✏️ Ajuste de conteo</option>
+        </select>
+      </div>
+      <div class="fld"><label class="lbl">Cantidad</label><input class="inp" type="number" id="movCantidad" min="1" placeholder="0"/></div>
+    </div>
+    <div class="fld"><label class="lbl">Motivo / observación</label><input class="inp" id="movMotivo" placeholder="Opcional"/></div>
+    <div class="mf">
+      <button class="btn btn-s" onclick="closeMovModal()">Cancelar</button>
+      <button class="btn btn-p" onclick="saveMovimiento()">Guardar</button>
+    </div>
   </div>
 </div>
 
@@ -1334,7 +1465,7 @@ function showSec(id,el){
   if(id==='ad-rep')renderAnalisis();
   if(id==='op-rep')initReponer();
   if(id==='sa-users')renderUsers();if(id==='sa-logs')renderLogs();
-  if(id==='op-ci'){renderCiPosInputs();renderCiMovFromRet();ciGoTo(1);}
+  if(id==='op-ci'){window._ciPosTotal=undefined;window._ciDiffPos=0;renderCiPosInputs();renderCiMovFromRet();ciGoTo(1);}
   closeSidebar();
 }
 
@@ -1448,6 +1579,523 @@ function ciGoTo(n){
 }
 function renderCiPosInputs(){const c=document.getElementById('ciPosInputs');if(!c)return;c.innerHTML=POS_TERMINALES.map(t=>`<div class="fld"><label class="lbl">${t.name}</label><input class="inp" type="number" placeholder="0" value="${CI.pos[t.id]||''}" oninput="CI.pos['${t.id}']=parseFloat(this.value)||0"/></div>`).join('');}
 function saveCiSis(){CI.sis={ef:parseFloat(document.getElementById('ciSisEf')?.value)||0,tarj:parseFloat(document.getElementById('ciSisTarj')?.value)||0,otros:parseFloat(document.getElementById('ciSisOtros')?.value)||0};}
+
+/* ============ VENCIMIENTOS ============ */
+let LOTES=[];
+let _editLoteId=null;
+
+function diasParaVencer(fecha){
+  if(!fecha)return null;
+  const hoy=new Date();hoy.setHours(0,0,0,0);
+  const v=new Date(fecha+'T00:00');
+  return Math.round((v-hoy)/86400000);
+}
+
+function estadoLote(fecha,diasAlerta=7){
+  const d=diasParaVencer(fecha);
+  if(d===null)return{key:'ok',label:'—',color:'var(--g400)',bg:'var(--g100)'};
+  if(d<0)return{key:'vencido',label:`Vencido hace ${Math.abs(d)}d`,color:'var(--r600)',bg:'var(--r100)'};
+  if(d===0)return{key:'vencido',label:'Vence hoy',color:'var(--r600)',bg:'var(--r100)'};
+  if(d<=diasAlerta)return{key:'critico',label:`${d} día${d>1?'s':''}`,color:'#C2410C',bg:'#FFEDD5'};
+  if(d<=30)return{key:'proximo',label:`${d} días`,color:'var(--a700)',bg:'var(--a50)'};
+  return{key:'ok',label:`${d} días`,color:'var(--gr600)',bg:'var(--gr100)'};
+}
+
+async function loadLotes(){
+  try{
+    const snap=await db.collection('lotes').where('activo','==',true).get();
+    LOTES=snap.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(e){console.warn('Lotes:',e);LOTES=[];}
+}
+
+async function initVencimientos(){
+  const sel=document.getElementById('vtoSucFiltro');
+  if(sel&&sel.children.length<=1)SUCURSALES.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.nombre;sel.appendChild(o);});
+  await loadLotes();
+  renderVencimientos();
+}
+
+function renderVencimientos(){
+  const c=document.getElementById('vtoList');if(!c)return;
+  const sucF=document.getElementById('vtoSucFiltro')?.value||'';
+  const estF=document.getElementById('vtoEstadoFiltro')?.value||'';
+
+  let lotes=LOTES.slice();
+  if(sucF)lotes=lotes.filter(l=>l.sucursalId===sucF);
+
+  // Enriquecer con estado
+  lotes=lotes.map(l=>{
+    const prod=INVENTARIO.find(p=>p.id===l.productoId);
+    const est=estadoLote(l.fechaVencimiento,prod?.diasAlerta||7);
+    return{...l,est,prod};
+  });
+  if(estF)lotes=lotes.filter(l=>l.est.key===estF);
+  lotes.sort((a,b)=>(a.fechaVencimiento||'').localeCompare(b.fechaVencimiento||''));
+
+  // KPIs
+  const all=LOTES.map(l=>{
+    const prod=INVENTARIO.find(p=>p.id===l.productoId);
+    return{...l,est:estadoLote(l.fechaVencimiento,prod?.diasAlerta||7)};
+  });
+  const kc=document.getElementById('vtoKPIs');
+  if(kc){
+    const cnt=k=>all.filter(l=>l.est.key===k).length;
+    const und=k=>all.filter(l=>l.est.key===k).reduce((a,l)=>a+(l.cantidad||0),0);
+    kc.innerHTML=[
+      {l:'🔴 Vencidos',v:cnt('vencido'),sub:und('vencido')+' unidades',col:'var(--r600)'},
+      {l:'🟠 Por vencer',v:cnt('critico'),sub:und('critico')+' unidades',col:'#C2410C'},
+      {l:'🟡 Próximos 30d',v:cnt('proximo'),sub:und('proximo')+' unidades',col:'var(--a700)'},
+      {l:'🟢 Vigentes',v:cnt('ok'),sub:und('ok')+' unidades',col:'var(--gr600)'},
+    ].map(x=>`<div class="sc"><div class="lbl">${x.l}</div><div class="val" style="color:${x.col}">${x.v}</div><div class="sub">${x.sub}</div></div>`).join('');
+  }
+
+  if(!lotes.length){
+    c.innerHTML='<div class="card"><p class="fs14 text-gray">Sin lotes registrados. Usa «+ Registrar lote» para controlar vencimientos.</p></div>';
+    return;
+  }
+
+  c.innerHTML=`<div class="tw"><table>
+    <thead><tr><th>Producto</th><th>Sucursal</th><th style="text-align:center">Cant.</th><th style="text-align:center">Ubicación</th><th>Lote</th><th>Vence</th><th style="text-align:center">Estado</th><th></th></tr></thead>
+    <tbody>${lotes.map(l=>`<tr>
+      <td class="fw6 fs13">${l.productoNombre||'—'}</td>
+      <td class="fs13 text-gray">${l.sucursal||'—'}</td>
+      <td style="text-align:center;font-family:var(--mono);font-weight:700">${l.cantidad||0}</td>
+      <td style="text-align:center" class="fs12">${l.ubicacion==='bodega'?'📦 Bodega':'🏪 Exhib.'}</td>
+      <td class="fs12 text-gray">${l.lote||'—'}</td>
+      <td class="fs13 mono">${l.fechaVencimiento||'—'}</td>
+      <td style="text-align:center"><span class="badge" style="background:${l.est.bg};color:${l.est.color}">${l.est.label}</span></td>
+      <td><div style="display:flex;gap:.25rem">
+        <button class="btn btn-s sm" onclick="editLote('${l.id}')">✎</button>
+        ${l.est.key==='vencido'?`<button class="btn btn-d sm" onclick="darBajaLote('${l.id}')" title="Dar de baja">🗑</button>`:''}
+      </div></td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+function openLoteModal(){
+  _editLoteId=null;
+  document.getElementById('loteModalTitle').textContent='Registrar lote';
+  document.getElementById('loteDeleteBtn').classList.add('hidden');
+  ['loteProducto','loteCantidad','loteVence','loteCodigo'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  // Poblar productos
+  const dl=document.getElementById('loteProdList');
+  if(dl)dl.innerHTML=INVENTARIO.map(p=>`<option value="${p.nombre}">`).join('');
+  const sel=document.getElementById('loteSucursal');
+  if(sel)sel.innerHTML=SUCURSALES.map(s=>`<option value="${s.id}" ${s.id===(CU.sucursalActiva||CU.sucursalId)?'selected':''}>${s.nombre}</option>`).join('');
+  document.getElementById('loteModal').classList.remove('hidden');
+}
+
+function editLote(id){
+  const l=LOTES.find(x=>x.id===id);if(!l)return;
+  _editLoteId=id;
+  document.getElementById('loteModalTitle').textContent='Editar lote';
+  document.getElementById('loteDeleteBtn').classList.remove('hidden');
+  const dl=document.getElementById('loteProdList');
+  if(dl)dl.innerHTML=INVENTARIO.map(p=>`<option value="${p.nombre}">`).join('');
+  document.getElementById('loteProducto').value=l.productoNombre||'';
+  const sel=document.getElementById('loteSucursal');
+  if(sel)sel.innerHTML=SUCURSALES.map(s=>`<option value="${s.id}" ${s.id===l.sucursalId?'selected':''}>${s.nombre}</option>`).join('');
+  document.getElementById('loteCantidad').value=l.cantidad||0;
+  document.getElementById('loteVence').value=l.fechaVencimiento||'';
+  document.getElementById('loteCodigo').value=l.lote||'';
+  document.getElementById('loteUbicacion').value=l.ubicacion||'exhibicion';
+  document.getElementById('loteModal').classList.remove('hidden');
+}
+
+function closeLoteModal(){document.getElementById('loteModal').classList.add('hidden');}
+
+async function saveLote(){
+  const nombreProd=document.getElementById('loteProducto').value.trim();
+  const prod=INVENTARIO.find(p=>p.nombre.toLowerCase()===nombreProd.toLowerCase());
+  if(!prod){toast('Selecciona un producto válido de la lista');return;}
+  const sucursalId=document.getElementById('loteSucursal').value;
+  const cantidad=parseInt(document.getElementById('loteCantidad').value)||0;
+  const fechaVencimiento=document.getElementById('loteVence').value;
+  const lote=document.getElementById('loteCodigo').value.trim();
+  const ubicacion=document.getElementById('loteUbicacion').value;
+  if(!cantidad){toast('Ingresa la cantidad');return;}
+  if(!fechaVencimiento){toast('Ingresa la fecha de vencimiento');return;}
+
+  const data={
+    productoId:prod.id,productoNombre:prod.nombre,sku:prod.sku||'',
+    sucursalId,sucursal:SUCURSALES.find(s=>s.id===sucursalId)?.nombre||'',
+    cantidad,fechaVencimiento,lote,ubicacion,activo:true,
+    uid:CU.uid,operador:CU.nombre
+  };
+
+  try{
+    if(_editLoteId){
+      await db.collection('lotes').doc(_editLoteId).update(data);
+      toast('✅ Lote actualizado');
+    }else{
+      await db.collection('lotes').add({...data,creadoEn:firebase.firestore.FieldValue.serverTimestamp()});
+      // Registrar movimiento de entrada
+      await registrarMovimiento({
+        productoId:prod.id,productoNombre:prod.nombre,sku:prod.sku||'',
+        sucursalId,tipo:'entrada',cantidad,ubicacion,
+        motivo:`Lote ${lote||'s/n'} vence ${fechaVencimiento}`
+      });
+      toast('✅ Lote registrado');
+    }
+    await loadLotes();
+    renderVencimientos();
+    closeLoteModal();
+    await auditLog('inventario',{accion:_editLoteId?'editar_lote':'crear_lote',producto:prod.nombre});
+  }catch(e){toast('❌ Error: '+e.message);}
+}
+
+async function eliminarLote(){
+  if(!confirm('¿Eliminar este lote del registro?'))return;
+  try{
+    await db.collection('lotes').doc(_editLoteId).update({activo:false});
+    await loadLotes();renderVencimientos();closeLoteModal();
+    toast('🗑 Lote eliminado');
+  }catch(e){toast('❌ Error: '+e.message);}
+}
+
+async function darBajaLote(id){
+  const l=LOTES.find(x=>x.id===id);if(!l)return;
+  if(!confirm(`¿Dar de baja ${l.cantidad} unidades de ${l.productoNombre} por vencimiento?\n\nSe descontará del stock y quedará registrado en Movimientos.`))return;
+  try{
+    await db.collection('lotes').doc(id).update({activo:false,bajaPorVencimiento:true,bajaEn:firebase.firestore.FieldValue.serverTimestamp()});
+    await registrarMovimiento({
+      productoId:l.productoId,productoNombre:l.productoNombre,sku:l.sku||'',
+      sucursalId:l.sucursalId,tipo:'vencimiento',cantidad:-(l.cantidad||0),
+      ubicacion:l.ubicacion||'exhibicion',
+      motivo:`Lote ${l.lote||'s/n'} vencido el ${l.fechaVencimiento}`
+    });
+    // Descontar del stock de sucursal
+    await descontarStockSucursal(l.sucursalId,l.productoId,l.ubicacion||'exhibicion',l.cantidad||0);
+    await loadLotes();renderVencimientos();
+    await auditLog('inventario',{accion:'baja_vencimiento',producto:l.productoNombre,cantidad:l.cantidad});
+    toast('✅ Baja registrada y stock descontado');
+  }catch(e){toast('❌ Error: '+e.message);}
+}
+
+async function descontarStockSucursal(sucId,prodId,ubicacion,cantidad){
+  try{
+    const ref=db.collection('stockSucursal').doc(sucId);
+    const snap=await ref.get();
+    const data=snap.exists?snap.data():{};
+    const actual=data[prodId]||{exhibicion:0,bodega:0,min:0};
+    const nuevo={...actual};
+    nuevo[ubicacion]=Math.max(0,(actual[ubicacion]||0)-cantidad);
+    await ref.set({[prodId]:nuevo},{merge:true});
+  }catch(e){console.warn('descontarStock:',e);}
+}
+
+async function exportVencimientosExcel(){
+  if(!LOTES.length){toast('Sin lotes');return;}
+  await loadXLSX();
+  const rows=[['Producto','SKU','Sucursal','Cantidad','Ubicación','Lote','Vencimiento','Días restantes','Estado']];
+  LOTES.forEach(l=>{
+    const prod=INVENTARIO.find(p=>p.id===l.productoId);
+    const est=estadoLote(l.fechaVencimiento,prod?.diasAlerta||7);
+    rows.push([l.productoNombre,l.sku||'',l.sucursal,l.cantidad,l.ubicacion==='bodega'?'Bodega':'Exhibición',l.lote||'',l.fechaVencimiento,diasParaVencer(l.fechaVencimiento),est.key.toUpperCase()]);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:30},{wch:12},{wch:16},{wch:10},{wch:14},{wch:14},{wch:14},{wch:14},{wch:12}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Vencimientos');
+  XLSX.writeFile(wb,`vencimientos_${today()}.xlsx`);
+  toast('✅ Excel descargado');
+}
+
+/* ============ MOVIMIENTOS DE STOCK (KARDEX) ============ */
+let MOVIMIENTOS=[];
+
+async function registrarMovimiento(mov){
+  const sucNombre=SUCURSALES.find(s=>s.id===mov.sucursalId)?.nombre||'';
+  await db.collection('movimientosStock').add({
+    ...mov,
+    sucursal:sucNombre,
+    operador:CU.nombre,uid:CU.uid,
+    fecha:today(),hora:timeNow(),
+    timestamp:firebase.firestore.FieldValue.serverTimestamp()
+  });
+}
+
+async function initMovimientos(){
+  const sel=document.getElementById('movSucFiltro');
+  if(sel&&sel.children.length<=1)SUCURSALES.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.nombre;sel.appendChild(o);});
+  const hoy=new Date();
+  const hace30=new Date();hace30.setDate(hace30.getDate()-30);
+  const d=document.getElementById('movDesde'),h=document.getElementById('movHasta');
+  if(d&&!d.value)d.value=hace30.toISOString().slice(0,10);
+  if(h&&!h.value)h.value=today();
+  await loadMovimientos();
+  renderMovimientos();
+}
+
+async function loadMovimientos(){
+  const desde=document.getElementById('movDesde')?.value||'';
+  const hasta=document.getElementById('movHasta')?.value||today();
+  try{
+    let q=db.collection('movimientosStock').orderBy('fecha','desc').limit(500);
+    const snap=await q.get();
+    MOVIMIENTOS=snap.docs.map(d=>({id:d.id,...d.data()}))
+      .filter(m=>(!desde||m.fecha>=desde)&&(!hasta||m.fecha<=hasta));
+  }catch(e){console.warn('Movimientos:',e);MOVIMIENTOS=[];}
+}
+
+function renderMovimientos(){
+  const c=document.getElementById('movList');if(!c)return;
+  const buscar=(document.getElementById('movBuscar')?.value||'').toLowerCase();
+  const sucF=document.getElementById('movSucFiltro')?.value||'';
+  const tipoF=document.getElementById('movTipoFiltro')?.value||'';
+
+  let movs=MOVIMIENTOS.slice();
+  if(buscar)movs=movs.filter(m=>(m.productoNombre||'').toLowerCase().includes(buscar));
+  if(sucF)movs=movs.filter(m=>m.sucursalId===sucF);
+  if(tipoF)movs=movs.filter(m=>m.tipo===tipoF);
+
+  if(!movs.length){
+    c.innerHTML='<div class="card"><p class="fs14 text-gray">Sin movimientos en el período seleccionado.</p></div>';
+    return;
+  }
+
+  const iconos={entrada:'📥',salida:'📤',reposicion:'🔄',merma:'🗑',vencimiento:'📅',ajuste:'✏️',venta:'🛒'};
+  const colores={entrada:'var(--gr600)',salida:'var(--r600)',reposicion:'var(--b600)',merma:'var(--r600)',vencimiento:'#C2410C',ajuste:'var(--g600)',venta:'var(--a600)'};
+
+  // Agrupar por fecha
+  const byFecha={};
+  movs.forEach(m=>{if(!byFecha[m.fecha])byFecha[m.fecha]=[];byFecha[m.fecha].push(m);});
+
+  c.innerHTML=Object.entries(byFecha).sort((a,b)=>b[0].localeCompare(a[0])).map(([fecha,items])=>`
+    <div style="margin-bottom:1.25rem">
+      <div style="font-size:.75rem;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem">${fdate(fecha)} · ${items.length} movimiento${items.length>1?'s':''}</div>
+      <div class="tw"><table>
+        <thead><tr><th>Hora</th><th>Producto</th><th>Sucursal</th><th style="text-align:center">Tipo</th><th style="text-align:center">Cant.</th><th style="text-align:center">Ubic.</th><th>Motivo</th><th>Operador</th></tr></thead>
+        <tbody>${items.map(m=>`<tr>
+          <td class="fs12 text-gray mono">${m.hora||'—'}</td>
+          <td class="fw6 fs13">${m.productoNombre||'—'}</td>
+          <td class="fs12 text-gray">${m.sucursal||'—'}</td>
+          <td style="text-align:center"><span class="fs12" style="color:${colores[m.tipo]||'var(--g600)'};font-weight:600">${iconos[m.tipo]||''} ${m.tipo||'—'}</span></td>
+          <td style="text-align:center;font-family:var(--mono);font-weight:700;color:${(m.cantidad||0)>=0?'var(--gr600)':'var(--r600)'}">${(m.cantidad||0)>=0?'+':''}${m.cantidad||0}</td>
+          <td style="text-align:center" class="fs12">${m.ubicacion==='bodega'?'📦':'🏪'}</td>
+          <td class="fs12 text-gray">${m.motivo||'—'}</td>
+          <td class="fs12 text-gray">${m.operador||'—'}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+    </div>`).join('');
+}
+
+function openMovModal(){
+  ['movProducto','movCantidad','movMotivo'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const dl=document.getElementById('movProdList');
+  if(dl)dl.innerHTML=INVENTARIO.map(p=>`<option value="${p.nombre}">`).join('');
+  const sel=document.getElementById('movSucursal');
+  if(sel)sel.innerHTML=SUCURSALES.map(s=>`<option value="${s.id}" ${s.id===(CU.sucursalActiva||CU.sucursalId)?'selected':''}>${s.nombre}</option>`).join('');
+  document.getElementById('movModal').classList.remove('hidden');
+}
+
+function closeMovModal(){document.getElementById('movModal').classList.add('hidden');}
+
+async function saveMovimiento(){
+  const nombreProd=document.getElementById('movProducto').value.trim();
+  const prod=INVENTARIO.find(p=>p.nombre.toLowerCase()===nombreProd.toLowerCase());
+  if(!prod){toast('Selecciona un producto válido');return;}
+  const sucursalId=document.getElementById('movSucursal').value;
+  const ubicacion=document.getElementById('movUbicacion').value;
+  const tipo=document.getElementById('movTipo').value;
+  let cantidad=parseInt(document.getElementById('movCantidad').value)||0;
+  const motivo=document.getElementById('movMotivo').value.trim();
+  if(!cantidad){toast('Ingresa la cantidad');return;}
+
+  // Salidas en negativo
+  if(['salida','merma','vencimiento'].includes(tipo))cantidad=-Math.abs(cantidad);
+
+  try{
+    await registrarMovimiento({
+      productoId:prod.id,productoNombre:prod.nombre,sku:prod.sku||'',
+      sucursalId,tipo,cantidad,ubicacion,motivo
+    });
+    // Actualizar stock de sucursal
+    const ref=db.collection('stockSucursal').doc(sucursalId);
+    const snap=await ref.get();
+    const data=snap.exists?snap.data():{};
+    const actual=data[prod.id]||{exhibicion:0,bodega:0,min:0};
+    const nuevo={...actual};
+    nuevo[ubicacion]=Math.max(0,(actual[ubicacion]||0)+cantidad);
+    await ref.set({[prod.id]:nuevo},{merge:true});
+
+    await loadMovimientos();renderMovimientos();closeMovModal();
+    await auditLog('inventario',{accion:'movimiento',tipo,producto:prod.nombre,cantidad});
+    toast('✅ Movimiento registrado');
+  }catch(e){toast('❌ Error: '+e.message);}
+}
+
+async function exportMovimientosExcel(){
+  if(!MOVIMIENTOS.length){toast('Sin movimientos');return;}
+  await loadXLSX();
+  const rows=[['Fecha','Hora','Producto','SKU','Sucursal','Tipo','Cantidad','Ubicación','Motivo','Operador']];
+  MOVIMIENTOS.forEach(m=>rows.push([m.fecha,m.hora||'',m.productoNombre,m.sku||'',m.sucursal||'',m.tipo,m.cantidad,m.ubicacion==='bodega'?'Bodega':'Exhibición',m.motivo||'',m.operador||'']));
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:12},{wch:8},{wch:30},{wch:12},{wch:16},{wch:14},{wch:10},{wch:14},{wch:30},{wch:16}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Movimientos');
+  XLSX.writeFile(wb,`movimientos_${today()}.xlsx`);
+  toast('✅ Excel descargado');
+}
+
+/* ============ ALERTA VENCIMIENTOS DASHBOARD ============ */
+async function checkVencimientos(){
+  await loadLotes();
+  const alertas=LOTES.map(l=>{
+    const prod=INVENTARIO.find(p=>p.id===l.productoId);
+    return{...l,est:estadoLote(l.fechaVencimiento,prod?.diasAlerta||7)};
+  }).filter(l=>l.est.key==='vencido'||l.est.key==='critico');
+
+  document.getElementById('vtoAlert')?.remove();
+  if(!alertas.length)return;
+
+  const banner=document.getElementById('notifBanner');if(!banner)return;
+  const vencidos=alertas.filter(l=>l.est.key==='vencido');
+  const criticos=alertas.filter(l=>l.est.key==='critico');
+
+  const div=document.createElement('div');
+  div.id='vtoAlert';
+  const esRojo=vencidos.length>0;
+  div.style.cssText=`display:flex;align-items:flex-start;gap:.75rem;background:${esRojo?'var(--r100)':'#FFEDD5'};border:1px solid ${esRojo?'var(--r500)':'#FB923C'};border-radius:10px;padding:.875rem 1rem;margin-bottom:.5rem`;
+  div.innerHTML=`<span style="font-size:1.25rem;flex-shrink:0">📅</span>
+    <div style="flex:1">
+      <div class="fw7 fs14" style="color:${esRojo?'var(--r600)':'#C2410C'}">
+        ${vencidos.length?`${vencidos.length} producto${vencidos.length>1?'s':''} vencido${vencidos.length>1?'s':''}`:''}${vencidos.length&&criticos.length?' · ':''}${criticos.length?`${criticos.length} por vencer`:''}
+      </div>
+      <div class="fs12" style="color:${esRojo?'var(--r600)':'#C2410C'};margin-top:.25rem">
+        ${alertas.slice(0,4).map(l=>`${l.productoNombre} (${l.est.label}${l.sucursal?' · '+l.sucursal:''})`).join(' · ')}${alertas.length>4?` y ${alertas.length-4} más`:''}
+      </div>
+    </div>
+    <div style="display:flex;gap:.375rem;flex-shrink:0">
+      <button class="btn btn-s sm" onclick="showSec('ad-inv',document.querySelector('.ni[data-sec=ad-inv]'));setTimeout(()=>showInvTab('vencimientos',document.querySelectorAll('#ad-inv .rep-tab')[2]),100)">Ver</button>
+      <button onclick="this.closest('#vtoAlert').remove()" style="background:none;border:none;color:${esRojo?'var(--r500)':'#C2410C'};cursor:pointer;font-size:1rem">✕</button>
+    </div>`;
+  banner.prepend(div);
+}
+
+/* ============ IMPORTAR CATÁLOGO DESDE POS ============ */
+async function importarCatalogoPOS(){
+  // Elegir sucursal
+  const sucId=CU.sucursalActiva||CU.sucursalId||SUCURSALES[0]?.id;
+  const sucNombre=SUCURSALES.find(s=>s.id===sucId)?.nombre||'';
+  if(!confirm(`¿Importar el catálogo de productos del POS de ${sucNombre}?\n\nSe actualizarán precios y se agregarán productos nuevos. El stock actual no se modifica.`))return;
+
+  toast('🔄 Leyendo catálogo del POS…',8000);
+  try{
+    // Read sync metadata
+    const metaSnap=await db.collection('syncPOS').doc(sucId).get();
+    if(!metaSnap.exists){toast('❌ Sin catálogo sincronizado. Ejecuta el sync primero.');return;}
+    const meta=metaSnap.data();
+    const partes=meta.partes||1;
+
+    // Load all chunks
+    let productos=[];
+    for(let i=0;i<partes;i++){
+      const chunkSnap=await db.collection('catalogoPOS').doc(`${sucId}_${i}`).get();
+      if(chunkSnap.exists){
+        try{productos=productos.concat(JSON.parse(chunkSnap.data().productos||'[]'));}catch(e){}
+      }
+    }
+    if(!productos.length){toast('❌ Catálogo vacío');return;}
+
+    toast(`⏳ Importando ${productos.length} productos…`,10000);
+
+    // Index existing by sku
+    const existing={};
+    INVENTARIO.forEach(i=>{if(i.sku)existing[i.sku]=i.id;});
+
+    let added=0,updated=0;
+    const BATCH=450;
+    for(let i=0;i<productos.length;i+=BATCH){
+      const chunk=productos.slice(i,i+BATCH);
+      const batch=db.batch();
+      chunk.forEach(p=>{
+        const prod={
+          sku:p.sku,nombre:p.nombre,cat:p.cat||'General',
+          precio:p.precio||0,costo:p.costo||0,barcode:p.barcode||'',
+          origenPOS:true,
+          actualizadoEn:firebase.firestore.FieldValue.serverTimestamp()
+        };
+        if(existing[p.sku]){
+          batch.update(db.collection('inventario').doc(existing[p.sku]),prod);
+          updated++;
+        }else{
+          batch.set(db.collection('inventario').doc(),{...prod,stock:0,min:0,marca:'',creadoEn:firebase.firestore.FieldValue.serverTimestamp()});
+          added++;
+        }
+      });
+      await batch.commit();
+    }
+
+    await loadInventario();
+    renderInv();
+    await auditLog('inventario',{accion:'importar_pos',sucursalId:sucId,agregados:added,actualizados:updated});
+    toast(`✅ ${added} agregados, ${updated} actualizados`,5000);
+  }catch(e){toast('❌ Error: '+e.message,5000);}
+}
+
+/* ============ TRAER DATOS DEL POS ============ */
+async function traerDatosPOS(){
+  const sucId=CU.sucursalActiva||CU.sucursalId||'';
+  const st=document.getElementById('posAutoStatus');
+  if(st){st.classList.remove('hidden');st.style.background='var(--a50)';st.style.borderColor='var(--a200)';st.style.color='var(--a700)';st.textContent='🔄 Consultando POS…';}
+  try{
+    const snap=await db.collection('ventasPOS').doc(today()+'_'+sucId).get();
+    if(!snap.exists){
+      if(st){st.style.background='var(--r100)';st.style.borderColor='var(--r500)';st.style.color='var(--r600)';st.textContent='⚠️ Sin datos del POS para hoy en esta sucursal.';}
+      return;
+    }
+    const d=snap.data();
+    // Fill the fields
+    document.getElementById('ciSisEf').value=d.efectivo||0;
+    document.getElementById('ciSisTarj').value=(d.debito||0)+(d.credito||0);
+    document.getElementById('ciSisOtros').value=d.otros||0;
+    refreshCiSisTotal();
+    saveCiSis();
+    // Show status with sync freshness
+    const syncDate=d.syncAt?new Date(d.syncAt):null;
+    const minAgo=syncDate?Math.round((Date.now()-syncDate.getTime())/60000):null;
+    const fresh=minAgo!==null&&minAgo<60;
+    if(st){
+      st.style.background=fresh?'var(--gr100)':'var(--a50)';
+      st.style.borderColor=fresh?'var(--gr500)':'var(--a400)';
+      st.style.color=fresh?'var(--gr600)':'var(--a700)';
+      st.innerHTML=`${fresh?'✅':'⚠️'} <strong>${clp(d.totalVenta||0)}</strong> · ${d.totalBoletas||0} boletas · sync hace ${minAgo!==null?minAgo+' min':'—'}${!fresh?' <em>(datos antiguos)</em>':''}`;
+    }
+    toast('✅ Datos del POS cargados');
+  }catch(e){
+    if(st){st.style.background='var(--r100)';st.style.borderColor='var(--r500)';st.style.color='var(--r600)';st.textContent='❌ Error: '+e.message;}
+  }
+}
+
+/* ============ MONITOREO POS ============ */
+async function checkPOSStale(){
+  const alerts=[];
+  for(const suc of SUCURSALES){
+    try{
+      const snap=await db.collection('ventasPOS').doc(today()+'_'+suc.id).get();
+      if(!snap.exists){alerts.push({suc:suc.nombre,motivo:'Sin datos hoy'});continue;}
+      const d=snap.data();
+      if(!d.syncAt){alerts.push({suc:suc.nombre,motivo:'Sin timestamp'});continue;}
+      const horas=(Date.now()-new Date(d.syncAt).getTime())/3600000;
+      if(horas>2)alerts.push({suc:suc.nombre,motivo:`Sin sync hace ${Math.round(horas)}h`});
+    }catch(e){}
+  }
+  const banner=document.getElementById('notifBanner');
+  if(!banner)return;
+  // Remove old POS alerts
+  document.getElementById('posStaleAlert')?.remove();
+  if(alerts.length){
+    const div=document.createElement('div');
+    div.id='posStaleAlert';
+    div.style.cssText='display:flex;align-items:flex-start;gap:.75rem;background:var(--a50);border:1px solid var(--a400);border-radius:10px;padding:.875rem 1rem;margin-bottom:.5rem';
+    div.innerHTML=`<span style="font-size:1.125rem">🖥️</span>
+      <div style="flex:1">
+        <div class="fw7 fs13" style="color:var(--a700)">POS sin actualizar</div>
+        <div class="fs12" style="color:var(--a700);margin-top:.125rem">${alerts.map(a=>`${a.suc}: ${a.motivo}`).join(' · ')}</div>
+      </div>
+      <button onclick="this.parentElement.remove()" style="background:none;border:none;color:var(--a600);cursor:pointer;font-size:1rem">✕</button>`;
+    banner.prepend(div);
+  }
+}
 function refreshCiSisTotal(){const ef=parseFloat(document.getElementById('ciSisEf')?.value)||0,tarj=parseFloat(document.getElementById('ciSisTarj')?.value)||0,otros=parseFloat(document.getElementById('ciSisOtros')?.value)||0;const el=document.getElementById('ciSisTotal');if(el)el.textContent=clp(ef+tarj+otros);}
 function renderCiMovFromRet(){
   const c=document.getElementById('ciMovFromRet');if(!c)return;const hoy=RETIROS.filter(r=>r.fecha===today());
@@ -1461,9 +2109,18 @@ function renderCiResumen(){
   const retHoy=RETIROS.filter(r=>r.fecha===today()&&r.tipo==='retiro').reduce((a,r)=>a+r.monto,0),abHoy=RETIROS.filter(r=>r.fecha===today()&&r.tipo==='abono').reduce((a,r)=>a+r.monto,0);
   const efAp=totalBills(AP),saldoEsp=efAp+abHoy-retHoy,diffEf=ef-saldoEsp;
   const sis=CI.sis||{},sisTotal=(sis.ef||0)+(sis.tarj||0)+(sis.otros||0),totalReal=ef+posTotal+transf,diffSis=totalReal-sisTotal;
+  // Cargar POS para cuadratura (async, se refresca al volver)
+  if(window._ciPosTotal===undefined){
+    window._ciPosTotal=0;
+    db.collection('ventasPOS').doc(today()+'_'+(CU.sucursalActiva||CU.sucursalId||'')).get()
+      .then(s=>{if(s.exists){window._ciPosTotal=s.data().totalVenta||0;window._ciDiffPos=totalReal-window._ciPosTotal;renderCiResumen();}})
+      .catch(()=>{});
+  } else if(window._ciPosTotal){
+    window._ciDiffPos=totalReal-window._ciPosTotal;
+  }
   if(isOp){c.innerHTML=`<div class="ar"><span class="ar-l">Sistema</span><span class="ar-v">${clp(sisTotal)}</span></div><div class="ar"><span class="ar-l">Movimientos</span><span class="ar-v">${RETIROS.filter(r=>r.fecha===today()).length}</span></div><div class="ar"><span class="ar-l">Cigarros</span><span class="ar-v">${CI.cigarros.length} productos</span></div>`;return;}
   const sec=l=>`<div style="font-size:.75rem;font-weight:700;color:var(--g400);text-transform:uppercase;letter-spacing:.06em;padding:.5rem 1rem .25rem">${l}</div>`;
-  c.innerHTML=sec('Sistema')+`<div class="ar"><span class="ar-l">Efectivo sis.</span><span class="ar-v">${clp(sis.ef||0)}</span></div><div class="ar"><span class="ar-l">Tarjetas sis.</span><span class="ar-v">${clp(sis.tarj||0)}</span></div><div class="ar tot"><span class="ar-l">Total Sistema</span><span class="ar-v">${clp(sisTotal)}</span></div><div class="div"></div>`+sec('Conteo')+`<div class="ar"><span class="ar-l">💵 Efectivo</span><span class="ar-v">${clp(ef)}</span></div>${POS_TERMINALES.map(t=>`<div class="ar"><span class="ar-l">💳 ${t.name}</span><span class="ar-v">${clp(CI.pos[t.id]||0)}</span></div>`).join('')}<div class="ar tot"><span class="ar-l">Total Real</span><span class="ar-v">${clp(totalReal)}</span></div><div class="div"></div>`+sec('Cuadraturas')+`<div class="ar ${diffEf===0?'tot':diffEf>0?'dp':'dn'}"><span class="ar-l">Dif. Efectivo</span><span class="ar-v">${diffEf>=0?'+':''}${clp(diffEf)}</span></div><div class="ar ${diffSis===0?'tot':diffSis>0?'dp':'dn'}"><span class="ar-l">Dif. Sistema</span><span class="ar-v">${diffSis>=0?'+':''}${clp(diffSis)}</span></div>`;
+  c.innerHTML=sec('Sistema')+`<div class="ar"><span class="ar-l">Efectivo sis.</span><span class="ar-v">${clp(sis.ef||0)}</span></div><div class="ar"><span class="ar-l">Tarjetas sis.</span><span class="ar-v">${clp(sis.tarj||0)}</span></div><div class="ar tot"><span class="ar-l">Total Sistema</span><span class="ar-v">${clp(sisTotal)}</span></div><div class="div"></div>`+sec('Conteo')+`<div class="ar"><span class="ar-l">💵 Efectivo</span><span class="ar-v">${clp(ef)}</span></div>${POS_TERMINALES.map(t=>`<div class="ar"><span class="ar-l">💳 ${t.name}</span><span class="ar-v">${clp(CI.pos[t.id]||0)}</span></div>`).join('')}<div class="ar tot"><span class="ar-l">Total Real</span><span class="ar-v">${clp(totalReal)}</span></div><div class="div"></div>`+sec('Cuadraturas')+`<div class="ar ${diffEf===0?'tot':diffEf>0?'dp':'dn'}"><span class="ar-l">Dif. Efectivo</span><span class="ar-v">${diffEf>=0?'+':''}${clp(diffEf)}</span></div><div class="ar ${diffSis===0?'tot':diffSis>0?'dp':'dn'}"><span class="ar-l">Dif. Sistema</span><span class="ar-v">${diffSis>=0?'+':''}${clp(diffSis)}</span></div>`+(window._ciPosTotal?`<div class="ar ${window._ciDiffPos===0?'tot':window._ciDiffPos>0?'dp':'dn'}"><span class="ar-l">🖥️ Dif. vs POS</span><span class="ar-v">${window._ciDiffPos>=0?'+':''}${clp(window._ciDiffPos)}</span></div>`:'');
 }
 function renderCiCheckFotos(){
   const c=document.getElementById('ciCheckFotos');if(!c)return;
@@ -1492,6 +2149,15 @@ async function enviarCierre(){
   const efAp=totalBills(AP),saldoEsp=efAp+abHoy-retHoy,diffEf=ef-saldoEsp;
   const sis=CI.sis||{},sisTotal=(sis.ef||0)+(sis.tarj||0)+(sis.otros||0),totalReal=ef+posTotal+transf,diffSis=totalReal-sisTotal;
   const comentario=document.getElementById('ciComentario')?.value.trim()||'';
+
+  // Traer total del POS para cuadratura
+  let posData=null;
+  try{
+    const posSnap=await db.collection('ventasPOS').doc(today()+'_'+(CU.sucursalActiva||CU.sucursalId||'')).get();
+    if(posSnap.exists)posData=posSnap.data();
+  }catch(e){}
+  const totalPOS=posData?.totalVenta||0;
+  const diffPOS=totalPOS?totalReal-totalPOS:null;
 
   // Upload fotos a Google Drive vía GAS
   toast('📤 Subiendo fotos a Drive…',10000);
@@ -1528,6 +2194,10 @@ async function enviarCierre(){
     cigarrosCi:[...(CI.cigarros||[])],
     fotos:fotosURLs,
     comentario,
+    totalPOS,
+    diffPOS,
+    posSyncAt:posData?.syncAt||null,
+    posBoletas:posData?.totalBoletas||0,
     timestamp:firebase.firestore.FieldValue.serverTimestamp()
   };
 
@@ -1538,9 +2208,9 @@ async function enviarCierre(){
 
     // Write real-time notification for admins/gerentes
     await db.collection('notificaciones').add({
-      tipo: diffEf!==0||diffSis!==0 ? 'diferencia' : 'cierre_ok',
-      titulo: diffEf!==0||diffSis!==0 ? '⚠️ Cierre con diferencia' : '✅ Cierre enviado',
-      mensaje: `${CU.nombre} — ${CU.sucursalActivaNombre||''} — ${CU.turnoActivo||''}${diffEf!==0?' · Dif. ef: '+(diffEf>=0?'+':'')+clp(diffEf):''}${diffSis!==0?' · Dif. sis: '+(diffSis>=0?'+':'')+clp(diffSis):''}${comentario?' · "'+comentario+'"':''}`,
+      tipo: (diffEf!==0||diffSis!==0||(diffPOS!==null&&diffPOS!==0)) ? 'diferencia' : 'cierre_ok',
+      titulo: (diffEf!==0||diffSis!==0||(diffPOS!==null&&diffPOS!==0)) ? '⚠️ Cierre con diferencia' : '✅ Cierre enviado',
+      mensaje: `${CU.nombre} — ${CU.sucursalActivaNombre||''} — ${CU.turnoActivo||''}${diffEf!==0?' · Dif. ef: '+(diffEf>=0?'+':'')+clp(diffEf):''}${diffSis!==0?' · Dif. sis: '+(diffSis>=0?'+':'')+clp(diffSis):''}${diffPOS!==null&&diffPOS!==0?' · 🖥️ vs POS: '+(diffPOS>=0?'+':'')+clp(diffPOS):''}${comentario?' · "'+comentario+'"':''}`,
       sucursalId:CU.sucursalActiva||CU.sucursalId||'',
       sucursal:CU.sucursalActivaNombre||'',
       operador:CU.nombre,
@@ -1551,11 +2221,12 @@ async function enviarCierre(){
 
     notificarGerentes({...turno,id:ref.id});
     confetti();
-    if(diffEf!==0||diffSis!==0){
+    if(diffEf!==0||diffSis!==0||(diffPOS!==null&&diffPOS!==0)){
       const msg=[];
       if(diffEf!==0)msg.push(`Efectivo: ${diffEf>=0?'+':''}${clp(diffEf)}`);
       if(diffSis!==0)msg.push(`vs Sistema: ${diffSis>=0?'+':''}${clp(diffSis)}`);
-      showDiffAlert(msg.join(' | '),diffEf<0||diffSis<0);
+      if(diffPOS!==null&&diffPOS!==0)msg.push(`vs POS: ${diffPOS>=0?'+':''}${clp(diffPOS)}`);
+      showDiffAlert(msg.join(' | '),diffEf<0||diffSis<0||(diffPOS!==null&&diffPOS<0));
     } else {
       toast('✅ Cierre enviado — caja cuadra perfectamente',4000);
     }
@@ -1574,9 +2245,11 @@ function renderDash(){
   renderDashChart(v);renderDashCompo(v);renderDashCigs();renderDashStock();renderDashTL();
   renderMetaVentas();renderDashRetirosCat();renderDashVentasSuc();
   loadPOSData();
+  checkPOSStale();
+  checkVencimientos();
   // Auto-refresh POS data every 15 min
   if(!window._posRefreshTimer){
-    window._posRefreshTimer=setInterval(()=>loadPOSData(),15*60*1000);
+    window._posRefreshTimer=setInterval(()=>{loadPOSData();checkPOSStale();},15*60*1000);
   }
 }
 function renderDashChart(ventas){
@@ -1748,6 +2421,18 @@ function buildTurnoHTML(t){
   const sec=l=>`<div style="font-size:.75rem;font-weight:700;color:var(--g400);text-transform:uppercase;letter-spacing:.06em;padding:.5rem 1rem .25rem">${l}</div>`;
   let html=`<p style="font-size:.8125rem;color:var(--g500);margin-bottom:1rem">📍 ${t.sucursal||'—'} · 👤 ${t.operador} · ${t.horaAp||'—'} → ${t.horaCi||'—'}</p>`;
   if(t.comentario) html+=`<div style="background:var(--a50);border:1px solid var(--a200);border-radius:8px;padding:.75rem 1rem;margin-bottom:1rem;font-size:.875rem;color:var(--a900)"><span style="font-weight:700">💬 Comentario:</span> ${t.comentario}</div>`;
+  if(t.totalPOS){
+    const dp=t.diffPOS||0;
+    html+=`<div style="background:${dp===0?'var(--gr100)':'var(--r100)'};border:1px solid ${dp===0?'var(--gr500)':'var(--r500)'};border-radius:8px;padding:.75rem 1rem;margin-bottom:1rem;font-size:.8125rem">
+      <div style="font-weight:700;color:${dp===0?'var(--gr600)':'var(--r600)'};margin-bottom:.25rem">🖥️ Cuadratura vs POS ${dp===0?'✓':'⚠️'}</div>
+      <div style="display:flex;gap:1rem;flex-wrap:wrap;color:var(--g600)">
+        <span>POS: <strong class="mono">${clp(t.totalPOS)}</strong></span>
+        <span>Contado: <strong class="mono">${clp(t.totalReal)}</strong></span>
+        <span>Dif: <strong class="mono" style="color:${dp===0?'var(--gr600)':'var(--r600)'}">${dp>=0?'+':''}${clp(dp)}</strong></span>
+        ${t.posBoletas?`<span>${t.posBoletas} boletas</span>`:''}
+      </div>
+    </div>`;
+  }
   html+=sec('Efectivo')+
     `<div class="ar"><span class="ar-l">Apertura</span><span class="ar-v">${clp(t.efAp)}</span></div>`+
     `<div class="ar"><span class="ar-l">Cierre</span><span class="ar-v">${clp(t.efCi)}</span></div>`+
@@ -1784,21 +2469,27 @@ function renderVH(){const c=document.getElementById('vHist');if(!c)return;if(!VE
 function renderCaja(){const c=document.getElementById('cajaContent');if(!c)return;const efAp=totalBills(AP),retH=RETIROS.filter(r=>r.fecha===today()&&r.tipo==='retiro').reduce((a,r)=>a+r.monto,0),abH=RETIROS.filter(r=>r.fecha===today()&&r.tipo==='abono').reduce((a,r)=>a+r.monto,0),saldo=efAp+abH-retH,posTotal=POS_TERMINALES.reduce((a,t)=>a+(AP.pos?.[t.id]||0),0),total=saldo+posTotal;const rows=[{l:'EFECTIVO APERTURA',v:efAp},{l:'ABONOS',v:abH,pos:true},{l:'RETIROS',v:retH,neg:true},{l:'SALDO EFECTIVO',v:saldo,tot:true},...POS_TERMINALES.map(t=>({l:t.name,v:AP.pos?.[t.id]||0})),{l:'TOTAL',v:total,tot:true}];c.innerHTML=rows.map(r=>`<div class="ar ${r.tot?'tot':''}"><span class="ar-l">${r.l}</span><span class="ar-v ${r.neg?'text-red':r.pos?'text-green':''}">${r.neg?'-':r.pos?'+':''}${clp(r.v)}</span></div>`).join('');}
 
 let _invCat='TODOS',_invSearch='';
-function renderInv(search){if(search!==undefined)_invSearch=search;const cats=['TODOS',...new Set(INVENTARIO.map(i=>i.cat).filter(Boolean))];const tabs=document.getElementById('invCatTabs');if(tabs)tabs.innerHTML=cats.map(cat=>`<button class="marca-tag ${_invCat===cat?'active':''}" onclick="_invCat='${cat}';renderInv()">${cat}</button>`).join('');const b=document.getElementById('invBody');if(!b)return;let items=INVENTARIO;if(_invCat!=='TODOS')items=items.filter(i=>i.cat===_invCat);if(_invSearch)items=items.filter(i=>i.nombre.toLowerCase().includes(_invSearch.toLowerCase())||(i.marca||'').toLowerCase().includes(_invSearch.toLowerCase()));b.innerHTML=items.map(i=>`<tr><td class="fw6">${i.nombre}</td><td class="text-gray fs13">${i.marca||'—'}</td><td><span class="badge ${i.cat==='Cigarros'?'ba':''}" style="${i.cat!=='Cigarros'?'background:var(--g100);color:var(--g600)':''}">${i.cat}</span></td><td><span class="badge ${i.stock<=i.min&&i.min>0?'br':'bg'}">${i.stock}</span></td><td class="text-gray fs13">${i.min}</td><td class="mono">${clp(i.precio)}</td><td><div style="display:flex;gap:.375rem"><button class="btn btn-s sm" onclick="editProd('${i.id}')">✎</button><button class="btn btn-d sm" onclick="delProd('${i.id}')">✕</button></div></td></tr>`).join('');}
+function renderInv(search){if(search!==undefined)_invSearch=search;const cats=['TODOS',...new Set(INVENTARIO.map(i=>i.cat).filter(Boolean))];const tabs=document.getElementById('invCatTabs');if(tabs)tabs.innerHTML=cats.map(cat=>`<button class="marca-tag ${_invCat===cat?'active':''}" onclick="_invCat='${cat}';renderInv()">${cat}</button>`).join('');const b=document.getElementById('invBody');if(!b)return;let items=INVENTARIO;if(_invCat!=='TODOS')items=items.filter(i=>i.cat===_invCat);if(_invSearch)items=items.filter(i=>i.nombre.toLowerCase().includes(_invSearch.toLowerCase())||(i.marca||'').toLowerCase().includes(_invSearch.toLowerCase()));b.innerHTML=items.map(i=>`<tr><td class="fw6">${i.nombre}${i.perecible?'<span title="Producto perecible" style="margin-left:.375rem">📅</span>':''}</td><td class="text-gray fs13">${i.marca||'—'}</td><td><span class="badge ${i.cat==='Cigarros'?'ba':''}" style="${i.cat!=='Cigarros'?'background:var(--g100);color:var(--g600)':''}">${i.cat}</span></td><td><span class="badge ${i.stock<=i.min&&i.min>0?'br':'bg'}">${i.stock}</span></td><td class="text-gray fs13">${i.min}</td><td class="mono">${clp(i.precio)}</td><td><div style="display:flex;gap:.375rem"><button class="btn btn-s sm" onclick="editProd('${i.id}')">✎</button><button class="btn btn-d sm" onclick="delProd('${i.id}')">✕</button></div></td></tr>`).join('');}
 function filterInv(v){renderInv(v);}
 
 /* ============ INV TABS ============ */
 function showInvTab(tab,el){
-  ['general','sucursal','reposicion','historial'].forEach(t=>{
+  ['general','sucursal','vencimientos','movimientos','reposicion','historial'].forEach(t=>{
     const d=document.getElementById('invTab'+t.charAt(0).toUpperCase()+t.slice(1));
     if(d)d.style.display=t===tab?'block':'none';
   });
   document.querySelectorAll('#ad-inv .rep-tab').forEach(b=>b.classList.remove('active'));
   el?.classList.add('active');
   if(tab==='sucursal') initStockSucursal();
+  if(tab==='vencimientos') initVencimientos();
+  if(tab==='movimientos') initMovimientos();
   if(tab==='reposicion') renderReposicion();
   if(tab==='historial') initHistorialRep();
   if(tab==='general'){_invCat='TODOS';renderInv();}
+}
+function togglePerecible(){
+  const chk=document.getElementById('pPerecible');
+  document.getElementById('pPerecibleFields')?.classList.toggle('hidden',!chk?.checked);
 }
 
 /* ============ STOCK POR SUCURSAL (admin) ============ */
@@ -2034,6 +2725,14 @@ async function confirmarReposicion(){
       timestamp:firebase.firestore.FieldValue.serverTimestamp()
     });
     await batch.commit();
+    // Registrar en kardex
+    for(const m of movimientos){
+      await registrarMovimiento({
+        productoId:m.prodId,productoNombre:m.nombre,sku:'',
+        sucursalId:sucId,tipo:'reposicion',cantidad:m.cantidad,
+        ubicacion:'exhibicion',motivo:`Bodega ${m.bodegaAntes}→${m.bodegaDespues}`
+      });
+    }
     await auditLog('inventario',{accion:'reposicion',sucursalId:sucId,productos:movimientos.length});
     _repPendientes={};
     toast(`✅ Reposición confirmada — ${movimientos.length} producto${movimientos.length>1?'s':''} actualizados`);
@@ -2284,12 +2983,12 @@ async function exportHistorialExcel(){
   const wb=XLSX.utils.book_new();
   // Sheet 1: Resumen
   const data=[
-    ['Fecha','Sucursal','Turno','Operador','Ef. Apertura','Ef. Cierre','Retiros','Abonos','Saldo Esperado','Dif. Efectivo','POS Total','Transferencias','Total Contado','Total Sistema','Dif. Sistema','Comentario'],
-    ...TURNOS.map(t=>[t.fecha,t.sucursal,t.turno,t.operador,t.efAp,t.efCi,t.retiros,t.abonos,t.saldoEsp,t.diffEf,t.posTotal,t.transf||0,t.totalReal,t.sisTotal,t.diffSis,t.comentario||''])
+    ['Fecha','Sucursal','Turno','Operador','Ef. Apertura','Ef. Cierre','Retiros','Abonos','Saldo Esperado','Dif. Efectivo','POS Total','Transferencias','Total Contado','Total Sistema','Dif. Sistema','Venta POS','Dif. vs POS','Boletas POS','Comentario'],
+    ...TURNOS.map(t=>[t.fecha,t.sucursal,t.turno,t.operador,t.efAp,t.efCi,t.retiros,t.abonos,t.saldoEsp,t.diffEf,t.posTotal,t.transf||0,t.totalReal,t.sisTotal,t.diffSis,t.totalPOS||0,t.diffPOS||0,t.posBoletas||0,t.comentario||''])
   ];
   const ws=XLSX.utils.aoa_to_sheet(data);
   // Column widths
-  ws['!cols']=[{wch:12},{wch:16},{wch:10},{wch:16},{wch:12},{wch:12},{wch:10},{wch:10},{wch:14},{wch:12},{wch:10},{wch:12},{wch:12},{wch:12},{wch:12},{wch:30}];
+  ws['!cols']=[{wch:12},{wch:16},{wch:10},{wch:16},{wch:12},{wch:12},{wch:10},{wch:10},{wch:14},{wch:12},{wch:10},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:11},{wch:30}];
   // Highlight diff rows
   TURNOS.forEach((t,i)=>{
     if(t.diffEf!==0||t.diffSis!==0){
@@ -2321,13 +3020,13 @@ async function exportInvExcel(){
   toast('✅ Excel descargado');
 }
 function filterInv(v){renderInv(v);}
-function openPM(){_editPid=null;document.getElementById('pmTitle').textContent='Nuevo Producto';['pN','pS','pC','pMarca','pSt','pMn','pPr'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});document.getElementById('pm').classList.remove('hidden');}
+function openPM(){_editPid=null;document.getElementById('pmTitle').textContent='Nuevo Producto';['pN','pS','pC','pMarca','pSt','pMn','pPr'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});const pc=document.getElementById('pPerecible');if(pc)pc.checked=false;const da=document.getElementById('pDiasAlerta');if(da)da.value=7;togglePerecible();document.getElementById('pm').classList.remove('hidden');}
 function closePM(){document.getElementById('pm').classList.add('hidden');}
 let _editPid=null;
-function editProd(id){const it=INVENTARIO.find(i=>i.id===id);if(!it)return;_editPid=id;document.getElementById('pmTitle').textContent='Editar';document.getElementById('pN').value=it.nombre;document.getElementById('pS').value=it.sku||'';document.getElementById('pC').value=it.cat||'';document.getElementById('pMarca').value=it.marca||'';document.getElementById('pSt').value=it.stock;document.getElementById('pMn').value=it.min;document.getElementById('pPr').value=it.precio;document.getElementById('pm').classList.remove('hidden');}
+function editProd(id){const it=INVENTARIO.find(i=>i.id===id);if(!it)return;_editPid=id;document.getElementById('pmTitle').textContent='Editar';document.getElementById('pN').value=it.nombre;document.getElementById('pS').value=it.sku||'';document.getElementById('pC').value=it.cat||'';document.getElementById('pMarca').value=it.marca||'';document.getElementById('pSt').value=it.stock;document.getElementById('pMn').value=it.min;document.getElementById('pPr').value=it.precio;const pc=document.getElementById('pPerecible');if(pc)pc.checked=!!it.perecible;const da=document.getElementById('pDiasAlerta');if(da)da.value=it.diasAlerta||7;togglePerecible();document.getElementById('pm').classList.remove('hidden');}
 async function saveProduct(){
   const n=document.getElementById('pN').value.trim();if(!n){toast('Ingresa el nombre');return;}
-  const e={nombre:n,sku:document.getElementById('pS').value,cat:document.getElementById('pC').value||'General',marca:document.getElementById('pMarca').value.trim().toUpperCase()||'',stock:parseInt(document.getElementById('pSt').value)||0,min:parseInt(document.getElementById('pMn').value)||0,precio:parseInt(document.getElementById('pPr').value)||0};
+  const e={nombre:n,sku:document.getElementById('pS').value,cat:document.getElementById('pC').value||'General',marca:document.getElementById('pMarca').value.trim().toUpperCase()||'',stock:parseInt(document.getElementById('pSt').value)||0,min:parseInt(document.getElementById('pMn').value)||0,precio:parseInt(document.getElementById('pPr').value)||0,perecible:!!document.getElementById('pPerecible')?.checked,diasAlerta:parseInt(document.getElementById('pDiasAlerta')?.value)||7};
   try{if(_editPid){const old=INVENTARIO.find(i=>i.id===_editPid);if(old&&old.precio!==e.precio)await db.collection('historialPrecios').add({...old,precioAnterior:old.precio,precioNuevo:e.precio,fecha:today(),hora:timeNow(),uid:CU.uid,timestamp:firebase.firestore.FieldValue.serverTimestamp()});await db.collection('inventario').doc(_editPid).update(e);}else await db.collection('inventario').add({...e,creadoEn:firebase.firestore.FieldValue.serverTimestamp()});await loadInventario();closePM();renderInv();await auditLog('inventario',{accion:_editPid?'editar':'crear',nombre:n});toast('✅ Guardado');}
   catch(err){toast('❌ Error: '+err.message);}
 }
