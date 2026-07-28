@@ -1268,6 +1268,14 @@ let _rolSeleccionado='operador';
 
 function selectRolLogin(r){
   _rolSeleccionado=r;
+  // Si elige un rol global, ocultar selección de sucursal y turno
+  const global=esRolGlobal(r);
+  const sucFld=document.getElementById('lSucursal')?.closest('.fg');
+  const turFld=document.getElementById('tBtnMan')?.closest('.fg');
+  if(sucFld)sucFld.style.display=global?'none':'block';
+  if(turFld)turFld.style.display=global?'none':'block';
+  const sub=document.getElementById('loginStep2Sub');
+  if(sub)sub.textContent=global?'Acceso a todas las sucursales':'Confirma tu sucursal y turno para este ingreso';
   document.querySelectorAll('[id^="lRolBtn_"]').forEach(el=>{
     const isThis=el.id===`lRolBtn_${r}`;
     el.style.border=`1.5px solid ${isThis?'var(--a500)':'var(--g200)'}`;
@@ -1345,8 +1353,21 @@ async function login(){
   }
 }
 
+function esRolGlobal(rol){return rol==='superadmin'||rol==='gerente';}
+
 function showSucursalStep(){
   showLoading(false);
+  const roles0=Array.isArray(CU.roles)&&CU.roles.length?CU.roles:[CU.rol||'operador'];
+  // Superadmin/gerente con un solo rol → entra directo, ve todas las sucursales
+  if(roles0.length===1&&esRolGlobal(roles0[0])){
+    CU.rolActivo=roles0[0];
+    CU.sucursalActiva='';
+    CU.sucursalActivaNombre='Todas las sucursales';
+    CU.turnoActivo='';
+    document.getElementById('loginScreen').style.display='none';
+    showApp();
+    return;
+  }
   const sel=document.getElementById('lSucursal');
   if(sel){
     sel.innerHTML=SUCURSALES.map(s=>`<option value="${s.id}">${s.nombre}</option>`).join('');
@@ -1390,15 +1411,19 @@ function showSucursalStep(){
 }
 
 async function confirmarSucursal(){
-  const sel=document.getElementById('lSucursal');
-  const sucursalId=sel?.value||(SUCURSALES[0]?.id||'');
-  const sucursalNombre=SUCURSALES.find(s=>s.id===sucursalId)?.nombre||'';
-  // Determine active rol for this session
   const roles=Array.isArray(CU.roles)&&CU.roles.length?CU.roles:[CU.rol||'operador'];
   CU.rolActivo=roles.length>1?_rolSeleccionado:roles[0];
-  CU.sucursalActiva=sucursalId;
-  CU.sucursalActivaNombre=sucursalNombre;
-  CU.turnoActivo=_turnoSeleccionado;
+  if(esRolGlobal(CU.rolActivo)){
+    CU.sucursalActiva='';
+    CU.sucursalActivaNombre='Todas las sucursales';
+    CU.turnoActivo='';
+  }else{
+    const sel=document.getElementById('lSucursal');
+    const sucursalId=sel?.value||(SUCURSALES[0]?.id||'');
+    CU.sucursalActiva=sucursalId;
+    CU.sucursalActivaNombre=SUCURSALES.find(s=>s.id===sucursalId)?.nombre||'';
+    CU.turnoActivo=_turnoSeleccionado;
+  }
   document.getElementById('loginScreen').style.display='none';
   await showApp();
 }
@@ -1423,13 +1448,15 @@ async function loadConfig(){
 async function showApp(){
   clearBootTimer();
   showLoading(false);document.getElementById('loginScreen').style.display='none';document.getElementById('app').classList.add('v');
-  const sucId=CU.sucursalActiva||CU.sucursalId||'';
-  const sucNombre=CU.sucursalActivaNombre||(SUCURSALES.find(s=>s.id===sucId)?.nombre)||'';
-  const turno=CU.turnoActivo||CU.turno||'mañana';
+  const rolAct=CU.rolActivo||CU.rol;
+  const global=esRolGlobal(rolAct);
+  const sucId=CU.sucursalActiva||(global?'':CU.sucursalId)||'';
+  const sucNombre=global?'🌐 Todas las sucursales':(CU.sucursalActivaNombre||(SUCURSALES.find(s=>s.id===sucId)?.nombre)||'');
+  const turno=global?'':(CU.turnoActivo||CU.turno||'mañana');
   const emoji={'mañana':'☀️','tarde':'🌤','noche':'🌙'};
   document.getElementById('uLabel').textContent=CU.nombre||CU.email;
   document.getElementById('sucursalLabel').textContent=sucNombre;
-  document.getElementById('turnoLabel').textContent=` ${emoji[turno]||''} ${turno}`;
+  document.getElementById('turnoLabel').textContent=turno?` ${emoji[turno]||''} ${turno}`:'';
   document.getElementById('turnoFechaOp').textContent=new Date().toLocaleDateString('es-CL',{weekday:'short',day:'numeric',month:'short'});
   const rb=document.getElementById('roleLabel');
   rb.className='badge role-'+(CU.rolActivo||CU.rol);
@@ -1461,7 +1488,7 @@ async function showApp(){
   startSessionTimer();
   registerSW();
   if(isOp) renderTurnoStatus();
-  await auditLog('login',{sucursal:sucNombre,turno});
+  await auditLog('login',{sucursal:global?'todas':sucNombre,turno:turno||'—'});
 }
 
 async function loadInventario(){
@@ -1489,7 +1516,10 @@ async function loadVentas(sucId){
 async function loadRetiros(sucId){
   try{
     const sid=sucId||CU.sucursalActiva||CU.sucursalId||'';
-    const snap=await db.collection('retiros').where('sucursalId','==',sid).where('fecha','==',today()).get();
+    const global=esRolGlobal(CU.rolActivo||CU.rol)&&!sid;
+    let q=db.collection('retiros').where('fecha','==',today());
+    if(!global)q=q.where('sucursalId','==',sid);
+    const snap=await q.get();
     RETIROS=snap.docs.map(d=>({id:d.id,...d.data()}));renderRetList();
   }catch(e){console.error('Retiros:',e);}
 }
