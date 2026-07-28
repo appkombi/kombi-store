@@ -1,29 +1,25 @@
-const CACHE='kombi-v4';
-const SKIP=['firebaseapp','googleapis','gstatic','firestore','identitytoolkit','script.google'];
+// ============================================
+// SW AUTODESTRUCTIVO
+// Este archivo reemplaza el Service Worker anterior.
+// Se desregistra solo y borra todos los caches, para
+// que la app siempre cargue la versión más reciente.
+// ============================================
 
-self.addEventListener('install',e=>self.skipWaiting());
-
-self.addEventListener('activate',e=>{
-  e.waitUntil(caches.keys().then(keys=>Promise.all(keys.map(k=>caches.delete(k)))));
-  self.clients.claim();
+self.addEventListener('install', () => {
+  self.skipWaiting();
 });
 
-self.addEventListener('fetch',e=>{
-  if(SKIP.some(s=>e.request.url.includes(s)))return;
-  if(e.request.method!=='GET')return;
-
-  e.respondWith(
-    fetch(e.request)
-      .then(res=>{
-        if(res.ok){
-          const clone=res.clone();
-          caches.open(CACHE).then(c=>c.put(e.request,clone));
-        }
-        return res;
-      })
-      .catch(()=>{
-        // Si no hay cache devuelve respuesta vacía en vez de undefined
-        return caches.match(e.request).then(r=>r||new Response('',{status:503}));
-      })
-  );
+self.addEventListener('activate', event => {
+  event.waitUntil((async () => {
+    // Borrar todos los caches
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => caches.delete(k)));
+    // Desregistrarse
+    await self.registration.unregister();
+    // Recargar todas las pestañas abiertas
+    const clients = await self.clients.matchAll({ type: 'window' });
+    clients.forEach(c => c.navigate(c.url));
+  })());
 });
+
+// No interceptar nada
