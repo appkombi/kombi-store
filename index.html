@@ -3,6 +3,26 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+<script>
+/* ══ LIMPIEZA PREVIA — corre antes de cargar la app ══
+   Elimina Service Workers y caches que puedan servir
+   una versión rota. Evita tener que borrar datos del sitio. */
+(function(){
+  try{
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.getRegistrations()
+        .then(function(rs){rs.forEach(function(r){r.unregister();});})
+        .catch(function(){});
+    }
+    if(window.caches){
+      caches.keys().then(function(ks){ks.forEach(function(k){caches.delete(k);});}).catch(function(){});
+    }
+  }catch(e){}
+})();
+</script>
 <meta name="theme-color" content="#B45309"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -302,6 +322,7 @@ tr:hover td{background:var(--g50)}
         <button class="btn-login" onclick="login()">Ingresar</button>
         <div class="login-err hidden" id="lErr">Usuario o contraseña incorrectos</div>
         <button type="button" onclick="showForgotPass()" style="width:100%;margin-top:.875rem;background:none;border:none;color:var(--g400);font-size:.875rem;cursor:pointer;text-align:center">¿Olvidaste tu contraseña?</button>
+        <button type="button" onclick="resetApp()" style="width:100%;margin-top:.5rem;background:none;border:none;color:var(--g300);font-size:.75rem;cursor:pointer;text-align:center">¿Problemas para entrar? Reiniciar aplicación</button>
       </div>
 
       <!-- RECUPERAR CONTRASEÑA -->
@@ -1144,6 +1165,13 @@ const firebaseConfig={apiKey:"AIzaSyCat-wevUXz8RK6OUmSkxdilitEGMbGi1g",authDomai
 firebase.initializeApp(firebaseConfig);
 const auth=firebase.auth(),db=firebase.firestore();
 
+// Persistencia de sesión con degradación: si IndexedDB está bloqueado
+// cae a sessionStorage y si no, a memoria. Evita que la app se cuelgue.
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+  .catch(function(){return auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);})
+  .catch(function(){return auth.setPersistence(firebase.auth.Auth.Persistence.NONE);})
+  .catch(function(){});
+
 // STATE
 let CU=null,CFG={},SUCURSALES=[],POS_TERMINALES=[{id:'gn1',name:'GetNet 1'},{id:'gn2',name:'GetNet 2'},{id:'tb',name:'Transbank'}];
 let INVENTARIO=[],VENTAS=[],TURNOS=[],CK_APERTURA=[],CK_CIERRE=[],RETIROS=[];
@@ -1164,17 +1192,30 @@ async function auditLog(action,details={}){
   try{await db.collection('logs').add({uid:CU.uid,nombre:CU.nombre,email:CU.email,rol:CU.rolActivo||CU.rol,sucursal:(CU.sucursalActivaNombre||CU.sucursalNombre)||'—',sucursalId:(CU.sucursalActiva||CU.sucursalId)||'—',turno:(CU.turnoActivo||CU.turno)||'—',action,details,timestamp:firebase.firestore.FieldValue.serverTimestamp(),fecha:today(),hora:timeNow()});}catch(e){console.warn('Log:',e);}
 }
 
-// Failsafe global: si en 12s no cargó nada, mostrar login con opción de reset
-let _bootTimer=setTimeout(()=>{
+// Failsafe global de arranque.
+// 1er intento: si en 9s no arrancó, limpia todo y recarga automáticamente.
+// 2do intento: muestra el login con el botón de reinicio manual.
+let _bootTimer=setTimeout(async ()=>{
   const ls=document.getElementById('loadingScreen');
-  if(ls&&ls.style.display!=='none'){
-    console.warn('Boot timeout — forzando login');
-    showLogin('La carga tardó demasiado. Revisa tu conexión e intenta de nuevo.');
-    mostrarBotonReset();
+  if(!ls||ls.style.display==='none')return;
+  let yaIntento=false;
+  try{yaIntento=sessionStorage.getItem('kombi_autoreset')==='1';}catch(e){}
+  if(!yaIntento){
+    console.warn('Boot timeout — auto-recuperación');
+    try{sessionStorage.setItem('kombi_autoreset','1');}catch(e){}
+    await limpiarTodo();
+    location.reload();
+    return;
   }
-},12000);
+  console.warn('Boot timeout — segundo intento fallido');
+  showLogin('No se pudo iniciar. Usa «Reiniciar aplicación» o revisa tu conexión.');
+  mostrarBotonReset();
+},9000);
 
-function clearBootTimer(){if(_bootTimer){clearTimeout(_bootTimer);_bootTimer=null;}}
+function clearBootTimer(){
+  if(_bootTimer){clearTimeout(_bootTimer);_bootTimer=null;}
+  try{sessionStorage.removeItem('kombi_autoreset');}catch(e){}
+}
 
 function mostrarBotonReset(){
   if(document.getElementById('resetAppBtn'))return;
@@ -1189,20 +1230,47 @@ function mostrarBotonReset(){
   cont.appendChild(b);
 }
 
-async function resetApp(){
+// Limpieza profunda: SW, caches e IndexedDB (donde Firebase guarda la sesión)
+async function limpiarTodo(){
   try{
     if('serviceWorker' in navigator){
       const regs=await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map(r=>r.unregister()));
+      await Promise.all(regs.map(r=>r.unregister().catch(()=>{})));
     }
+  }catch(e){}
+  try{
     if(window.caches){
       const keys=await caches.keys();
-      await Promise.all(keys.map(k=>caches.delete(k)));
+      await Promise.all(keys.map(k=>caches.delete(k).catch(()=>{})));
     }
-    try{localStorage.removeItem('firebase:previous_websocket_failure');}catch(e){}
-    try{await db.clearPersistence();}catch(e){}
-  }catch(e){console.warn('reset:',e);}
-  location.reload(true);
+  }catch(e){}
+  try{
+    if(window.indexedDB&&indexedDB.databases){
+      const dbs=await indexedDB.databases();
+      await Promise.all(dbs.map(d=>new Promise(res=>{
+        if(!d.name)return res();
+        const req=indexedDB.deleteDatabase(d.name);
+        req.onsuccess=req.onerror=req.onblocked=()=>res();
+        setTimeout(res,1500);
+      })));
+    }else if(window.indexedDB){
+      ['firebaseLocalStorageDb','firestore/[DEFAULT]/kombi-store/main']
+        .forEach(n=>{try{indexedDB.deleteDatabase(n);}catch(e){}});
+    }
+  }catch(e){}
+  try{
+    Object.keys(localStorage).forEach(k=>{
+      if(k.startsWith('firebase')||k.startsWith('firestore'))localStorage.removeItem(k);
+    });
+  }catch(e){}
+}
+
+async function resetApp(){
+  const b=document.getElementById('resetAppBtn');
+  if(b){b.textContent='Limpiando…';b.disabled=true;}
+  await limpiarTodo();
+  try{sessionStorage.clear();}catch(e){}
+  location.reload();
 }
 
 // Timeout helper para promesas de Firestore
@@ -1486,7 +1554,6 @@ async function showApp(){
   startRealTimeListeners();
   initDarkMode();
   startSessionTimer();
-  registerSW();
   if(isOp) renderTurnoStatus();
   await auditLog('login',{sucursal:global?'todas':sucNombre,turno:turno||'—'});
 }
