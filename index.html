@@ -238,6 +238,11 @@ tr:hover td{background:var(--g50)}
 .rep-tab{padding:.5rem 1rem;border:none;background:none;font-size:.875rem;font-weight:500;color:var(--g500);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s}
 .rep-tab:hover{color:var(--g900)}
 .rep-tab.active{color:var(--a600);border-bottom-color:var(--a500);font-weight:700}
+.badge-manual{margin-left:auto;font-size:.75rem;opacity:.55}
+.ni{position:relative}
+.fuente-banner{display:flex;align-items:center;gap:.625rem;padding:.625rem .875rem;border-radius:8px;font-size:.8125rem;margin-bottom:1rem}
+.fuente-manual{background:#FEF3C7;color:#92400E;border:1px solid #FDE68A}
+.fuente-auto{background:#DBEAFE;color:#1E40AF;border:1px solid #BFDBFE}
 @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
 .cbars{display:flex;align-items:flex-end;gap:4px;height:160px}
 .cbw{display:flex;flex-direction:column;align-items:center;flex:1;gap:4px}
@@ -593,6 +598,26 @@ tr:hover td{background:var(--g50)}
         <!-- NOTIFICACIONES -->
         <div id="notifBanner" style="margin-bottom:1rem"></div>
 
+        <!-- CUADRATURA POS vs OPERADOR — pieza central -->
+        <div class="card" id="cuadraturaCard" style="margin-bottom:1.25rem;border:1.5px solid var(--g200)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">
+            <div>
+              <div class="fw7 fs15">⚖️ Cuadratura — Sistema vs Operador</div>
+              <div class="fs12 text-gray" id="cuadraturaSub">Comparando lo que dice el POS contra lo declarado en el cierre de turno</div>
+            </div>
+            <div style="display:flex;gap:.375rem;align-items:center;flex-wrap:wrap">
+              <select class="sel sm" id="cuadFechaFiltro" onchange="renderCuadratura()" style="font-size:.8125rem">
+                <option value="hoy">Hoy</option>
+                <option value="ayer">Ayer</option>
+                <option value="semana">Últimos 7 días</option>
+              </select>
+              <button class="btn btn-s sm" onclick="syncPOS('sync_all');setTimeout(renderCuadratura,2500)">🔄 Actualizar</button>
+            </div>
+          </div>
+          <div id="cuadraturaResumen" class="g3" style="margin-bottom:1rem"></div>
+          <div id="cuadraturaList"></div>
+        </div>
+
         <!-- META DE VENTAS -->
         <div id="metaVentasCard" class="card" style="margin-bottom:1rem;display:none">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.625rem">
@@ -633,7 +658,7 @@ tr:hover td{background:var(--g50)}
         <!-- POS SYNC PANEL -->
         <div class="card mt4" id="posSyncPanel">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">
-            <div class="fw7 fs14">🖥️ POS-XPRESS — Datos en tiempo real</div>
+            <div class="fw7 fs14">🖥️ POS-XPRESS — Detalle por período</div>
             <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
               <span class="fs12 text-gray" id="posSyncTime"></span>
               <button class="btn btn-s sm" onclick="syncPOS('sync_all')">🔄 Sync ahora</button>
@@ -690,11 +715,11 @@ tr:hover td{background:var(--g50)}
       </div>
 
       <div class="section" id="ad-v">
-        <div class="ph"><h2>Ventas del Día</h2></div>
+        <div class="ph"><h2>Ventas del Día</h2><p>Registro del operador, contrastado con el sistema</p></div>
         <div class="g2">
           <div class="card">
-            <div class="ct">Registrar</div>
-            <div class="fld"><label class="lbl">Fecha</label><input class="inp" type="date" id="vFecha"/></div>
+            <div class="ct">✍️ Registro Operador</div>
+            <div class="fld"><label class="lbl">Fecha</label><input class="inp" type="date" id="vFecha" onchange="renderVContraste()"/></div>
             <div class="fld"><label class="lbl">Efectivo</label><input class="inp" type="number" id="vEf" placeholder="0" oninput="calcVenta()"/></div>
             <div class="fld"><label class="lbl">POS</label><input class="inp" type="number" id="vPos" placeholder="0" oninput="calcVenta()"/></div>
             <div class="fld"><label class="lbl">Transferencias</label><input class="inp" type="number" id="vTr" placeholder="0" oninput="calcVenta()"/></div>
@@ -703,6 +728,11 @@ tr:hover td{background:var(--g50)}
             <button class="btn btn-p w100" onclick="saveVenta()">Guardar</button>
           </div>
           <div>
+            <!-- CONTRASTE CON EL SISTEMA -->
+            <div class="card" style="margin-bottom:1rem">
+              <div class="ct">⚖️ Contraste con el Sistema — <span id="vContrasteFecha"></span></div>
+              <div id="vContraste"></div>
+            </div>
             <div class="card"><div class="ct">Tendencia</div><div id="vChart"></div></div>
             <div class="card mt4"><div class="ct">Historial</div><div id="vHist"></div></div>
           </div>
@@ -710,8 +740,12 @@ tr:hover td{background:var(--g50)}
       </div>
 
       <div class="section" id="ad-caja">
-        <div class="ph"><h2>Caja</h2></div>
-        <div style="max-width:560px"><div class="card"><div class="ct">Arqueo</div><div id="cajaContent"></div></div></div>
+        <div class="ph"><h2>Caja — Operador vs Sistema</h2><p>Estado en vivo de cada sucursal, hoy</p></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">
+          <span class="fs12 text-gray" id="cajaUltActz"></span>
+          <button class="btn btn-s sm" onclick="renderCajaEstado()">🔄 Actualizar</button>
+        </div>
+        <div id="cajaContent"></div>
       </div>
 
       <div class="section" id="ad-inv">
@@ -1606,8 +1640,8 @@ function showSec(id,el){
   document.getElementById(id)?.classList.add('active');
   document.querySelectorAll('.ni').forEach(b=>b.classList.remove('active'));
   el?.classList.add('active');
-  if(id==='ad-dash')renderDash();if(id==='ad-hist')renderHistorial();if(id==='ad-v'){renderVChart();renderVH();}
-  if(id==='ad-caja')renderCaja();if(id==='ad-inv')renderInv();if(id==='ad-aj')renderAjustes();
+  if(id==='ad-dash')renderDash();if(id==='ad-hist')renderHistorial();if(id==='ad-v'){renderVChart();renderVH();renderVContraste();}
+  if(id==='ad-caja')renderCajaEstado();if(id==='ad-inv')renderInv();if(id==='ad-aj')renderAjustes();
   if(id==='ad-rep')renderAnalisis();
   if(id==='op-rep')initReponer();
   if(id==='sa-users')renderUsers();if(id==='sa-logs')renderLogs();
@@ -2390,14 +2424,146 @@ function renderDash(){
   s.innerHTML=[{l:'Ventas período',v:clp(total),sub:`${v.length} registros`,col:'var(--a500)'},{l:'Promedio diario',v:clp(avg),sub:'del período',col:'var(--b500)'},{l:'Stock crítico',v:stk,sub:'bajo mínimo',col:stk?'var(--r500)':'var(--gr500)'},{l:'Retiros hoy',v:clp(retH),sub:`${RETIROS.filter(r=>r.fecha===today()).length} mov.`,col:'var(--g500)'}].map(x=>`<div class="sc"><div class="lbl">${x.l}</div><div class="val" style="color:${x.col}">${x.v}</div><div class="sub">${x.sub}</div></div>`).join('');
   renderDashChart(v);renderDashCompo(v);renderDashCigs();renderDashStock();renderDashTL();
   renderMetaVentas();renderDashRetirosCat();renderDashVentasSuc();
+  renderCuadratura();
   loadPOSData();
   checkPOSStale();
   checkVencimientos();
   // Auto-refresh POS data every 15 min
   if(!window._posRefreshTimer){
-    window._posRefreshTimer=setInterval(()=>{loadPOSData();checkPOSStale();},15*60*1000);
+    window._posRefreshTimer=setInterval(()=>{loadPOSData();checkPOSStale();renderCuadratura();},15*60*1000);
   }
 }
+
+/* ============ CUADRATURA POS vs OPERADOR ============ */
+function rangoFechasCuad(filtro){
+  const hoy=new Date();
+  if(filtro==='ayer'){
+    const a=new Date(hoy);a.setDate(a.getDate()-1);
+    const f=a.toISOString().slice(0,10);
+    return[f,f];
+  }
+  if(filtro==='semana'){
+    const a=new Date(hoy);a.setDate(a.getDate()-6);
+    return[a.toISOString().slice(0,10),today()];
+  }
+  return[today(),today()]; // hoy
+}
+
+async function renderCuadratura(){
+  const resumen=document.getElementById('cuadraturaResumen');
+  const list=document.getElementById('cuadraturaList');
+  if(!resumen||!list)return;
+  const filtro=document.getElementById('cuadFechaFiltro')?.value||'hoy';
+  const[desde,hasta]=rangoFechasCuad(filtro);
+
+  resumen.innerHTML='<div class="sc"><div class="lbl">Cargando…</div></div>';
+  list.innerHTML='';
+
+  try{
+    // 1. Traer ventasPOS del rango, por sucursal
+    const posDocs=[];
+    const fechas=[];
+    let cur=new Date(desde+'T00:00');
+    const fin=new Date(hasta+'T00:00');
+    while(cur<=fin){fechas.push(cur.toISOString().slice(0,10));cur.setDate(cur.getDate()+1);}
+
+    for(const suc of SUCURSALES){
+      for(const f of fechas){
+        try{
+          const snap=await db.collection('ventasPOS').doc(f+'_'+suc.id).get();
+          if(snap.exists)posDocs.push({fecha:f,sucId:suc.id,sucNombre:suc.nombre,...snap.data()});
+        }catch(e){}
+      }
+    }
+
+    // 2. Traer turnos cerrados del rango (ya están en TURNOS si coincide con hoy, si no consultar)
+    let turnosRango=TURNOS.filter(t=>t.fecha>=desde&&t.fecha<=hasta);
+    if(filtro!=='hoy'){
+      try{
+        const snap=await db.collection('turnos').where('fecha','>=',desde).where('fecha','<=',hasta).get();
+        turnosRango=snap.docs.map(d=>({id:d.id,...d.data()}));
+      }catch(e){}
+    }
+
+    // 3. Agrupar por sucursal
+    const bySuc={};
+    SUCURSALES.forEach(s=>{bySuc[s.id]={nombre:s.nombre,pos:0,posBoletas:0,operador:0,turnosCerrados:0,turnosConDiff:0,ultimoSync:null};});
+
+    posDocs.forEach(p=>{
+      if(!bySuc[p.sucId])bySuc[p.sucId]={nombre:p.sucNombre,pos:0,posBoletas:0,operador:0,turnosCerrados:0,turnosConDiff:0,ultimoSync:null};
+      bySuc[p.sucId].pos+=p.totalVenta||0;
+      bySuc[p.sucId].posBoletas+=p.totalBoletas||0;
+      if(!bySuc[p.sucId].ultimoSync||(p.syncAt&&p.syncAt>bySuc[p.sucId].ultimoSync))bySuc[p.sucId].ultimoSync=p.syncAt;
+    });
+
+    turnosRango.forEach(t=>{
+      const sid=t.sucursalId;
+      if(!bySuc[sid])bySuc[sid]={nombre:t.sucursal||'—',pos:0,posBoletas:0,operador:0,turnosCerrados:0,turnosConDiff:0,ultimoSync:null};
+      bySuc[sid].operador+=t.totalReal||0;
+      bySuc[sid].turnosCerrados++;
+      if(t.totalPOS&&t.diffPOS!==0&&t.diffPOS!==undefined)bySuc[sid].turnosConDiff++;
+    });
+
+    // 4. KPIs resumen global
+    const totalPOS=Object.values(bySuc).reduce((a,s)=>a+s.pos,0);
+    const totalOp=Object.values(bySuc).reduce((a,s)=>a+s.operador,0);
+    const diffTotal=totalOp-totalPOS;
+    const sucursalesConDatos=Object.values(bySuc).filter(s=>s.pos>0||s.operador>0).length;
+    const sucursalesConDiff=Object.values(bySuc).filter(s=>s.pos>0&&s.operador>0&&Math.abs(s.operador-s.pos)>0).length;
+
+    resumen.innerHTML=[
+      {l:'💻 Total Sistema (POS)',v:clp(totalPOS),sub:'suma de todas las sucursales',col:'var(--b600)'},
+      {l:'👤 Total Operador',v:clp(totalOp),sub:'declarado en cierres',col:'var(--a600)'},
+      {l:'⚖️ Diferencia',v:(diffTotal>=0?'+':'')+clp(diffTotal),sub:sucursalesConDiff?`${sucursalesConDiff} sucursal${sucursalesConDiff>1?'es':''} con diferencia`:'todo cuadra',col:diffTotal===0?'var(--gr600)':'var(--r600)'},
+    ].map(x=>`<div class="sc"><div class="lbl">${x.l}</div><div class="val" style="color:${x.col};font-size:1.25rem">${x.v}</div><div class="sub">${x.sub}</div></div>`).join('');
+
+    // 5. Detalle por sucursal
+    const entries=Object.entries(bySuc).filter(([,s])=>s.pos>0||s.operador>0);
+    if(!entries.length){
+      list.innerHTML='<div style="text-align:center;padding:1.5rem;color:var(--g400);font-size:.875rem">Sin datos para este período — aún no hay sync del POS ni cierres registrados.</div>';
+      return;
+    }
+
+    list.innerHTML=`<div class="tw"><table>
+      <thead><tr>
+        <th>Sucursal</th>
+        <th style="text-align:right">💻 Sistema (POS)</th>
+        <th style="text-align:right">👤 Operador</th>
+        <th style="text-align:right">Diferencia</th>
+        <th style="text-align:center">Turnos</th>
+        <th style="text-align:center">Estado</th>
+        <th style="text-align:right">Últ. sync</th>
+      </tr></thead>
+      <tbody>${entries.sort((a,b)=>b[1].pos-a[1].pos).map(([id,s])=>{
+        const diff=s.operador-s.pos;
+        const tieneAmbos=s.pos>0&&s.operador>0;
+        const cuadra=tieneAmbos&&diff===0;
+        const sinPos=s.operador>0&&!s.pos;
+        const sinOp=s.pos>0&&!s.operador;
+        let estadoBadge;
+        if(sinPos)estadoBadge='<span class="badge" style="background:#FEF3C7;color:#92400E">⚠ Sin datos POS</span>';
+        else if(sinOp)estadoBadge='<span class="badge" style="background:var(--g100);color:var(--g500)">⏳ Turno no cerrado</span>';
+        else if(cuadra)estadoBadge='<span class="badge bg">✓ Cuadra</span>';
+        else estadoBadge='<span class="badge br">⚠ Diferencia</span>';
+        const minAgo=s.ultimoSync?Math.round((Date.now()-new Date(s.ultimoSync).getTime())/60000):null;
+        return`<tr style="${!cuadra&&tieneAmbos?'background:var(--r50, #FEF2F2)':''}">
+          <td class="fw6">🏬 ${s.nombre}</td>
+          <td style="text-align:right;font-family:var(--mono)">${s.pos?clp(s.pos):'<span style="color:var(--g300)">—</span>'}</td>
+          <td style="text-align:right;font-family:var(--mono)">${s.operador?clp(s.operador):'<span style="color:var(--g300)">—</span>'}</td>
+          <td style="text-align:right;font-family:var(--mono);font-weight:700;color:${diff===0?'var(--gr600)':tieneAmbos?'var(--r600)':'var(--g300)'}">${tieneAmbos?(diff>=0?'+':'')+clp(diff):'—'}</td>
+          <td style="text-align:center;font-size:.8125rem">${s.turnosCerrados}${s.turnosConDiff?` <span style="color:var(--r500)">(${s.turnosConDiff}⚠)</span>`:''}</td>
+          <td style="text-align:center">${estadoBadge}</td>
+          <td style="text-align:right;font-size:.75rem;color:var(--g400)">${minAgo!==null?(minAgo<60?minAgo+'m':Math.round(minAgo/60)+'h'):'—'}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>`;
+
+  }catch(e){
+    console.warn('Cuadratura:',e);
+    resumen.innerHTML='<div class="sc"><div class="lbl" style="color:var(--r600)">Error al cargar</div></div>';
+  }
+}
+
 function renderDashChart(ventas){
   const c=document.getElementById('dashChart');if(!c)return;if(!ventas.length){c.innerHTML='<p class="fs14 text-gray" style="padding:1rem">Sin datos</p>';return;}
   const s=[...ventas].sort((a,b)=>a.fecha.localeCompare(b.fecha)).slice(-14),max=Math.max(...s.map(v=>v.total),1);
@@ -2610,13 +2776,180 @@ async function saveVenta(){
   const fecha=document.getElementById('vFecha').value,ef=parseFloat(document.getElementById('vEf').value)||0,pos=parseFloat(document.getElementById('vPos').value)||0,tr=parseFloat(document.getElementById('vTr').value)||0;
   if(!ef&&!pos&&!tr){toast('Ingresa al menos un monto');return;}
   const v={fecha,ef,pos,tr,total:ef+pos+tr,obs:document.getElementById('vObs').value,sucursalId:CU.sucursalActiva||CU.sucursalId||'',sucursal:CU.sucursalActivaNombre||CU.sucursalNombre||'',uid:CU.uid,timestamp:firebase.firestore.FieldValue.serverTimestamp()};
-  try{const snap=await db.collection('ventas').where('fecha','==',fecha).where('sucursalId','==',CU.sucursalId||'').get();if(!snap.empty)await snap.docs[0].ref.update(v);else await db.collection('ventas').add(v);await loadVentas();renderVChart();renderVH();['vEf','vPos','vTr','vObs'].forEach(id=>document.getElementById(id).value='');document.getElementById('vTotal').textContent='$0';await auditLog('venta',{fecha,total:ef+pos+tr});toast('✅ Ventas guardadas');}
+  try{const snap=await db.collection('ventas').where('fecha','==',fecha).where('sucursalId','==',CU.sucursalId||'').get();if(!snap.empty)await snap.docs[0].ref.update(v);else await db.collection('ventas').add(v);await loadVentas();renderVChart();renderVH();renderVContraste();['vEf','vPos','vTr','vObs'].forEach(id=>document.getElementById(id).value='');document.getElementById('vTotal').textContent='$0';await auditLog('venta',{fecha,total:ef+pos+tr});toast('✅ Ventas guardadas');}
   catch(e){toast('❌ Error: '+e.message);}
 }
 function renderVChart(){const c=document.getElementById('vChart');if(!c)return;const d=[...VENTAS].slice(0,7).reverse(),max=Math.max(...d.map(v=>v.total),1);c.innerHTML=d.length?`<div class="cbars">${d.map(v=>{const h=Math.max(Math.round(v.total/max*140),4);return`<div class="cbw"><div class="cvl">${v.total>=1000?Math.round(v.total/1000)+'k':v.total}</div><div class="cbar ${v.fecha===today()?'today':''}" style="height:${h}px"></div><div class="cbl">${v.fecha.slice(5)}</div></div>`;}).join('')}</div>`:'<p class="fs14 text-gray" style="padding:1rem">Sin datos</p>';}
 function renderVH(){const c=document.getElementById('vHist');if(!c)return;if(!VENTAS.length){c.innerHTML='<p class="fs14 text-gray">Sin registros</p>';return;}c.innerHTML=`<div class="tw"><table><thead><tr><th>Fecha</th><th>Ef.</th><th>POS</th><th>Transf.</th><th>Total</th></tr></thead><tbody>${VENTAS.slice(0,30).map(v=>`<tr><td>${fdate(v.fecha)}</td><td class="mono">${clp(v.ef)}</td><td class="mono">${clp(v.pos)}</td><td class="mono">${clp(v.tr)}</td><td class="mono fw7 text-amber">${clp(v.total)}</td></tr>`).join('')}</tbody></table></div>`;}
 
-function renderCaja(){const c=document.getElementById('cajaContent');if(!c)return;const efAp=totalBills(AP),retH=RETIROS.filter(r=>r.fecha===today()&&r.tipo==='retiro').reduce((a,r)=>a+r.monto,0),abH=RETIROS.filter(r=>r.fecha===today()&&r.tipo==='abono').reduce((a,r)=>a+r.monto,0),saldo=efAp+abH-retH,posTotal=POS_TERMINALES.reduce((a,t)=>a+(AP.pos?.[t.id]||0),0),total=saldo+posTotal;const rows=[{l:'EFECTIVO APERTURA',v:efAp},{l:'ABONOS',v:abH,pos:true},{l:'RETIROS',v:retH,neg:true},{l:'SALDO EFECTIVO',v:saldo,tot:true},...POS_TERMINALES.map(t=>({l:t.name,v:AP.pos?.[t.id]||0})),{l:'TOTAL',v:total,tot:true}];c.innerHTML=rows.map(r=>`<div class="ar ${r.tot?'tot':''}"><span class="ar-l">${r.l}</span><span class="ar-v ${r.neg?'text-red':r.pos?'text-green':''}">${r.neg?'-':r.pos?'+':''}${clp(r.v)}</span></div>`).join('');}
+/* ============ CONTRASTE VENTAS DEL DÍA (Operador vs Sistema) ============ */
+async function renderVContraste(){
+  const c=document.getElementById('vContraste');if(!c)return;
+  const fecha=document.getElementById('vFecha')?.value||today();
+  const fechaEl=document.getElementById('vContrasteFecha');
+  if(fechaEl)fechaEl.textContent=fdate(fecha);
+  c.innerHTML='<p class="fs13 text-gray">Cargando…</p>';
+
+  try{
+    // 1. Manual (VENTAS) para esa fecha
+    const manual=VENTAS.find(v=>v.fecha===fecha);
+    // 2. Operador — suma de turnos cerrados esa fecha
+    let turnosFecha=TURNOS.filter(t=>t.fecha===fecha);
+    if(!turnosFecha.length){
+      try{
+        const snap=await db.collection('turnos').where('fecha','==',fecha).get();
+        turnosFecha=snap.docs.map(d=>({id:d.id,...d.data()}));
+      }catch(e){}
+    }
+    const operadorTotal=turnosFecha.reduce((a,t)=>a+(t.totalReal||0),0);
+    // 3. Sistema — suma de POS de todas las sucursales esa fecha
+    let posTotal=0,posBoletas=0;
+    for(const suc of SUCURSALES){
+      try{
+        const snap=await db.collection('ventasPOS').doc(fecha+'_'+suc.id).get();
+        if(snap.exists){posTotal+=snap.data().totalVenta||0;posBoletas+=snap.data().totalBoletas||0;}
+      }catch(e){}
+    }
+
+    const filas=[
+      {l:'✍️ Manual (admin)',v:manual?manual.total:null,col:'var(--g600)'},
+      {l:'👤 Operador (cierres)',v:turnosFecha.length?operadorTotal:null,sub:turnosFecha.length?`${turnosFecha.length} turno${turnosFecha.length>1?'s':''} cerrado${turnosFecha.length>1?'s':''}`:'',col:'var(--a600)'},
+      {l:'💻 Sistema (POS)',v:posTotal||null,sub:posBoletas?`${posBoletas} boletas`:'',col:'var(--b600)'},
+    ];
+
+    c.innerHTML=filas.map(f=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:.625rem 0;border-bottom:1px solid var(--g100)">
+        <div>
+          <div class="fs13 fw6">${f.l}</div>
+          ${f.sub?`<div class="fs11 text-gray">${f.sub}</div>`:''}
+        </div>
+        <div class="mono fw7 fs14" style="color:${f.v!==null?f.col:'var(--g300)'}">${f.v!==null?clp(f.v):'—'}</div>
+      </div>`).join('');
+
+    // Diferencia si hay al menos 2 fuentes con datos
+    const conDatos=filas.filter(f=>f.v!==null);
+    if(conDatos.length>=2){
+      const vals=conDatos.map(f=>f.v);
+      const max=Math.max(...vals),min=Math.min(...vals);
+      const diff=max-min;
+      c.innerHTML+=`<div style="margin-top:.75rem;padding-top:.75rem;display:flex;justify-content:space-between;align-items:center">
+        <span class="fs13 fw7">Diferencia máxima</span>
+        <span class="fs15 fw7 mono" style="color:${diff===0?'var(--gr600)':'var(--r600)'}">${clp(diff)}</span>
+      </div>`;
+    } else if(conDatos.length===0){
+      c.innerHTML='<p class="fs13 text-gray">Sin datos registrados para esta fecha en ninguna fuente.</p>';
+    }
+  }catch(e){
+    console.warn('renderVContraste:',e);
+    c.innerHTML='<p class="fs13 text-gray">Error al cargar contraste.</p>';
+  }
+}
+
+
+async function renderCajaEstado(){
+  const c=document.getElementById('cajaContent');if(!c)return;
+  c.innerHTML='<p class="fs14 text-gray">Cargando…</p>';
+  const upd=document.getElementById('cajaUltActz');
+  if(upd)upd.textContent='Actualizado: '+new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+
+  try{
+    const fecha=today();
+    const[apSnap,turSnap,retSnap]=await Promise.all([
+      db.collection('aperturas').where('fecha','==',fecha).get(),
+      db.collection('turnos').where('fecha','==',fecha).get(),
+      db.collection('retiros').where('fecha','==',fecha).get()
+    ]);
+    const aperturas=apSnap.docs.map(d=>({id:d.id,...d.data()}));
+    const turnos=turSnap.docs.map(d=>({id:d.id,...d.data()}));
+    const retiros=retSnap.docs.map(d=>d.data());
+
+    // POS por sucursal (hoy)
+    const posBySuc={};
+    for(const suc of SUCURSALES){
+      try{
+        const snap=await db.collection('ventasPOS').doc(fecha+'_'+suc.id).get();
+        if(snap.exists)posBySuc[suc.id]=snap.data();
+      }catch(e){}
+    }
+
+    if(!aperturas.length&&!Object.keys(posBySuc).length){
+      c.innerHTML='<div class="card"><p class="fs14 text-gray">Sin cajas abiertas ni datos del sistema para hoy.</p></div>';
+      return;
+    }
+
+    // Agrupar aperturas por sucursal+turno
+    const cajas=aperturas.map(ap=>{
+      const cierre=turnos.find(t=>t.sucursalId===ap.sucursalId&&t.turno===ap.turno);
+      const retH=retiros.filter(r=>r.sucursalId===ap.sucursalId&&r.turno===ap.turno);
+      const retirosMonto=retH.filter(r=>r.tipo==='retiro').reduce((a,r)=>a+r.monto,0);
+      const abonosMonto=retH.filter(r=>r.tipo==='abono').reduce((a,r)=>a+r.monto,0);
+      const efAp=totalBillsObj(ap.bills||{});
+      const posSuc=posBySuc[ap.sucursalId];
+      return{ap,cierre,retirosMonto,abonosMonto,efAp,posSuc,sucNombre:ap.sucursal||SUCURSALES.find(s=>s.id===ap.sucursalId)?.nombre||'—'};
+    });
+
+    // Sucursales con datos POS pero sin apertura hoy
+    SUCURSALES.forEach(suc=>{
+      if(posBySuc[suc.id]&&!cajas.find(c2=>c2.ap.sucursalId===suc.id)){
+        cajas.push({ap:null,cierre:null,retirosMonto:0,abonosMonto:0,efAp:0,posSuc:posBySuc[suc.id],sucNombre:suc.nombre,sinApertura:true});
+      }
+    });
+
+    const emoji={'mañana':'☀️','tarde':'🌤','noche':'🌙'};
+
+    c.innerHTML=`<div class="g2">${cajas.map(cj=>{
+      const opTotal=cj.cierre?cj.cierre.totalReal:null;
+      const posTotal=cj.posSuc?.totalVenta||0;
+      const diff=(opTotal!==null&&posTotal)?opTotal-posTotal:null;
+      const estado=cj.sinApertura?{txt:'Sin apertura registrada',cls:'br'}
+        :!cj.cierre?{txt:'🟢 En turno',cls:'ba'}
+        :diff===0?{txt:'✓ Cuadra',cls:'bg'}
+        :diff!==null?{txt:'⚠ Diferencia',cls:'br'}
+        :{txt:'Cerrado',cls:'bg'};
+
+      return`<div class="card" style="border-left:4px solid ${cj.sinApertura?'var(--g300)':!cj.cierre?'var(--b400)':diff===0?'var(--gr500)':diff!==null?'var(--r500)':'var(--g300)'}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.875rem">
+          <div class="fw7 fs15">🏬 ${cj.sucNombre}</div>
+          <span class="badge ${estado.cls}">${estado.txt}</span>
+        </div>
+        ${cj.ap?`<div class="fs12 text-gray mb2">${emoji[cj.ap.turno]||''} ${cj.ap.turno} · 👤 ${cj.ap.operador||'—'} · apertura ${cj.ap.hora||'—'}</div>`:cj.sinApertura?'<div class="fs12 text-gray mb2">El sistema tiene ventas pero nadie ha abierto caja en la app</div>':''}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-top:.75rem">
+          <div style="background:var(--a50);border-radius:8px;padding:.75rem">
+            <div style="font-size:.6875rem;font-weight:700;color:var(--a700);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem">👤 Operador</div>
+            ${cj.ap?`
+              <div class="fs12" style="display:flex;justify-content:space-between;margin-bottom:.25rem"><span class="text-gray">Ef. apertura</span><span class="mono fw6">${clp(cj.efAp)}</span></div>
+              <div class="fs12" style="display:flex;justify-content:space-between;margin-bottom:.25rem"><span class="text-gray">Movim.</span><span class="mono">+${clp(cj.abonosMonto)}/-${clp(cj.retirosMonto)}</span></div>
+              ${cj.cierre?`<div class="fs12" style="display:flex;justify-content:space-between;padding-top:.375rem;border-top:1px solid var(--a200);margin-top:.375rem"><span class="fw6">Total declarado</span><span class="mono fw7" style="color:var(--a700)">${clp(opTotal)}</span></div>`
+              :`<div class="fs12 text-gray" style="margin-top:.375rem;font-style:italic">Turno aún no cerrado</div>`}
+            `:'<div class="fs12 text-gray" style="font-style:italic">Sin registro en la app</div>'}
+          </div>
+          <div style="background:var(--b100,#DBEAFE);border-radius:8px;padding:.75rem">
+            <div style="font-size:.6875rem;font-weight:700;color:var(--b600);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem">💻 Sistema (POS)</div>
+            ${cj.posSuc?`
+              <div class="fs12" style="display:flex;justify-content:space-between;margin-bottom:.25rem"><span class="text-gray">Boletas</span><span class="mono fw6">${cj.posSuc.totalBoletas||0}</span></div>
+              <div class="fs12" style="display:flex;justify-content:space-between;margin-bottom:.25rem"><span class="text-gray">Efectivo</span><span class="mono">${clp(cj.posSuc.efectivo||0)}</span></div>
+              <div class="fs12" style="display:flex;justify-content:space-between;padding-top:.375rem;border-top:1px solid var(--b200,#BFDBFE);margin-top:.375rem"><span class="fw6">Total sistema</span><span class="mono fw7" style="color:var(--b600)">${clp(posTotal)}</span></div>
+            `:'<div class="fs12 text-gray" style="font-style:italic">Sin sync del POS hoy</div>'}
+          </div>
+        </div>
+        ${diff!==null?`<div style="margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--g100);display:flex;justify-content:space-between;align-items:center">
+          <span class="fs13 fw6 text-gray">Diferencia</span>
+          <span class="fs14 fw7 mono" style="color:${diff===0?'var(--gr600)':'var(--r600)'}">${diff>=0?'+':''}${clp(diff)}</span>
+        </div>`:''}
+      </div>`;
+    }).join('')}</div>`;
+
+  }catch(e){
+    console.warn('renderCajaEstado:',e);
+    c.innerHTML='<div class="card"><p class="fs14 text-gray">Error al cargar el estado de cajas.</p></div>';
+  }
+}
+
+function totalBillsObj(bills){
+  if(!bills)return 0;
+  return Object.entries(bills).reduce((a,[den,cant])=>a+parseInt(den)*(cant||0),0);
+}
+
 
 let _invCat='TODOS',_invSearch='';
 function renderInv(search){if(search!==undefined)_invSearch=search;const cats=['TODOS',...new Set(INVENTARIO.map(i=>i.cat).filter(Boolean))];const tabs=document.getElementById('invCatTabs');if(tabs)tabs.innerHTML=cats.map(cat=>`<button class="marca-tag ${_invCat===cat?'active':''}" onclick="_invCat='${cat}';renderInv()">${cat}</button>`).join('');const b=document.getElementById('invBody');if(!b)return;let items=INVENTARIO;if(_invCat!=='TODOS')items=items.filter(i=>i.cat===_invCat);if(_invSearch)items=items.filter(i=>i.nombre.toLowerCase().includes(_invSearch.toLowerCase())||(i.marca||'').toLowerCase().includes(_invSearch.toLowerCase()));b.innerHTML=items.map(i=>`<tr><td class="fw6">${i.nombre}${i.perecible?'<span title="Producto perecible" style="margin-left:.375rem">📅</span>':''}</td><td class="text-gray fs13">${i.marca||'—'}</td><td><span class="badge ${i.cat==='Cigarros'?'ba':''}" style="${i.cat!=='Cigarros'?'background:var(--g100);color:var(--g600)':''}">${i.cat}</span></td><td><span class="badge ${i.stock<=i.min&&i.min>0?'br':'bg'}">${i.stock}</span></td><td class="text-gray fs13">${i.min}</td><td class="mono">${clp(i.precio)}</td><td><div style="display:flex;gap:.375rem"><button class="btn btn-s sm" onclick="editProd('${i.id}')">✎</button><button class="btn btn-d sm" onclick="delProd('${i.id}')">✕</button></div></td></tr>`).join('');}
