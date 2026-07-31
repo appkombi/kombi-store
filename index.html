@@ -754,6 +754,7 @@ tr:hover td{background:var(--g50)}
         <div style="display:flex;gap:.375rem;margin-bottom:1rem;border-bottom:2px solid var(--g200)">
           <button class="rep-tab active" onclick="showInvTab('general',this)">📦 General</button>
           <button class="rep-tab" onclick="showInvTab('sucursal',this)">🏬 Stock Sucursales</button>
+          <button class="rep-tab" onclick="showInvTab('conteo',this)">🔫 Conteo Físico</button>
           <button class="rep-tab" onclick="showInvTab('vencimientos',this)">📅 Vencimientos</button>
           <button class="rep-tab" onclick="showInvTab('movimientos',this)">📋 Movimientos</button>
           <button class="rep-tab" onclick="showInvTab('reposicion',this)">⚠️ Reposición</button>
@@ -813,15 +814,72 @@ tr:hover td{background:var(--g50)}
 
         <!-- TAB STOCK SUCURSALES -->
         <div id="invTabSucursal" style="display:none">
-          <div style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center">
-            <select class="sel" id="invSucFiltro" onchange="renderStockSucursal()">
-              <option value="">Selecciona sucursal</option>
-            </select>
-            <button class="btn btn-p sm" onclick="guardarStockSucursal()">💾 Guardar cambios</button>
-            <button class="btn btn-s sm" onclick="exportStockSucExcel()">⬇ Excel</button>
+          <div style="display:flex;gap:.375rem;margin-bottom:1rem">
+            <button class="marca-tag active" id="stockVistaBtn_una" onclick="setStockVista('una')">Por sucursal</button>
+            <button class="marca-tag" id="stockVistaBtn_todas" onclick="setStockVista('todas')">🌐 Todas consolidado</button>
           </div>
-          <p class="fs13 text-gray mb4">Gestiona el stock de <strong>Exhibición</strong> (en tienda) y <strong>Bodega</strong> (reserva) por sucursal. El operador puede mover unidades de bodega a exhibición desde su módulo "Reponer Stock".</p>
-          <div id="invSucTable"></div>
+
+          <div id="stockVistaUna">
+            <div style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center">
+              <select class="sel" id="invSucFiltro" onchange="renderStockSucursal()">
+                <option value="">Selecciona sucursal</option>
+              </select>
+              <button class="btn btn-p sm" onclick="guardarStockSucursal()">💾 Guardar cambios</button>
+              <button class="btn btn-s sm" onclick="exportStockSucExcel()">⬇ Excel</button>
+            </div>
+            <p class="fs13 text-gray mb4">Gestiona el stock de <strong>Exhibición</strong> (en tienda) y <strong>Bodega</strong> (reserva) por sucursal. El operador puede mover unidades de bodega a exhibición desde su módulo "Reponer Stock".</p>
+            <div id="invSucTable"></div>
+          </div>
+
+          <div id="stockVistaTodas" style="display:none">
+            <div style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center">
+              <input class="inp" type="search" id="stockConsBuscar" placeholder="Buscar producto…" style="max-width:220px" oninput="renderStockConsolidado()"/>
+              <select class="sel" id="stockConsCat" onchange="renderStockConsolidado()"><option value="">Todas las categorías</option></select>
+              <button class="btn btn-s sm" onclick="exportStockConsolidadoExcel()">⬇ Excel</button>
+            </div>
+            <p class="fs13 text-gray mb4">Vista consolidada del stock total (exhibición + bodega) de cada producto, comparado entre todas las sucursales.</p>
+            <div id="stockConsolidadoTable"></div>
+          </div>
+        </div>
+
+        <!-- TAB CONTEO FÍSICO (pistoleo de código de barras) -->
+        <div id="invTabConteo" style="display:none">
+          <div class="card" style="margin-bottom:1rem">
+            <div class="ct">🔫 Sesión de Conteo</div>
+            <div class="g2" style="margin-bottom:.75rem">
+              <div class="fld" style="margin:0"><label class="lbl">Sucursal</label><select class="sel w100" id="conteoSucursal" onchange="cambiarSucursalConteo()"></select></div>
+              <div class="fld" style="margin:0"><label class="lbl">Ubicación a contar</label><select class="sel w100" id="conteoUbicacion" onchange="cambiarSucursalConteo()"><option value="exhibicion">🏪 Exhibición</option><option value="bodega">📦 Bodega</option></select></div>
+            </div>
+            <label class="lbl">Escanea o escribe el código de barras</label>
+            <input class="inp" id="conteoScanInput" placeholder="Esperando pistoleo… (Enter para confirmar)" style="font-size:1.125rem;padding:.875rem;font-family:var(--mono);border:2px solid var(--a400)" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();procesarScan(this.value);this.value='';}"/>
+            <div class="fs12 text-gray mt2">También puedes escribir el código manualmente y presionar Enter. Un pistolero USB/Bluetooth escribe el código y presiona Enter automáticamente.</div>
+          </div>
+
+          <div class="card" style="margin-bottom:1rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+              <div class="ct" style="margin:0;padding:0">📋 Productos escaneados <span id="conteoContador" class="badge ba" style="margin-left:.5rem">0</span></div>
+              <div style="display:flex;gap:.5rem">
+                <button class="btn btn-s sm" onclick="limpiarConteo()">🗑 Vaciar sesión</button>
+                <button class="btn btn-p sm" onclick="finalizarConteo()">✅ Finalizar y comparar</button>
+              </div>
+            </div>
+            <div id="conteoScanList"><p class="fs13 text-gray">Aún no se ha escaneado ningún producto.</p></div>
+          </div>
+
+          <!-- Resultado comparativo -->
+          <div class="card hidden" id="conteoResultadoCard">
+            <div class="ct">⚖️ Sistema vs Contado</div>
+            <div id="conteoResultadoContent"></div>
+            <div style="display:flex;gap:.75rem;margin-top:1rem">
+              <button class="btn btn-s" onclick="document.getElementById('conteoResultadoCard').classList.add('hidden')">Cerrar</button>
+              <button class="btn btn-p" onclick="aplicarAjusteConteo()">✅ Aplicar ajustes al stock</button>
+            </div>
+          </div>
+
+          <div class="card mt4">
+            <div class="ct">📜 Conteos anteriores</div>
+            <div id="conteoHistorialList"></div>
+          </div>
         </div>
 
         <!-- TAB HISTORIAL REPOSICIONES -->
@@ -1016,6 +1074,14 @@ tr:hover td{background:var(--g50)}
       <div class="section" id="ad-aj">
         <div class="ph"><h2>Ajustes</h2></div>
         <div style="max-width:600px;display:flex;flex-direction:column;gap:1rem">
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+              <div class="ct" style="margin:0;padding:0">🔧 Diagnóstico de Sincronización</div>
+              <button class="btn btn-s sm" onclick="renderDiagnosticoSync()">🔄 Actualizar</button>
+            </div>
+            <p class="fs12 text-gray mb4">Muestra qué está leyendo el sync de cada sucursal en este momento — útil para detectar cuando un archivo del POS cambia de formato.</p>
+            <div id="diagnosticoSyncList"></div>
+          </div>
           <div class="card"><div class="ct">🏪 Tienda</div><div class="fld"><label class="lbl">Nombre</label><input class="inp" type="text" id="ajNombre"/></div><div class="fld"><label class="lbl">Dirección</label><input class="inp" type="text" id="ajDir"/></div><button class="btn btn-p" onclick="saveTienda()">Guardar</button></div>
           <div class="card"><div class="ct">🏬 Sucursales</div><div class="ml" id="ajSucList" style="margin-bottom:1rem"></div><button class="btn btn-s w100" style="margin-bottom:.75rem" onclick="saveSucursales()">💾 Guardar cambios</button><div class="g2"><div class="fld"><label class="lbl">Nombre</label><input class="inp" type="text" id="ajSucNombre" placeholder="Ej: Centro"/></div><div class="fld"><label class="lbl">Dirección</label><input class="inp" type="text" id="ajSucDir" placeholder="Opcional"/></div></div><button class="btn btn-p w100" onclick="addSucursal()">+ Agregar</button></div>
           <div class="card"><div class="ct">💳 Terminales POS</div><div class="ml" id="posTermList" style="margin-bottom:1rem"></div><div style="display:flex;gap:.5rem"><input class="inp" type="text" id="newTerm" placeholder="Nombre terminal"/><button class="btn btn-p" onclick="addTerminal()">+</button></div></div>
@@ -1059,6 +1125,7 @@ tr:hover td{background:var(--g50)}
     <div class="mh"><span class="mt2-title" id="pmTitle">Nuevo Producto</span><button class="btn btn-g sm" onclick="closePM()">✕</button></div>
     <div class="fld"><label class="lbl">Nombre</label><input class="inp" id="pN"/></div>
     <div class="g2"><div class="fld"><label class="lbl">SKU</label><input class="inp" id="pS"/></div><div class="fld"><label class="lbl">Categoría</label><input class="inp" id="pC" list="catList"/><datalist id="catList"></datalist></div></div>
+    <div class="fld"><label class="lbl">Código de barras</label><input class="inp" id="pBarcode" placeholder="Se llena automático desde el POS, o edítalo aquí"/></div>
     <div class="g2"><div class="fld"><label class="lbl">Marca</label><input class="inp" id="pMarca"/></div><div class="fld"><label class="lbl">Precio</label><input class="inp" type="number" id="pPr" min="0"/></div></div>
     <div class="g2"><div class="fld"><label class="lbl">Stock</label><input class="inp" type="number" id="pSt" min="0"/></div><div class="fld"><label class="lbl">Stock Mín.</label><input class="inp" type="number" id="pMn" min="0"/></div></div>
     <div style="border-top:1px solid var(--g200);padding-top:.875rem;margin-top:.25rem">
@@ -2957,13 +3024,14 @@ function filterInv(v){renderInv(v);}
 
 /* ============ INV TABS ============ */
 function showInvTab(tab,el){
-  ['general','sucursal','vencimientos','movimientos','reposicion','historial'].forEach(t=>{
+  ['general','sucursal','conteo','vencimientos','movimientos','reposicion','historial'].forEach(t=>{
     const d=document.getElementById('invTab'+t.charAt(0).toUpperCase()+t.slice(1));
     if(d)d.style.display=t===tab?'block':'none';
   });
   document.querySelectorAll('#ad-inv .rep-tab').forEach(b=>b.classList.remove('active'));
   el?.classList.add('active');
   if(tab==='sucursal') initStockSucursal();
+  if(tab==='conteo') initConteoFisico();
   if(tab==='vencimientos') initVencimientos();
   if(tab==='movimientos') initMovimientos();
   if(tab==='reposicion') renderReposicion();
@@ -3070,6 +3138,281 @@ async function exportStockSucExcel(){
   XLSX.writeFile(wb,`stock_${suc?.nombre||sucId}_${today()}.xlsx`);
   toast('✅ Excel descargado');
 }
+
+/* ============ VISTA CONSOLIDADA — TODAS LAS SUCURSALES ============ */
+function setStockVista(vista){
+  document.getElementById('stockVistaUna').style.display=vista==='una'?'block':'none';
+  document.getElementById('stockVistaTodas').style.display=vista==='todas'?'block':'none';
+  document.getElementById('stockVistaBtn_una').classList.toggle('active',vista==='una');
+  document.getElementById('stockVistaBtn_todas').classList.toggle('active',vista==='todas');
+  if(vista==='todas')renderStockConsolidado();
+}
+
+async function renderStockConsolidado(){
+  const c=document.getElementById('stockConsolidadoTable');if(!c)return;
+  c.innerHTML='<p class="fs13 text-gray">Cargando…</p>';
+  const buscar=(document.getElementById('stockConsBuscar')?.value||'').toLowerCase();
+  const catF=document.getElementById('stockConsCat')?.value||'';
+
+  // Poblar filtro de categorías una vez
+  const selCat=document.getElementById('stockConsCat');
+  if(selCat&&selCat.children.length<=1){
+    [...new Set(INVENTARIO.map(p=>p.cat))].forEach(cat=>{
+      const o=document.createElement('option');o.value=cat;o.textContent=cat;selCat.appendChild(o);
+    });
+  }
+
+  // Cargar stock de todas las sucursales
+  const stockPorSuc={};
+  for(const suc of SUCURSALES){
+    try{
+      const snap=await db.collection('stockSucursal').doc(suc.id).get();
+      stockPorSuc[suc.id]=snap.exists?snap.data():{};
+    }catch(e){stockPorSuc[suc.id]={};}
+  }
+
+  let productos=INVENTARIO;
+  if(catF)productos=productos.filter(p=>p.cat===catF);
+  if(buscar)productos=productos.filter(p=>p.nombre.toLowerCase().includes(buscar));
+  productos=productos.slice(0,300); // límite razonable para rendimiento visual
+
+  if(!productos.length){c.innerHTML='<p class="fs13 text-gray">Sin productos.</p>';return;}
+
+  c.innerHTML=`<div class="tw"><table>
+    <thead><tr>
+      <th>Producto</th>
+      ${SUCURSALES.map(s=>`<th style="text-align:center">${s.nombre}</th>`).join('')}
+      <th style="text-align:center;background:var(--a50)">Total general</th>
+    </tr></thead>
+    <tbody>${productos.map(p=>{
+      let totalGeneral=0;
+      const celdas=SUCURSALES.map(suc=>{
+        const d=stockPorSuc[suc.id]?.[p.id]||{exhibicion:0,bodega:0};
+        const tot=(d.exhibicion||0)+(d.bodega||0);
+        totalGeneral+=tot;
+        const bajo=(d.exhibicion||0)<=(d.min||p.min||0)&&(d.min||p.min||0)>0;
+        return`<td style="text-align:center">
+          <div class="fw6" style="color:${bajo?'var(--r600)':'inherit'}">${tot}</div>
+          <div class="fs11 text-gray">🏪${d.exhibicion||0} 📦${d.bodega||0}</div>
+        </td>`;
+      }).join('');
+      return`<tr>
+        <td class="fw6 fs13">${p.nombre}${p.perecible?' 📅':''}</td>
+        ${celdas}
+        <td style="text-align:center;background:var(--a50);font-weight:800;font-family:var(--mono)">${totalGeneral}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div>
+  ${productos.length===300?'<p class="fs12 text-gray mt2">Mostrando los primeros 300 productos — usa el buscador o filtro de categoría para acotar.</p>':''}`;
+}
+
+async function exportStockConsolidadoExcel(){
+  await loadXLSX();
+  const stockPorSuc={};
+  for(const suc of SUCURSALES){
+    try{const snap=await db.collection('stockSucursal').doc(suc.id).get();stockPorSuc[suc.id]=snap.exists?snap.data():{};}catch(e){stockPorSuc[suc.id]={};}
+  }
+  const headers=['Producto','Categoría',...SUCURSALES.flatMap(s=>[`${s.nombre} Exhib.`,`${s.nombre} Bodega`,`${s.nombre} Total`]),'Total General'];
+  const rows=[headers];
+  INVENTARIO.forEach(p=>{
+    let totalGeneral=0;
+    const cols=[];
+    SUCURSALES.forEach(suc=>{
+      const d=stockPorSuc[suc.id]?.[p.id]||{exhibicion:0,bodega:0};
+      const tot=(d.exhibicion||0)+(d.bodega||0);
+      totalGeneral+=tot;
+      cols.push(d.exhibicion||0,d.bodega||0,tot);
+    });
+    rows.push([p.nombre,p.cat,...cols,totalGeneral]);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Stock Consolidado');
+  XLSX.writeFile(wb,`stock_consolidado_${today()}.xlsx`);
+  toast('✅ Excel descargado');
+}
+
+/* ============ CONTEO FÍSICO — PISTOLEO DE CÓDIGO DE BARRAS ============ */
+let _conteoItems={};       // { prodId: {producto, cantidad} }
+let _conteoSucursal='';
+let _conteoUbicacion='exhibicion';
+let _conteoStockActual={}; // stock actual de la sucursal/ubicación elegida, para comparar al finalizar
+
+function initConteoFisico(){
+  const sel=document.getElementById('conteoSucursal');
+  if(sel&&sel.children.length===0){
+    SUCURSALES.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.nombre;sel.appendChild(o);});
+    sel.value=CU.sucursalActiva||CU.sucursalId||SUCURSALES[0]?.id||'';
+  }
+  cambiarSucursalConteo();
+  renderConteoHistorial();
+  setTimeout(()=>document.getElementById('conteoScanInput')?.focus(),200);
+}
+
+async function cambiarSucursalConteo(){
+  _conteoSucursal=document.getElementById('conteoSucursal')?.value||'';
+  _conteoUbicacion=document.getElementById('conteoUbicacion')?.value||'exhibicion';
+  try{
+    const snap=await db.collection('stockSucursal').doc(_conteoSucursal).get();
+    _conteoStockActual=snap.exists?snap.data():{};
+  }catch(e){_conteoStockActual={};}
+  document.getElementById('conteoScanInput')?.focus();
+}
+
+function procesarScan(codigo){
+  codigo=(codigo||'').trim();
+  if(!codigo)return;
+  const prod=INVENTARIO.find(p=>p.barcode&&p.barcode.trim()===codigo)
+    || INVENTARIO.find(p=>p.sku&&p.sku.trim()===codigo);
+  if(!prod){
+    toast(`❌ Sin coincidencia para el código "${codigo}"`);
+    // feedback sonoro/visual de error
+    const inp=document.getElementById('conteoScanInput');
+    if(inp){inp.style.borderColor='var(--r500)';setTimeout(()=>inp.style.borderColor='var(--a400)',400);}
+    return;
+  }
+  if(!_conteoItems[prod.id])_conteoItems[prod.id]={producto:prod,cantidad:0};
+  _conteoItems[prod.id].cantidad++;
+  renderConteoScanList();
+  // feedback visual de éxito
+  const inp=document.getElementById('conteoScanInput');
+  if(inp){inp.style.borderColor='var(--gr500)';setTimeout(()=>inp.style.borderColor='var(--a400)',250);}
+}
+
+function renderConteoScanList(){
+  const c=document.getElementById('conteoScanList');if(!c)return;
+  const items=Object.values(_conteoItems).sort((a,b)=>a.producto.nombre.localeCompare(b.producto.nombre));
+  document.getElementById('conteoContador').textContent=items.reduce((a,i)=>a+i.cantidad,0);
+  if(!items.length){c.innerHTML='<p class="fs13 text-gray">Aún no se ha escaneado ningún producto.</p>';return;}
+  c.innerHTML=items.map(it=>`
+    <div style="display:flex;align-items:center;gap:.75rem;padding:.625rem;border:1px solid var(--g200);border-radius:8px;margin-bottom:.5rem">
+      <div style="flex:1;min-width:0">
+        <div class="fw6 fs13">${it.producto.nombre}</div>
+        <div class="fs11 text-gray">${it.producto.sku||'—'} ${it.producto.barcode?'· '+it.producto.barcode:''}</div>
+      </div>
+      <button onclick="ajustarConteoCant('${it.producto.id}',-1)" style="width:28px;height:28px;border:1px solid var(--g300);border-radius:6px;background:#fff;cursor:pointer;font-weight:700">−</button>
+      <span class="mono fw7" style="min-width:32px;text-align:center;font-size:1rem">${it.cantidad}</span>
+      <button onclick="ajustarConteoCant('${it.producto.id}',1)" style="width:28px;height:28px;border:1px solid var(--g300);border-radius:6px;background:#fff;cursor:pointer;font-weight:700">+</button>
+      <button onclick="quitarConteoItem('${it.producto.id}')" style="background:none;border:none;color:var(--r500);cursor:pointer;font-size:1rem">✕</button>
+    </div>`).join('');
+}
+
+function ajustarConteoCant(prodId,delta){
+  if(!_conteoItems[prodId])return;
+  _conteoItems[prodId].cantidad=Math.max(0,_conteoItems[prodId].cantidad+delta);
+  if(_conteoItems[prodId].cantidad===0)delete _conteoItems[prodId];
+  renderConteoScanList();
+}
+function quitarConteoItem(prodId){delete _conteoItems[prodId];renderConteoScanList();}
+
+function limpiarConteo(){
+  if(Object.keys(_conteoItems).length&&!confirm('¿Vaciar toda la sesión de conteo actual?'))return;
+  _conteoItems={};
+  renderConteoScanList();
+  document.getElementById('conteoResultadoCard').classList.add('hidden');
+}
+
+function finalizarConteo(){
+  const items=Object.values(_conteoItems);
+  if(!items.length){toast('Escanea al menos un producto primero');return;}
+  const sucNombre=SUCURSALES.find(s=>s.id===_conteoSucursal)?.nombre||'—';
+  const ubicLabel=_conteoUbicacion==='bodega'?'📦 Bodega':'🏪 Exhibición';
+
+  const filas=items.map(it=>{
+    const sistemaData=_conteoStockActual[it.producto.id]||{exhibicion:0,bodega:0};
+    const sistema=sistemaData[_conteoUbicacion]||0;
+    const diff=it.cantidad-sistema;
+    return{...it,sistema,diff};
+  }).sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff));
+
+  const conDiff=filas.filter(f=>f.diff!==0).length;
+
+  const card=document.getElementById('conteoResultadoCard');
+  const content=document.getElementById('conteoResultadoContent');
+  card.classList.remove('hidden');
+  content.innerHTML=`
+    <p class="fs13 text-gray mb4">🏬 ${sucNombre} · ${ubicLabel} · ${filas.length} productos contados${conDiff?` · <strong style="color:var(--r600)">${conDiff} con diferencia</strong>`:' · <strong style="color:var(--gr600)">todo cuadra</strong>'}</p>
+    <div class="tw"><table>
+      <thead><tr><th>Producto</th><th style="text-align:center">Sistema</th><th style="text-align:center">Contado</th><th style="text-align:center">Diferencia</th></tr></thead>
+      <tbody>${filas.map(f=>`<tr style="${f.diff!==0?'background:var(--r50,#FEF2F2)':''}">
+        <td class="fw6 fs13">${f.producto.nombre}</td>
+        <td style="text-align:center;font-family:var(--mono)">${f.sistema}</td>
+        <td style="text-align:center;font-family:var(--mono);font-weight:700">${f.cantidad}</td>
+        <td style="text-align:center;font-family:var(--mono);font-weight:700;color:${f.diff===0?'var(--gr600)':f.diff>0?'var(--b600)':'var(--r600)'}">${f.diff>=0?'+':''}${f.diff}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+
+  // Guardar para aplicar después
+  window._conteoFilasResultado=filas;
+  card.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+async function aplicarAjusteConteo(){
+  const filas=window._conteoFilasResultado||[];
+  if(!filas.length)return;
+  if(!confirm(`¿Aplicar el conteo físico y ajustar el stock de ${filas.length} productos? Esta acción actualiza el stock del sistema al valor contado.`))return;
+
+  try{
+    const ref=db.collection('stockSucursal').doc(_conteoSucursal);
+    const updates={};
+    for(const f of filas){
+      const actual=_conteoStockActual[f.producto.id]||{exhibicion:0,bodega:0,min:f.producto.min||0};
+      const nuevo={...actual};
+      nuevo[_conteoUbicacion]=f.cantidad;
+      updates[f.producto.id]=nuevo;
+      if(f.diff!==0){
+        await registrarMovimiento({
+          productoId:f.producto.id,productoNombre:f.producto.nombre,sku:f.producto.sku||'',
+          sucursalId:_conteoSucursal,tipo:'ajuste',cantidad:f.diff,
+          ubicacion:_conteoUbicacion,motivo:`Conteo físico — sistema:${f.sistema} → contado:${f.cantidad}`
+        });
+      }
+    }
+    await ref.set(updates,{merge:true});
+
+    // Guardar el conteo como registro histórico
+    await db.collection('conteosFisicos').add({
+      sucursalId:_conteoSucursal,
+      sucursal:SUCURSALES.find(s=>s.id===_conteoSucursal)?.nombre||'',
+      ubicacion:_conteoUbicacion,
+      operador:CU.nombre,uid:CU.uid,
+      items:filas.map(f=>({productoId:f.producto.id,nombre:f.producto.nombre,sistema:f.sistema,contado:f.cantidad,diff:f.diff})),
+      totalProductos:filas.length,
+      totalConDiferencia:filas.filter(f=>f.diff!==0).length,
+      aplicado:true,
+      fecha:today(),hora:timeNow(),
+      timestamp:firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    await auditLog('inventario',{accion:'conteo_fisico',sucursalId:_conteoSucursal,productos:filas.length,conDiferencia:filas.filter(f=>f.diff!==0).length});
+
+    toast('✅ Stock actualizado según conteo físico');
+    _conteoItems={};
+    renderConteoScanList();
+    document.getElementById('conteoResultadoCard').classList.add('hidden');
+    renderConteoHistorial();
+    // Refrescar stock cache si está abierta la vista de sucursal
+    if(_stockSucursal)_stockSucursal[_conteoSucursal]=updates;
+  }catch(e){toast('❌ Error: '+e.message);}
+}
+
+async function renderConteoHistorial(){
+  const c=document.getElementById('conteoHistorialList');if(!c)return;
+  c.innerHTML='<p class="fs13 text-gray">Cargando…</p>';
+  try{
+    const snap=await db.collection('conteosFisicos').orderBy('timestamp','desc').limit(15).get();
+    if(snap.empty){c.innerHTML='<p class="fs13 text-gray">Sin conteos registrados aún.</p>';return;}
+    c.innerHTML=snap.docs.map(d=>{
+      const r=d.data();
+      return`<div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-bottom:1px solid var(--g100)">
+        <div>
+          <div class="fw6 fs13">🏬 ${r.sucursal} · ${r.ubicacion==='bodega'?'📦 Bodega':'🏪 Exhibición'}</div>
+          <div class="fs11 text-gray">${r.fecha} ${r.hora||''} · 👤 ${r.operador} · ${r.totalProductos} productos${r.totalConDiferencia?` · <span style="color:var(--r600)">${r.totalConDiferencia} con diferencia</span>`:''}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){c.innerHTML='<p class="fs13 text-gray">Error al cargar historial.</p>';}
+}
+
 
 /* ============ REPONER STOCK (operador) ============ */
 let _repPendientes={};  // {prodId: cantidad a reponer}
@@ -3503,13 +3846,13 @@ async function exportInvExcel(){
   toast('✅ Excel descargado');
 }
 function filterInv(v){renderInv(v);}
-function openPM(){_editPid=null;document.getElementById('pmTitle').textContent='Nuevo Producto';['pN','pS','pC','pMarca','pSt','pMn','pPr'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});const pc=document.getElementById('pPerecible');if(pc)pc.checked=false;const da=document.getElementById('pDiasAlerta');if(da)da.value=7;togglePerecible();document.getElementById('pm').classList.remove('hidden');}
+function openPM(){_editPid=null;document.getElementById('pmTitle').textContent='Nuevo Producto';['pN','pS','pC','pMarca','pSt','pMn','pPr','pBarcode'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});const pc=document.getElementById('pPerecible');if(pc)pc.checked=false;const da=document.getElementById('pDiasAlerta');if(da)da.value=7;togglePerecible();document.getElementById('pm').classList.remove('hidden');}
 function closePM(){document.getElementById('pm').classList.add('hidden');}
 let _editPid=null;
-function editProd(id){const it=INVENTARIO.find(i=>i.id===id);if(!it)return;_editPid=id;document.getElementById('pmTitle').textContent='Editar';document.getElementById('pN').value=it.nombre;document.getElementById('pS').value=it.sku||'';document.getElementById('pC').value=it.cat||'';document.getElementById('pMarca').value=it.marca||'';document.getElementById('pSt').value=it.stock;document.getElementById('pMn').value=it.min;document.getElementById('pPr').value=it.precio;const pc=document.getElementById('pPerecible');if(pc)pc.checked=!!it.perecible;const da=document.getElementById('pDiasAlerta');if(da)da.value=it.diasAlerta||7;togglePerecible();document.getElementById('pm').classList.remove('hidden');}
+function editProd(id){const it=INVENTARIO.find(i=>i.id===id);if(!it)return;_editPid=id;document.getElementById('pmTitle').textContent='Editar';document.getElementById('pN').value=it.nombre;document.getElementById('pS').value=it.sku||'';document.getElementById('pC').value=it.cat||'';document.getElementById('pMarca').value=it.marca||'';document.getElementById('pSt').value=it.stock;document.getElementById('pMn').value=it.min;document.getElementById('pPr').value=it.precio;document.getElementById('pBarcode').value=it.barcode||'';const pc=document.getElementById('pPerecible');if(pc)pc.checked=!!it.perecible;const da=document.getElementById('pDiasAlerta');if(da)da.value=it.diasAlerta||7;togglePerecible();document.getElementById('pm').classList.remove('hidden');}
 async function saveProduct(){
   const n=document.getElementById('pN').value.trim();if(!n){toast('Ingresa el nombre');return;}
-  const e={nombre:n,sku:document.getElementById('pS').value,cat:document.getElementById('pC').value||'General',marca:document.getElementById('pMarca').value.trim().toUpperCase()||'',stock:parseInt(document.getElementById('pSt').value)||0,min:parseInt(document.getElementById('pMn').value)||0,precio:parseInt(document.getElementById('pPr').value)||0,perecible:!!document.getElementById('pPerecible')?.checked,diasAlerta:parseInt(document.getElementById('pDiasAlerta')?.value)||7};
+  const e={nombre:n,sku:document.getElementById('pS').value,cat:document.getElementById('pC').value||'General',marca:document.getElementById('pMarca').value.trim().toUpperCase()||'',barcode:document.getElementById('pBarcode').value.trim()||'',stock:parseInt(document.getElementById('pSt').value)||0,min:parseInt(document.getElementById('pMn').value)||0,precio:parseInt(document.getElementById('pPr').value)||0,perecible:!!document.getElementById('pPerecible')?.checked,diasAlerta:parseInt(document.getElementById('pDiasAlerta')?.value)||7};
   try{if(_editPid){const old=INVENTARIO.find(i=>i.id===_editPid);if(old&&old.precio!==e.precio)await db.collection('historialPrecios').add({...old,precioAnterior:old.precio,precioNuevo:e.precio,fecha:today(),hora:timeNow(),uid:CU.uid,timestamp:firebase.firestore.FieldValue.serverTimestamp()});await db.collection('inventario').doc(_editPid).update(e);}else await db.collection('inventario').add({...e,creadoEn:firebase.firestore.FieldValue.serverTimestamp()});await loadInventario();closePM();renderInv();await auditLog('inventario',{accion:_editPid?'editar':'crear',nombre:n});toast('✅ Guardado');}
   catch(err){toast('❌ Error: '+err.message);}
 }
@@ -4217,7 +4560,40 @@ async function notificarGerentes(turno){
   }catch(e){console.warn('Notif gerentes:',e);}
 }
 
-function renderAjustes(){const t=CFG.tienda||{};const ajN=document.getElementById('ajNombre');if(ajN)ajN.value=t.nombre||'';const ajD=document.getElementById('ajDir');if(ajD)ajD.value=t.dir||'';const sl=CFG.sisLabels||{};const ajEf=document.getElementById('ajSisLblEf');if(ajEf)ajEf.value=sl.ef||'Efectivo';const ajTj=document.getElementById('ajSisLblTarj');if(ajTj)ajTj.value=sl.tarj||'Tarjetas / POS';const ajOt=document.getElementById('ajSisLblOtros');if(ajOt)ajOt.value=sl.otros||'Amipass, Edenred, etc.';renderAjSucList();renderPosTermList();renderAjCkList('apertura');renderAjCkList('cierre');renderPrecioHist();if(CFG.gasUrl){const gi=document.getElementById('gasUrlInput');if(gi)gi.value=CFG.gasUrl;}}
+function renderAjustes(){const t=CFG.tienda||{};const ajN=document.getElementById('ajNombre');if(ajN)ajN.value=t.nombre||'';const ajD=document.getElementById('ajDir');if(ajD)ajD.value=t.dir||'';const sl=CFG.sisLabels||{};const ajEf=document.getElementById('ajSisLblEf');if(ajEf)ajEf.value=sl.ef||'Efectivo';const ajTj=document.getElementById('ajSisLblTarj');if(ajTj)ajTj.value=sl.tarj||'Tarjetas / POS';const ajOt=document.getElementById('ajSisLblOtros');if(ajOt)ajOt.value=sl.otros||'Amipass, Edenred, etc.';renderAjSucList();renderPosTermList();renderAjCkList('apertura');renderAjCkList('cierre');renderPrecioHist();renderDiagnosticoSync();if(CFG.gasUrl){const gi=document.getElementById('gasUrlInput');if(gi)gi.value=CFG.gasUrl;}}
+
+async function renderDiagnosticoSync(){
+  const c=document.getElementById('diagnosticoSyncList');if(!c)return;
+  c.innerHTML='<p class="fs13 text-gray">Cargando…</p>';
+  try{
+    const snap=await db.collection('diagnosticoSync').get();
+    if(snap.empty){c.innerHTML='<p class="fs13 text-gray">Sin datos aún — ejecuta un sync primero.</p>';return;}
+    const docs=snap.docs.map(d=>d.data()).sort((a,b)=>(a.sucursal||'').localeCompare(b.sucursal||''));
+    c.innerHTML=docs.map(d=>{
+      const min=d.revisadoEn?Math.round((Date.now()-new Date(d.revisadoEn).getTime())/60000):null;
+      const stale=min!==null&&min>90;
+      const sospechoso=d.totalDetectado===0&&d.largoTexto>50;
+      return`<div style="border:1.5px solid ${sospechoso?'var(--r300,#FCA5A5)':'var(--g200)'};border-radius:8px;padding:.75rem;margin-bottom:.625rem;background:${sospechoso?'var(--r50,#FEF2F2)':'var(--g50)'}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.375rem">
+          <span class="fw7 fs13">🏬 ${d.sucursal} <span class="fs11 text-gray" style="font-weight:400">(${d.tipoArchivo})</span></span>
+          <span class="fs11" style="color:${stale?'var(--r600)':'var(--g400)'}">${min!==null?(min<60?min+'m':Math.round(min/60)+'h')+' atrás':'—'}${stale?' ⚠':''}</span>
+        </div>
+        <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:.5rem;font-size:.75rem">
+          <span>Total: <strong style="color:${sospechoso?'var(--r600)':'var(--gr600)'}">${clp(d.totalDetectado||0)}</strong></span>
+          <span>Boletas: <strong>${d.boletasDetectadas||0}</strong></span>
+          <span>Fecha detectada: <strong>${d.fechaDetectada||'hoy'}</strong></span>
+          <span>Largo archivo: <strong>${d.largoTexto||0}</strong> caract.</span>
+          ${sospechoso?'<span style="color:var(--r600);font-weight:700">⚠ Resultado sospechoso — no se sobrescribió</span>':''}
+        </div>
+        <details><summary class="fs11 text-gray" style="cursor:pointer">Ver muestra cruda</summary>
+          <pre style="font-size:.6875rem;background:#fff;border:1px solid var(--g200);border-radius:6px;padding:.5rem;margin-top:.375rem;white-space:pre-wrap;word-break:break-all;max-height:180px;overflow-y:auto">${(d.muestra||'').replace(/</g,'&lt;')}</pre>
+        </details>
+      </div>`;
+    }).join('');
+  }catch(e){
+    c.innerHTML='<p class="fs13 text-gray">Error al cargar diagnóstico.</p>';
+  }
+}
 async function saveTienda(){CFG.tienda={nombre:document.getElementById('ajNombre').value,dir:document.getElementById('ajDir').value};await db.collection('config').doc('global').update({tienda:CFG.tienda});toast('✅ Guardado');}
 async function saveSucursales(){await db.collection('config').doc('global').update({sucursales:CFG.sucursales});SUCURSALES=CFG.sucursales;toast('✅ Sucursales guardadas');}
 async function saveSisLabels(){CFG.sisLabels={ef:document.getElementById('ajSisLblEf').value.trim()||'Efectivo',tarj:document.getElementById('ajSisLblTarj').value.trim()||'Tarjetas / POS',otros:document.getElementById('ajSisLblOtros').value.trim()||'Amipass, Edenred, etc.'};await db.collection('config').doc('global').update({sisLabels:CFG.sisLabels});refreshCiSisTotal();toast('✅ Etiquetas actualizadas');}
