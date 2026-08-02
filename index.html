@@ -542,7 +542,7 @@ tr:hover td{background:var(--g50)}
             <div class="card">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
                 <div class="ct" style="padding:0;margin:0">🖥️ Ventas según Sistema</div>
-                <button class="btn btn-s sm" onclick="traerDatosPOS()">📥 Traer del POS</button>
+                <button class="btn btn-s sm" id="btnTraerPOS" onclick="traerDatosPOS()">📥 Traer del POS</button>
               </div>
               <div id="posAutoStatus" class="hidden" style="background:var(--gr100);border:1px solid var(--gr500);border-radius:8px;padding:.625rem .875rem;margin-bottom:.75rem;font-size:.8125rem;color:var(--gr600)"></div>
               <div class="fld"><label class="lbl" id="ciSisLblEf">Efectivo</label><input class="inp" type="number" id="ciSisEf" placeholder="0" oninput="refreshCiSisTotal()"/></div>
@@ -1074,6 +1074,15 @@ tr:hover td{background:var(--g50)}
       <div class="section" id="ad-aj">
         <div class="ph"><h2>Ajustes</h2></div>
         <div style="max-width:600px;display:flex;flex-direction:column;gap:1rem">
+          <div class="card hidden" id="cardTogglePOS">
+            <div class="ct">⚖️ Comparación con Sistema (POS)</div>
+            <p class="fs13 text-gray mb4">Mientras la sincronización con el POS no esté 100% estable, puedes desactivar la comparación Sistema vs Operador. La app sigue funcionando normalmente con lo que registran los operadores — apertura, retiros, cierre, cigarros y checklist no dependen de esto.</p>
+            <label style="display:flex;align-items:center;gap:.75rem;cursor:pointer;padding:.75rem;background:var(--g50);border-radius:8px">
+              <input type="checkbox" id="togglePOSCompare" onchange="guardarTogglePOS()" style="width:18px;height:18px"/>
+              <span class="fw6 fs14">Mostrar cuadratura y panel POS en el Dashboard</span>
+            </label>
+            <div id="togglePOSStatus" class="fs12 text-gray mt2"></div>
+          </div>
           <div class="card">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
               <div class="ct" style="margin:0;padding:0">🔧 Diagnóstico de Sincronización</div>
@@ -1712,7 +1721,7 @@ function showSec(id,el){
   if(id==='ad-rep')renderAnalisis();
   if(id==='op-rep')initReponer();
   if(id==='sa-users')renderUsers();if(id==='sa-logs')renderLogs();
-  if(id==='op-ci'){window._ciPosTotal=undefined;window._ciDiffPos=0;renderCiPosInputs();renderCiMovFromRet();ciGoTo(1);}
+  if(id==='op-ci'){window._ciPosTotal=undefined;window._ciDiffPos=0;renderCiPosInputs();renderCiMovFromRet();ciGoTo(1);const btnPOS=document.getElementById('btnTraerPOS');if(btnPOS)btnPOS.classList.toggle('hidden',!mostrarComparacionPOS());}
   closeSidebar();
 }
 
@@ -2220,32 +2229,39 @@ async function checkVencimientos(){
 
 /* ============ IMPORTAR CATÁLOGO DESDE POS ============ */
 async function importarCatalogoPOS(){
-  // Elegir sucursal
-  const sucId=CU.sucursalActiva||CU.sucursalId||SUCURSALES[0]?.id;
-  const sucNombre=SUCURSALES.find(s=>s.id===sucId)?.nombre||'';
-  if(!confirm(`¿Importar el catálogo de productos del POS de ${sucNombre}?\n\nSe actualizarán precios y se agregarán productos nuevos. El stock actual no se modifica.`))return;
+  if(!confirm('Vas a importar el catálogo de productos del POS al inventario.\n\nSe actualizarán precios y se agregarán productos nuevos. El stock actual no se modifica.\n\n¿Continuar?'))return;
+
+  // Preguntar cuál sucursal (usamos prompt simple ya que ask_user no aplica en este contexto)
+  const opts=SUCURSALES.map((s,i)=>`${i+1}. ${s.nombre}`).join('\n');
+  const resp=prompt(`¿De cuál sucursal importar?\n\n0. 🌐 Todas (combinar)\n${opts}\n\nEscribe el número:`,'0');
+  if(resp===null)return;
+  const idx=parseInt(resp);
+  const sucSeleccionadas = idx===0 ? SUCURSALES : (SUCURSALES[idx-1]?[SUCURSALES[idx-1]]:null);
+  if(!sucSeleccionadas){toast('Opción inválida');return;}
 
   toast('🔄 Leyendo catálogo del POS…',8000);
   try{
-    // Read sync metadata
-    const metaSnap=await db.collection('syncPOS').doc(sucId).get();
-    if(!metaSnap.exists){toast('❌ Sin catálogo sincronizado. Ejecuta el sync primero.');return;}
-    const meta=metaSnap.data();
-    const partes=meta.partes||1;
-
-    // Load all chunks
-    let productos=[];
-    for(let i=0;i<partes;i++){
-      const chunkSnap=await db.collection('catalogoPOS').doc(`${sucId}_${i}`).get();
-      if(chunkSnap.exists){
-        try{productos=productos.concat(JSON.parse(chunkSnap.data().productos||'[]'));}catch(e){}
+    // Cargar y combinar productos de las sucursales seleccionadas (dedupe por SKU)
+    let productosPorSku={};
+    for(const suc of sucSeleccionadas){
+      const metaSnap=await db.collection('syncPOS').doc(suc.id).get();
+      if(!metaSnap.exists)continue;
+      const partes=metaSnap.data().partes||1;
+      for(let i=0;i<partes;i++){
+        const chunkSnap=await db.collection('catalogoPOS').doc(`${suc.id}_${i}`).get();
+        if(chunkSnap.exists){
+          try{
+            const chunk=JSON.parse(chunkSnap.data().productos||'[]');
+            chunk.forEach(p=>{ if(p.sku) productosPorSku[p.sku]=p; }); // última sucursal gana si hay conflicto de precio
+          }catch(e){}
+        }
       }
     }
-    if(!productos.length){toast('❌ Catálogo vacío');return;}
+    const productos=Object.values(productosPorSku);
+    if(!productos.length){toast('❌ Sin catálogo sincronizado para la selección. Ejecuta el sync primero.');return;}
 
     toast(`⏳ Importando ${productos.length} productos…`,10000);
 
-    // Index existing by sku
     const existing={};
     INVENTARIO.forEach(i=>{if(i.sku)existing[i.sku]=i.id;});
 
@@ -2274,8 +2290,9 @@ async function importarCatalogoPOS(){
 
     await loadInventario();
     renderInv();
-    await auditLog('inventario',{accion:'importar_pos',sucursalId:sucId,agregados:added,actualizados:updated});
-    toast(`✅ ${added} agregados, ${updated} actualizados`,5000);
+    const origenTxt=idx===0?'todas las sucursales':sucSeleccionadas[0].nombre;
+    await auditLog('inventario',{accion:'importar_pos',origen:origenTxt,agregados:added,actualizados:updated});
+    toast(`✅ ${added} agregados, ${updated} actualizados (${origenTxt})`,6000);
   }catch(e){toast('❌ Error: '+e.message,5000);}
 }
 
@@ -2491,13 +2508,24 @@ function renderDash(){
   s.innerHTML=[{l:'Ventas período',v:clp(total),sub:`${v.length} registros`,col:'var(--a500)'},{l:'Promedio diario',v:clp(avg),sub:'del período',col:'var(--b500)'},{l:'Stock crítico',v:stk,sub:'bajo mínimo',col:stk?'var(--r500)':'var(--gr500)'},{l:'Retiros hoy',v:clp(retH),sub:`${RETIROS.filter(r=>r.fecha===today()).length} mov.`,col:'var(--g500)'}].map(x=>`<div class="sc"><div class="lbl">${x.l}</div><div class="val" style="color:${x.col}">${x.v}</div><div class="sub">${x.sub}</div></div>`).join('');
   renderDashChart(v);renderDashCompo(v);renderDashCigs();renderDashStock();renderDashTL();
   renderMetaVentas();renderDashRetirosCat();renderDashVentasSuc();
-  renderCuadratura();
-  loadPOSData();
-  checkPOSStale();
   checkVencimientos();
-  // Auto-refresh POS data every 15 min
-  if(!window._posRefreshTimer){
-    window._posRefreshTimer=setInterval(()=>{loadPOSData();checkPOSStale();renderCuadratura();},15*60*1000);
+
+  // Cuadratura y panel POS — solo si el superadmin los dejó activados
+  const cuadCard=document.getElementById('cuadraturaCard');
+  const posPanel=document.getElementById('posSyncPanel');
+  if(mostrarComparacionPOS()){
+    if(cuadCard)cuadCard.classList.remove('hidden');
+    if(posPanel)posPanel.classList.remove('hidden');
+    renderCuadratura();
+    loadPOSData();
+    checkPOSStale();
+    if(!window._posRefreshTimer){
+      window._posRefreshTimer=setInterval(()=>{loadPOSData();checkPOSStale();renderCuadratura();},15*60*1000);
+    }
+  }else{
+    if(cuadCard)cuadCard.classList.add('hidden');
+    if(posPanel)posPanel.classList.add('hidden');
+    if(window._posRefreshTimer){clearInterval(window._posRefreshTimer);window._posRefreshTimer=null;}
   }
 }
 
@@ -4560,7 +4588,46 @@ async function notificarGerentes(turno){
   }catch(e){console.warn('Notif gerentes:',e);}
 }
 
-function renderAjustes(){const t=CFG.tienda||{};const ajN=document.getElementById('ajNombre');if(ajN)ajN.value=t.nombre||'';const ajD=document.getElementById('ajDir');if(ajD)ajD.value=t.dir||'';const sl=CFG.sisLabels||{};const ajEf=document.getElementById('ajSisLblEf');if(ajEf)ajEf.value=sl.ef||'Efectivo';const ajTj=document.getElementById('ajSisLblTarj');if(ajTj)ajTj.value=sl.tarj||'Tarjetas / POS';const ajOt=document.getElementById('ajSisLblOtros');if(ajOt)ajOt.value=sl.otros||'Amipass, Edenred, etc.';renderAjSucList();renderPosTermList();renderAjCkList('apertura');renderAjCkList('cierre');renderPrecioHist();renderDiagnosticoSync();if(CFG.gasUrl){const gi=document.getElementById('gasUrlInput');if(gi)gi.value=CFG.gasUrl;}}
+function renderAjustes(){const t=CFG.tienda||{};const ajN=document.getElementById('ajNombre');if(ajN)ajN.value=t.nombre||'';const ajD=document.getElementById('ajDir');if(ajD)ajD.value=t.dir||'';const sl=CFG.sisLabels||{};const ajEf=document.getElementById('ajSisLblEf');if(ajEf)ajEf.value=sl.ef||'Efectivo';const ajTj=document.getElementById('ajSisLblTarj');if(ajTj)ajTj.value=sl.tarj||'Tarjetas / POS';const ajOt=document.getElementById('ajSisLblOtros');if(ajOt)ajOt.value=sl.otros||'Amipass, Edenred, etc.';renderAjSucList();renderPosTermList();renderAjCkList('apertura');renderAjCkList('cierre');renderPrecioHist();renderDiagnosticoSync();initToggleCardPOS();if(CFG.gasUrl){const gi=document.getElementById('gasUrlInput');if(gi)gi.value=CFG.gasUrl;}}
+
+/* ============ TOGGLE COMPARACIÓN POS (solo superadmin) ============ */
+function mostrarComparacionPOS(){
+  // Por defecto true si nunca se ha configurado (retrocompatible)
+  return CFG.mostrarComparacionPOS!==false;
+}
+
+function initToggleCardPOS(){
+  const card=document.getElementById('cardTogglePOS');
+  const rolAct=CU.rolActivo||CU.rol;
+  if(!card)return;
+  if(rolAct!=='superadmin'){card.classList.add('hidden');return;}
+  card.classList.remove('hidden');
+  const chk=document.getElementById('togglePOSCompare');
+  if(chk)chk.checked=mostrarComparacionPOS();
+  actualizarEstadoTogglePOS();
+}
+
+function actualizarEstadoTogglePOS(){
+  const st=document.getElementById('togglePOSStatus');
+  if(!st)return;
+  st.textContent=mostrarComparacionPOS()
+    ?'🟢 Activado — el Dashboard muestra la cuadratura y el detalle del POS.'
+    :'⚪ Desactivado — el Dashboard solo muestra los datos que ingresan los operadores.';
+}
+
+async function guardarTogglePOS(){
+  const chk=document.getElementById('togglePOSCompare');
+  const val=!!chk?.checked;
+  CFG.mostrarComparacionPOS=val;
+  try{
+    await db.collection('config').doc('global').update({mostrarComparacionPOS:val});
+    actualizarEstadoTogglePOS();
+    toast(val?'✅ Comparación POS activada':'✅ Comparación POS desactivada');
+    // Refrescar dashboard si está visible
+    renderDash();
+  }catch(e){toast('❌ Error: '+e.message);}
+}
+
 
 async function renderDiagnosticoSync(){
   const c=document.getElementById('diagnosticoSyncList');if(!c)return;
