@@ -641,17 +641,17 @@ tr:hover td{background:var(--g50)}
           <button class="marca-tag" onclick="setDashPeriod('ano',this)">Año</button>
         </div>
         <div class="g4" id="dashStats"></div>
-        <div class="g2 mt4">
+        <div class="g2 mt4" id="wgtVentasChart">
           <div class="card"><div class="ct">📈 Ventas</div><div id="dashChart"></div></div>
           <div class="card"><div class="ct">💰 Composición</div><div id="dashCompo"></div></div>
         </div>
-        <div class="g3 mt4">
+        <div class="g3 mt4" id="wgtCigStockAct">
           <div class="card"><div class="ct">🚬 Cigarros</div><div id="dashCigs"></div></div>
           <div class="card"><div class="ct">📦 Stock crítico</div><div id="dashStock"></div></div>
           <div class="card"><div class="ct">🕐 Actividad</div><div class="tl" id="dashTL"></div></div>
         </div>
         <!-- RETIROS POR CATEGORÍA -->
-        <div class="g2 mt4">
+        <div class="g2 mt4" id="wgtRetirosVentas">
           <div class="card"><div class="ct">💸 Retiros por categoría</div><div id="dashRetirosCat"></div></div>
           <div class="card"><div class="ct">🏬 Ventas por sucursal (mes)</div><div id="dashVentasSuc"></div></div>
         </div>
@@ -1074,6 +1074,12 @@ tr:hover td{background:var(--g50)}
       <div class="section" id="ad-aj">
         <div class="ph"><h2>Ajustes</h2></div>
         <div style="max-width:600px;display:flex;flex-direction:column;gap:1rem">
+          <div class="card hidden" id="cardDashCustom">
+            <div class="ct">🎛️ Personalizar Dashboard</div>
+            <p class="fs13 text-gray mb4">Elige qué secciones se muestran en el Dashboard para todos los administradores.</p>
+            <div id="dashWidgetList" style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:.75rem"></div>
+            <button class="btn btn-p" onclick="guardarDashWidgets()">Guardar</button>
+          </div>
           <div class="card hidden" id="cardTogglePOS">
             <div class="ct">⚖️ Comparación con Sistema (POS)</div>
             <p class="fs13 text-gray mb4">Mientras la sincronización con el POS no esté 100% estable, puedes desactivar la comparación Sistema vs Operador. La app sigue funcionando normalmente con lo que registran los operadores — apertura, retiros, cierre, cigarros y checklist no dependen de esto.</p>
@@ -1274,6 +1280,13 @@ tr:hover td{background:var(--g50)}
 const firebaseConfig={apiKey:"AIzaSyCat-wevUXz8RK6OUmSkxdilitEGMbGi1g",authDomain:"kombi-store.firebaseapp.com",projectId:"kombi-store",storageBucket:"kombi-store.firebasestorage.app",messagingSenderId:"169678853416",appId:"1:169678853416:web:e73057bd09c6584a0dec1d"};
 firebase.initializeApp(firebaseConfig);
 const auth=firebase.auth(),db=firebase.firestore();
+
+// Fuerza long-polling automático: evita errores 400/404 en el canal
+// "Listen" de Firestore que ocurren en redes móviles/proxies que no
+// manejan bien WebSockets o streaming HTTP.
+try{
+  db.settings({experimentalAutoDetectLongPolling:true,merge:true});
+}catch(e){console.warn('Firestore settings:',e);}
 
 // Persistencia de sesión con degradación: si IndexedDB está bloqueado
 // cae a sessionStorage y si no, a memoria. Evita que la app se cuelgue.
@@ -1757,6 +1770,7 @@ async function saveApertura(){
     document.getElementById('apW4')?.classList.replace('active','done');
     toast('✅ Apertura guardada');
     renderTurnoStatus();
+    enviarEmailApertura();
     // Block apertura section — show locked state
     setTimeout(()=>lockApertura(),800);
   }catch(e){toast('❌ Error: '+e.message);}
@@ -2527,6 +2541,7 @@ function renderDash(){
     if(posPanel)posPanel.classList.add('hidden');
     if(window._posRefreshTimer){clearInterval(window._posRefreshTimer);window._posRefreshTimer=null;}
   }
+  aplicarDashWidgets();
 }
 
 /* ============ CUADRATURA POS vs OPERADOR ============ */
@@ -4540,10 +4555,85 @@ function renderPOSSucursales(docs){
       </div>
     </div>`).join('');
 }function setGasStatus(m,col){const el=document.getElementById('gasStatus');if(el){el.textContent=m;el.style.color=col;}}
-async function enviarEmail(asunto,cuerpoTexto,htmlBody,tipo='general'){
+/* ============ PERSONALIZAR DASHBOARD (solo superadmin) ============ */
+const DASH_WIDGETS=[
+  {key:'panelOperativo',label:'🟢 Panel operativo en vivo',el:'panelOperativo'},
+  {key:'metaVentas',label:'🎯 Meta del mes',el:'metaVentasCard'},
+  {key:'ventasChart',label:'📈 Ventas y composición',el:'wgtVentasChart'},
+  {key:'cigStockAct',label:'🚬 Cigarros, stock crítico y actividad',el:'wgtCigStockAct'},
+  {key:'retirosVentas',label:'💸 Retiros por categoría y ventas por sucursal',el:'wgtRetirosVentas'},
+];
+
+function getDashWidgetConfig(){return CFG.dashWidgets||{};}
+function widgetHabilitado(key){const cfg=getDashWidgetConfig();return cfg[key]!==false;}
+
+function initDashCustom(){
+  const card=document.getElementById('cardDashCustom');
+  const rolAct=CU.rolActivo||CU.rol;
+  if(!card)return;
+  if(rolAct!=='superadmin'){card.classList.add('hidden');return;}
+  card.classList.remove('hidden');
+  const list=document.getElementById('dashWidgetList');
+  const cfg=getDashWidgetConfig();
+  list.innerHTML=DASH_WIDGETS.map(w=>`
+    <label style="display:flex;align-items:center;gap:.625rem;cursor:pointer;padding:.5rem;background:var(--g50);border-radius:8px">
+      <input type="checkbox" data-widget="${w.key}" ${cfg[w.key]!==false?'checked':''} style="width:16px;height:16px"/>
+      <span class="fs14">${w.label}</span>
+    </label>`).join('');
+}
+
+async function guardarDashWidgets(){
+  const nuevo={};
+  document.querySelectorAll('#dashWidgetList input[type="checkbox"]').forEach(chk=>{nuevo[chk.dataset.widget]=chk.checked;});
+  CFG.dashWidgets=nuevo;
+  try{
+    await db.collection('config').doc('global').update({dashWidgets:nuevo});
+    toast('✅ Dashboard personalizado guardado');
+    renderDash();
+  }catch(e){toast('❌ Error: '+e.message);}
+}
+
+function aplicarDashWidgets(){
+  DASH_WIDGETS.forEach(w=>{
+    const el=document.getElementById(w.el);
+    if(el&&!widgetHabilitado(w.key))el.classList.add('hidden');
+  });
+}
+
+/* ============ EMAILS AUTOMÁTICOS A GERENTES ============ */
+async function obtenerEmailsGerentes(){
+  try{
+    const snap=await db.collection('usuarios').where('activo','==',true).get();
+    const emails=[];
+    snap.docs.forEach(d=>{
+      const u=d.data();
+      const roles=Array.isArray(u.roles)&&u.roles.length?u.roles:[u.rol];
+      if(roles.includes('gerente')&&u.email)emails.push(u.email);
+    });
+    return[...new Set(emails)];
+  }catch(e){console.warn('gerentes:',e);return[];}
+}
+
+async function enviarEmailApertura(){
+  try{
+    const cc=(await obtenerEmailsGerentes()).join(',');
+    const sucNombre=CU.sucursalActivaNombre||CU.sucursalNombre||'—';
+    const turno=CU.turnoActivo||CU.turno||'—';
+    const rows=[
+      {header:`APERTURA DE TURNO — ${sucNombre}`},
+      {label:'Turno',value:turno},
+      {label:'Operador',value:CU.nombre},
+      {label:'Hora',value:AP.hora||timeNow()},
+      {label:'Efectivo apertura',value:clp(totalBills(AP)),total:true},
+    ];
+    await enviarEmail(`Apertura — ${sucNombre} (${turno})`,`${CU.nombre} abrió turno ${turno} en ${sucNombre}`,buildHTMLTable(rows),'diario',cc);
+  }catch(e){console.warn('email apertura:',e);}
+}
+
+async function enviarEmail(asunto,cuerpoTexto,htmlBody,tipo='general',cc=''){
   const url=getGasUrl();if(!url){toast('⚠ Configura la URL del script');return false;}
   try{toast('📤 Enviando…',6000);let iframe=document.getElementById('gas_iframe');if(!iframe){iframe=document.createElement('iframe');iframe.name='gas_iframe';iframe.id='gas_iframe';iframe.style.display='none';document.body.appendChild(iframe);}
-  const form=document.createElement('form');form.method='POST';form.action=url;form.target='gas_iframe';form.style.display='none';[{k:'asunto',v:asunto},{k:'cuerpo',v:cuerpoTexto},{k:'html',v:htmlBody},{k:'tipo',v:tipo}].forEach(({k,v})=>{const i=document.createElement('input');i.type='hidden';i.name=k;i.value=v;form.appendChild(i);});document.body.appendChild(form);form.submit();form.remove();setTimeout(()=>toast('✅ Correo enviado a appkombi@gmail.com',4000),1500);return true;}
+  const form=document.createElement('form');form.method='POST';form.action=url;form.target='gas_iframe';form.style.display='none';[{k:'asunto',v:asunto},{k:'cuerpo',v:cuerpoTexto},{k:'html',v:htmlBody},{k:'tipo',v:tipo},{k:'cc',v:cc}].forEach(({k,v})=>{const i=document.createElement('input');i.type='hidden';i.name=k;i.value=v;form.appendChild(i);});document.body.appendChild(form);form.submit();form.remove();setTimeout(()=>toast('✅ Correo enviado a appkombi@gmail.com',4000),1500);return true;}
   catch(err){toast('❌ Error: '+err.message);return false;}
 }
 function buildHTMLTable(rows){return`<table style="width:100%;border-collapse:collapse;font-size:13px;margin:8px 0">${rows.map(r=>r.header?`<tr style="background:#F9FAFB"><td colspan="2" style="padding:10px 12px;font-weight:800;font-size:11px;color:#6B7280;text-transform:uppercase;border-bottom:2px solid #F59E0B">${r.header}</td></tr>`:`<tr style="border-bottom:1px solid #F3F4F6${r.total?';background:#FFFBEB;font-weight:700':''}"><td style="padding:8px 12px;color:${r.total?'#92400E':'#6B7280'}">${r.label}</td><td style="padding:8px 12px;text-align:right;font-family:monospace;color:${r.neg?'#DC2626':r.pos?'#16A34A':r.total?'#B45309':'#111827'};font-weight:${r.total?700:500}">${r.value}</td></tr>`).join('')}</table>`;}
@@ -4557,9 +4647,12 @@ async function enviarTurnoDesdeModal(){const t=TURNOS.find(x=>x.id===_modalTurno
 async function notificarGerentes(turno){
   const url=getGasUrl(); if(!url) return;
   try{
-    // Load gerentes from Firestore
-    const snap=await db.collection('usuarios').where('rol','==','gerente').where('activo','==',true).get();
-    const gerentes=snap.docs.map(d=>d.data());
+    // Load gerentes from Firestore — soporta rol único (viejo) y roles[] (multi-rol)
+    const snap=await db.collection('usuarios').where('activo','==',true).get();
+    const gerentes=snap.docs.map(d=>d.data()).filter(u=>{
+      const roles=Array.isArray(u.roles)&&u.roles.length?u.roles:[u.rol];
+      return roles.includes('gerente');
+    });
     if(!gerentes.length) return;
     const tienda=CFG.tienda?.nombre||'Kombi Store';
     const emoji={'mañana':'☀️','tarde':'🌤','noche':'🌙'};
@@ -4588,7 +4681,7 @@ async function notificarGerentes(turno){
   }catch(e){console.warn('Notif gerentes:',e);}
 }
 
-function renderAjustes(){const t=CFG.tienda||{};const ajN=document.getElementById('ajNombre');if(ajN)ajN.value=t.nombre||'';const ajD=document.getElementById('ajDir');if(ajD)ajD.value=t.dir||'';const sl=CFG.sisLabels||{};const ajEf=document.getElementById('ajSisLblEf');if(ajEf)ajEf.value=sl.ef||'Efectivo';const ajTj=document.getElementById('ajSisLblTarj');if(ajTj)ajTj.value=sl.tarj||'Tarjetas / POS';const ajOt=document.getElementById('ajSisLblOtros');if(ajOt)ajOt.value=sl.otros||'Amipass, Edenred, etc.';renderAjSucList();renderPosTermList();renderAjCkList('apertura');renderAjCkList('cierre');renderPrecioHist();renderDiagnosticoSync();initToggleCardPOS();if(CFG.gasUrl){const gi=document.getElementById('gasUrlInput');if(gi)gi.value=CFG.gasUrl;}}
+function renderAjustes(){const t=CFG.tienda||{};const ajN=document.getElementById('ajNombre');if(ajN)ajN.value=t.nombre||'';const ajD=document.getElementById('ajDir');if(ajD)ajD.value=t.dir||'';const sl=CFG.sisLabels||{};const ajEf=document.getElementById('ajSisLblEf');if(ajEf)ajEf.value=sl.ef||'Efectivo';const ajTj=document.getElementById('ajSisLblTarj');if(ajTj)ajTj.value=sl.tarj||'Tarjetas / POS';const ajOt=document.getElementById('ajSisLblOtros');if(ajOt)ajOt.value=sl.otros||'Amipass, Edenred, etc.';renderAjSucList();renderPosTermList();renderAjCkList('apertura');renderAjCkList('cierre');renderPrecioHist();renderDiagnosticoSync();initToggleCardPOS();initDashCustom();if(CFG.gasUrl){const gi=document.getElementById('gasUrlInput');if(gi)gi.value=CFG.gasUrl;}}
 
 /* ============ TOGGLE COMPARACIÓN POS (solo superadmin) ============ */
 function mostrarComparacionPOS(){
