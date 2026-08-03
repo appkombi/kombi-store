@@ -358,11 +358,7 @@ tr:hover td{background:var(--g50)}
         </div>
         <div class="fg">
           <label>Turno</label>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem">
-            <button type="button" class="turno-btn active" id="tBtnMan" onclick="selectTurno('mañana',this)">☀️ Mañana</button>
-            <button type="button" class="turno-btn" id="tBtnTar" onclick="selectTurno('tarde',this)">🌤 Tarde</button>
-            <button type="button" class="turno-btn" id="tBtnNoc" onclick="selectTurno('noche',this)">🌙 Noche</button>
-          </div>
+          <div id="lTurnoBtns" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:.5rem"></div>
         </div>
         <button class="btn-login" onclick="confirmarSucursal()">Entrar →</button>
         <button type="button" onclick="volverLogin()" style="width:100%;margin-top:.75rem;padding:.625rem;background:none;border:none;color:var(--g500);font-size:.875rem;cursor:pointer">← Volver</button>
@@ -1075,6 +1071,23 @@ tr:hover td{background:var(--g50)}
       <div class="section" id="ad-aj">
         <div class="ph"><h2>Ajustes</h2></div>
         <div style="max-width:600px;display:flex;flex-direction:column;gap:1rem">
+          <div class="card hidden" id="cardTurnosConfig">
+            <div class="ct">⏰ Turnos</div>
+            <p class="fs13 text-gray mb4">Define los turnos disponibles en toda la app — nombre, emoji y horario de referencia. Los turnos ya usados en registros antiguos conservan su clave interna aunque cambies el nombre.</p>
+            <div id="turnosConfigList" style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:1rem"></div>
+            <div style="border-top:1px solid var(--g200);padding-top:.875rem">
+              <div class="fw6 fs13 mb2">+ Agregar turno nuevo</div>
+              <div class="g2">
+                <div class="fld" style="margin:0"><label class="lbl">Nombre</label><input class="inp" id="tcNuevoLabel" placeholder="Ej: Madrugada"/></div>
+                <div class="fld" style="margin:0"><label class="lbl">Emoji</label><input class="inp" id="tcNuevoEmoji" placeholder="🌌" maxlength="2"/></div>
+              </div>
+              <div class="g2">
+                <div class="fld" style="margin:0"><label class="lbl">Hora inicio (opcional)</label><input class="inp" type="time" id="tcNuevoInicio"/></div>
+                <div class="fld" style="margin:0"><label class="lbl">Hora fin (opcional)</label><input class="inp" type="time" id="tcNuevoFin"/></div>
+              </div>
+              <button class="btn btn-p w100" style="margin-top:.75rem" onclick="agregarTurnoConfig()">+ Agregar</button>
+            </div>
+          </div>
           <div class="card hidden" id="cardDashCustom">
             <div class="ct">🎛️ Personalizar Dashboard</div>
             <p class="fs13 text-gray mb4">Elige qué secciones se muestran en el Dashboard para todos los administradores.</p>
@@ -1339,6 +1352,24 @@ auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
 
 // STATE
 let CU=null,CFG={},SUCURSALES=[],POS_TERMINALES=[{id:'gn1',name:'GetNet 1'},{id:'gn2',name:'GetNet 2'},{id:'tb',name:'Transbank'}];
+
+/* ============ CONFIGURACIÓN DE TURNOS (dinámica) ============ */
+const TURNOS_DEFAULT=[
+  {key:'mañana',label:'Mañana',emoji:'☀️',horaInicio:'',horaFin:''},
+  {key:'tarde', label:'Tarde', emoji:'🌤',horaInicio:'',horaFin:''},
+  {key:'noche', label:'Noche', emoji:'🌙',horaInicio:'',horaFin:''},
+];
+function getTurnosConfig(){
+  const cfg=CFG.turnosConfig;
+  return(Array.isArray(cfg)&&cfg.length)?cfg:TURNOS_DEFAULT;
+}
+function turnoInfo(key){
+  return getTurnosConfig().find(t=>t.key===key)||{key,label:key||'—',emoji:''};
+}
+// Reemplazo directo de los mapas fijos {'mañana':'☀️',...} usados en todo el código
+function emojiTurnoMap(){
+  const m={};getTurnosConfig().forEach(t=>{m[t.key]=t.emoji||'';});return m;
+}
 let INVENTARIO=[],VENTAS=[],TURNOS=[],CK_APERTURA=[],CK_CIERRE=[],RETIROS=[];
 let AP={bills:{},cigarros:[],obs:'',sis:{},saved:false,hora:''};
 let CI={bills:{},pos:{},transf:0,cigarros:[],obs:'',sis:{},fotos:{},saved:false,hora:''};
@@ -1504,7 +1535,7 @@ function selectRolLogin(r){
   // Si elige un rol global, ocultar selección de sucursal y turno
   const global=esRolGlobal(r);
   const sucFld=document.getElementById('lSucursal')?.closest('.fg');
-  const turFld=document.getElementById('tBtnMan')?.closest('.fg');
+  const turFld=document.getElementById('lTurnoBtns')?.closest('.fg');
   if(sucFld)sucFld.style.display=global?'none':'block';
   if(turFld)turFld.style.display=global?'none':'block';
   const sub=document.getElementById('loginStep2Sub');
@@ -1606,11 +1637,14 @@ function showSucursalStep(){
     sel.innerHTML=SUCURSALES.map(s=>`<option value="${s.id}">${s.nombre}</option>`).join('');
     if(CU.sucursalId) sel.value=CU.sucursalId;
   }
-  const turnoDefault=CU.turno||'mañana';
+  const turnoDefault=CU.turno||getTurnosConfig()[0]?.key||'mañana';
   _turnoSeleccionado=turnoDefault;
-  document.querySelectorAll('.turno-btn').forEach(b=>b.classList.remove('active'));
-  const map={'mañana':'tBtnMan','tarde':'tBtnTar','noche':'tBtnNoc'};
-  document.getElementById(map[turnoDefault])?.classList.add('active');
+  const turnosBtnsC=document.getElementById('lTurnoBtns');
+  if(turnosBtnsC){
+    turnosBtnsC.innerHTML=getTurnosConfig().map(t=>
+      `<button type="button" class="turno-btn ${t.key===turnoDefault?'active':''}" onclick="selectTurno('${t.key}',this)">${t.emoji||''} ${t.label}</button>`
+    ).join('');
+  }
 
   // Role selector — show only if user has multiple roles
   const roles=Array.isArray(CU.roles)&&CU.roles.length?CU.roles:[CU.rol||'operador'];
@@ -1675,7 +1709,20 @@ async function loadConfig(){
     SUCURSALES=CFG.sucursales||[];POS_TERMINALES=CFG.posTerminales||POS_TERMINALES;
     CK_APERTURA=(CFG.ckApertura||[]).map(i=>({...i,done:false}));
     CK_CIERRE=(CFG.ckCierre||[]).map(i=>({...i,photo:null}));
+    poblarSelectsTurno();
   }catch(e){console.error('Config:',e);}
+}
+
+// Regenera todos los <select> de turno con la configuración actual
+function poblarSelectsTurno(){
+  const turnos=getTurnosConfig();
+  const opts=turnos.map(t=>`<option value="${t.key}">${t.emoji||''} ${t.label}</option>`).join('');
+  const histSel=document.getElementById('histFiltroTurno');
+  if(histSel){const cur=histSel.value;histSel.innerHTML='<option value="">Todos los turnos</option>'+opts;histSel.value=cur;}
+  const teSel=document.getElementById('teTurno');
+  if(teSel){const cur=teSel.value;teSel.innerHTML=opts;if(cur)teSel.value=cur;}
+  const uSel=document.getElementById('uTurno');
+  if(uSel){const cur=uSel.value;uSel.innerHTML='<option value="">Cualquier turno</option>'+opts;uSel.value=cur;}
 }
 
 async function showApp(){
@@ -1686,7 +1733,7 @@ async function showApp(){
   const sucId=CU.sucursalActiva||(global?'':CU.sucursalId)||'';
   const sucNombre=global?'🌐 Todas las sucursales':(CU.sucursalActivaNombre||(SUCURSALES.find(s=>s.id===sucId)?.nombre)||'');
   const turno=global?'':(CU.turnoActivo||CU.turno||'mañana');
-  const emoji={'mañana':'☀️','tarde':'🌤','noche':'🌙'};
+  const emoji=emojiTurnoMap();
   document.getElementById('uLabel').textContent=CU.nombre||CU.email;
   document.getElementById('sucursalLabel').textContent=sucNombre;
   document.getElementById('turnoLabel').textContent=turno?` ${emoji[turno]||''} ${turno}`:'';
@@ -1820,7 +1867,7 @@ async function saveApertura(){
 
 function lockApertura(){
   const sec=document.getElementById('op-ap');if(!sec)return;
-  const emoji={'mañana':'☀️','tarde':'🌤','noche':'🌙'};
+  const emoji=emojiTurnoMap();
   const turno=CU.turnoActivo||CU.turno||'';
   sec.innerHTML=`
     <div class="ph"><h2>Arqueo de Apertura</h2><p>Inicio del turno</p></div>
@@ -2894,11 +2941,73 @@ function renderHistorial(){
   if(selMes){const cur=selMes.value;selMes.innerHTML='<option value="">Todos los meses</option>'+meses.map(m=>`<option value="${m}" ${m===cur?'selected':''}>${m}</option>`).join('');}
   if(selSuc){const cur=selSuc.value;selSuc.innerHTML='<option value="">Todas las sucursales</option>'+sucs.map(s=>`<option value="${s}" ${s===cur?'selected':''}>${s}</option>`).join('');}
   let ts=[...TURNOS];if(selMes?.value)ts=ts.filter(t=>t.fecha?.slice(0,7)===selMes.value);if(selSuc?.value)ts=ts.filter(t=>t.sucursal===selSuc.value);if(selTurno?.value)ts=ts.filter(t=>t.turno===selTurno.value);
-  const emoji={'mañana':'☀️','tarde':'🌤','noche':'🌙'};
+  const emoji=emojiTurnoMap();
   c.innerHTML=ts.map(t=>{const ok=t.diffEf===0&&t.diffSis===0;return`<div class="card mb4" style="border-left:4px solid ${ok?'var(--gr500)':'var(--r500)'}"><div class="flex jcb aic mb2"><div><span class="fw7">${fdate(t.fecha)}</span><span class="badge ba" style="margin-left:.5rem">${emoji[t.turno]||''} ${t.turno||'—'}</span><span class="fs13 text-gray" style="margin-left:.5rem">${t.horaAp||'—'} → ${t.horaCi||'—'}</span></div><div style="display:flex;gap:.5rem;align-items:center"><span class="badge ${ok?'bg':'br'}">${ok?'✓ Cuadra':'⚠ Dif.'}</span><button class="btn btn-s sm" onclick="verTurno('${t.id}')">Ver</button></div></div><div class="g4" style="gap:.5rem"><div><div class="fs12 text-gray">Ef. cierre</div><div class="fw7 mono">${clp(t.efCi)}</div></div><div><div class="fs12 text-gray">POS</div><div class="fw7 mono">${clp(t.posTotal)}</div></div><div><div class="fs12 text-gray">Dif. ef.</div><div class="fw7 mono ${t.diffEf===0?'text-green':t.diffEf>0?'text-amber':'text-red'}">${t.diffEf>=0?'+':''}${clp(t.diffEf)}</div></div><div><div class="fs12 text-gray">Dif. sis.</div><div class="fw7 mono ${t.diffSis===0?'text-green':t.diffSis>0?'text-amber':'text-red'}">${t.diffSis>=0?'+':''}${clp(t.diffSis)}</div></div></div><div class="fs12 text-gray mt2">📍 ${t.sucursal||'—'} · 👤 ${t.operador}${t.comentario?` · 💬 "${t.comentario.slice(0,50)}${t.comentario.length>50?'…':''}"`:''}</div></div>`;}).join('');
 }
 let _modalTurnoId=null;
 let _editTurnoId=null;
+/* ============ CRUD DE TURNOS (solo superadmin) ============ */
+function initTurnosConfig(){
+  const card=document.getElementById('cardTurnosConfig');
+  if(!card)return;
+  if((CU.rolActivo||CU.rol)!=='superadmin'){card.classList.add('hidden');return;}
+  card.classList.remove('hidden');
+  renderTurnosConfigList();
+}
+
+function renderTurnosConfigList(){
+  const c=document.getElementById('turnosConfigList');if(!c)return;
+  const turnos=getTurnosConfig();
+  c.innerHTML=turnos.map((t,i)=>`
+    <div style="display:grid;grid-template-columns:50px 1fr 90px 90px 36px;gap:.375rem;align-items:center;background:var(--g50);padding:.5rem;border-radius:8px">
+      <input class="inp" value="${t.emoji||''}" maxlength="2" style="text-align:center;padding:.375rem" onchange="editarTurnoConfig(${i},'emoji',this.value)"/>
+      <input class="inp" value="${t.label}" style="padding:.375rem" onchange="editarTurnoConfig(${i},'label',this.value)"/>
+      <input class="inp" type="time" value="${t.horaInicio||''}" style="padding:.375rem;font-size:.75rem" onchange="editarTurnoConfig(${i},'horaInicio',this.value)"/>
+      <input class="inp" type="time" value="${t.horaFin||''}" style="padding:.375rem;font-size:.75rem" onchange="editarTurnoConfig(${i},'horaFin',this.value)"/>
+      <button onclick="eliminarTurnoConfig(${i})" style="background:none;border:none;color:var(--r500);cursor:pointer;font-size:1.125rem" title="Eliminar turno">🗑</button>
+    </div>`).join('');
+}
+
+async function guardarTurnosConfigDB(nuevaLista){
+  CFG.turnosConfig=nuevaLista;
+  try{
+    await db.collection('config').doc('global').update({turnosConfig:nuevaLista});
+    poblarSelectsTurno();
+    toast('✅ Turnos actualizados');
+  }catch(e){toast('❌ Error: '+e.message);}
+}
+
+function editarTurnoConfig(idx,campo,valor){
+  const turnos=[...getTurnosConfig()];
+  turnos[idx]={...turnos[idx],[campo]:valor};
+  guardarTurnosConfigDB(turnos);
+}
+
+async function eliminarTurnoConfig(idx){
+  const turnos=getTurnosConfig();
+  if(turnos.length<=1){toast('Debe quedar al menos un turno disponible');return;}
+  if(!confirm(`¿Eliminar el turno "${turnos[idx].label}"?\n\nLos registros históricos que ya lo usan mantienen su nombre guardado — solo dejará de aparecer como opción para turnos nuevos.`))return;
+  const nuevaLista=turnos.filter((_,i)=>i!==idx);
+  await guardarTurnosConfigDB(nuevaLista);
+  renderTurnosConfigList();
+}
+
+async function agregarTurnoConfig(){
+  const label=document.getElementById('tcNuevoLabel').value.trim();
+  const emoji=document.getElementById('tcNuevoEmoji').value.trim();
+  const horaInicio=document.getElementById('tcNuevoInicio').value;
+  const horaFin=document.getElementById('tcNuevoFin').value;
+  if(!label){toast('Ingresa un nombre para el turno');return;}
+  const key=label.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+  if(!key){toast('Nombre inválido');return;}
+  const turnos=getTurnosConfig();
+  if(turnos.some(t=>t.key===key)){toast('Ya existe un turno con ese nombre');return;}
+  const nuevaLista=[...turnos,{key,label,emoji,horaInicio,horaFin}];
+  await guardarTurnosConfigDB(nuevaLista);
+  ['tcNuevoLabel','tcNuevoEmoji','tcNuevoInicio','tcNuevoFin'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  renderTurnosConfigList();
+}
+
 function esSuperAdmin(){return (CU.rolActivo||CU.rol)==='superadmin';}
 
 function actualizarBotonesTurnoManual(){
@@ -3148,6 +3257,17 @@ async function renderVContraste(){
 }
 
 
+async function eliminarAperturaPrueba(id,sucNombre,turno){
+  if(!esSuperAdmin()){toast('Solo el Super Admin puede eliminar aperturas');return;}
+  if(!confirm(`⚠️ Esto es solo para pruebas.\n\n¿Eliminar la apertura de ${sucNombre} (${turno}) de hoy?\n\nEsto permite repetir el flujo de apertura desde cero. No usar en producción con datos reales.`))return;
+  try{
+    await db.collection('aperturas').doc(id).delete();
+    await auditLog('apertura',{accion:'eliminar_prueba',sucursal:sucNombre,turno});
+    renderCajaEstado();
+    toast('🗑 Apertura eliminada — se puede repetir el flujo');
+  }catch(e){toast('❌ Error: '+e.message);}
+}
+
 async function renderCajaEstado(){
   const c=document.getElementById('cajaContent');if(!c)return;
   c.innerHTML='<p class="fs14 text-gray">Cargando…</p>';
@@ -3197,7 +3317,7 @@ async function renderCajaEstado(){
       }
     });
 
-    const emoji={'mañana':'☀️','tarde':'🌤','noche':'🌙'};
+    const emoji=emojiTurnoMap();
 
     c.innerHTML=`<div class="g2">${cajas.map(cj=>{
       const opTotal=cj.cierre?cj.cierre.totalReal:null;
@@ -3212,7 +3332,10 @@ async function renderCajaEstado(){
       return`<div class="card" style="border-left:4px solid ${cj.sinApertura?'var(--g300)':!cj.cierre?'var(--b400)':diff===0?'var(--gr500)':diff!==null?'var(--r500)':'var(--g300)'}">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.875rem">
           <div class="fw7 fs15">🏬 ${cj.sucNombre}</div>
-          <span class="badge ${estado.cls}">${estado.txt}</span>
+          <div style="display:flex;gap:.375rem;align-items:center">
+            <span class="badge ${estado.cls}">${estado.txt}</span>
+            ${cj.ap&&!cj.cierre&&esSuperAdmin()?`<button onclick="eliminarAperturaPrueba('${cj.ap.id}','${cj.sucNombre}','${cj.ap.turno}')" title="Eliminar apertura (solo pruebas)" style="background:none;border:none;color:var(--r500);cursor:pointer;font-size:.9375rem">🗑</button>`:''}
+          </div>
         </div>
         ${cj.ap?`<div class="fs12 text-gray mb2">${emoji[cj.ap.turno]||''} ${cj.ap.turno} · 👤 ${cj.ap.operador||'—'} · apertura ${cj.ap.hora||'—'}</div>`:cj.sinApertura?'<div class="fs12 text-gray mb2">El sistema tiene ventas pero nadie ha abierto caja en la app</div>':''}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-top:.75rem">
@@ -4258,7 +4381,7 @@ function renderPanelOperativo(aperturas){
   c.innerHTML=SUCURSALES.map(suc=>{
     const sucAps=aperturas.filter(a=>a.sucursalId===suc.id);
     const turnos=['mañana','tarde','noche'];
-    const turnoEmoji={'mañana':'☀️','tarde':'🌤','noche':'🌙'};
+    const turnoEmoji=emojiTurnoMap();
     const estadoTurnos=turnos.map(t=>{
       const ap=sucAps.find(a=>a.turno===t);
       const ci=TURNOS.find(tu=>tu.fecha===today()&&tu.sucursalId===suc.id&&tu.turno===t);
@@ -4833,7 +4956,7 @@ function generarReporteDiario(){const fecha=document.getElementById('repFecha').
 async function enviarReporteDiario(){generarReporteDiario();const fecha=document.getElementById('repFecha').value||today(),t=TURNOS.find(x=>x.fecha===fecha),v=VENTAS.find(x=>x.fecha===fecha),tienda=CFG.tienda?.nombre||'Kombi Store';const rows=[];if(v){rows.push({header:'VENTAS'});['Efectivo','POS','Transf.','TOTAL'].forEach((l,i)=>rows.push({label:l,value:clp([v.ef,v.pos,v.tr,v.total][i]),total:i===3}));}if(t){rows.push({header:'CAJA'});rows.push({label:'Dif. efectivo',value:(t.diffEf>=0?'+':'')+clp(t.diffEf)+' '+(t.diffEf===0?'✓':'⚠'),neg:t.diffEf<0,pos:t.diffEf>0});rows.push({label:'Dif. sistema',value:(t.diffSis>=0?'+':'')+clp(t.diffSis)+' '+(t.diffSis===0?'✓':'⚠'),neg:t.diffSis<0,pos:t.diffSis>0});}const bajo=INVENTARIO.filter(i=>i.stock<=i.min&&i.min>0);if(bajo.length){rows.push({header:`⚠ STOCK CRÍTICO (${bajo.length})`});bajo.forEach(i=>rows.push({label:i.nombre,value:`${i.stock}/${i.min}`,neg:true}));}await enviarEmail(`Reporte ${tienda} — ${fecha}`,`Reporte ${fdate(fecha)}`,buildHTMLTable(rows),'diario');}
 function generarReporteInv(){const c=document.getElementById('repInvPreview');if(!c)return;c.classList.remove('hidden');const cats=[...new Set(INVENTARIO.map(i=>i.cat))];let html=`<div class="card" style="font-family:var(--mono);font-size:.8125rem;white-space:pre-wrap;line-height:1.7;background:var(--g50)"><strong>Inventario — ${new Date().toLocaleDateString('es-CL')}</strong>\n\n`;cats.forEach(cat=>{html+=cat.toUpperCase()+'\n';INVENTARIO.filter(i=>i.cat===cat).forEach(i=>{html+=`  ${i.nombre.padEnd(30)}${i.stock} u  ${clp(i.precio)}${i.stock<=i.min&&i.min>0?' ⚠':''}\n`;});html+='\n';});html+=`Total: ${INVENTARIO.length} | Bajo mínimo: ${INVENTARIO.filter(i=>i.stock<=i.min&&i.min>0).length}</div>`;c.innerHTML=html;}
 async function enviarReporteInv(){generarReporteInv();const tienda=CFG.tienda?.nombre||'Kombi Store',cats=[...new Set(INVENTARIO.map(i=>i.cat))],rows=[];cats.forEach(cat=>{rows.push({header:cat.toUpperCase()});INVENTARIO.filter(i=>i.cat===cat).forEach(i=>rows.push({label:i.nombre+(i.stock<=i.min&&i.min>0?' ⚠':''),value:`${i.stock} u — ${clp(i.precio)}`,neg:i.stock<=i.min&&i.min>0}));});await enviarEmail(`Inventario ${tienda}`,`Inventario ${new Date().toLocaleDateString('es-CL')}`,buildHTMLTable(rows),'inventario');}
-async function enviarTurnoDesdeModal(){const t=TURNOS.find(x=>x.id===_modalTurnoId);if(!t)return;const tienda=CFG.tienda?.nombre||'Kombi Store',emoji={'mañana':'☀️','tarde':'🌤','noche':'🌙'};await enviarEmail(`Cierre ${emoji[t.turno]||''} ${t.turno||''} — ${tienda} — ${fdate(t.fecha)}`,buildTurnoText(t),buildHTMLTable([{header:'EFECTIVO'},{label:'Apertura',value:clp(t.efAp)},{label:'Cierre',value:clp(t.efCi)},{label:'Retiros',value:'-'+clp(t.retiros),neg:true},{label:'Abonos',value:'+'+clp(t.abonos),pos:true},{label:'Diferencia',value:(t.diffEf>=0?'+':'')+clp(t.diffEf),neg:t.diffEf<0,pos:t.diffEf>0,total:true},{header:'TOTAL'},{label:'Total contado',value:clp(t.totalReal),total:true},{label:'Dif. Sistema',value:(t.diffSis>=0?'+':'')+clp(t.diffSis),neg:t.diffSis<0,pos:t.diffSis>0,total:true}]),t.diffEf!==0||t.diffSis!==0?'diferencia':'cierre');}
+async function enviarTurnoDesdeModal(){const t=TURNOS.find(x=>x.id===_modalTurnoId);if(!t)return;const tienda=CFG.tienda?.nombre||'Kombi Store',emoji=emojiTurnoMap();await enviarEmail(`Cierre ${emoji[t.turno]||''} ${t.turno||''} — ${tienda} — ${fdate(t.fecha)}`,buildTurnoText(t),buildHTMLTable([{header:'EFECTIVO'},{label:'Apertura',value:clp(t.efAp)},{label:'Cierre',value:clp(t.efCi)},{label:'Retiros',value:'-'+clp(t.retiros),neg:true},{label:'Abonos',value:'+'+clp(t.abonos),pos:true},{label:'Diferencia',value:(t.diffEf>=0?'+':'')+clp(t.diffEf),neg:t.diffEf<0,pos:t.diffEf>0,total:true},{header:'TOTAL'},{label:'Total contado',value:clp(t.totalReal),total:true},{label:'Dif. Sistema',value:(t.diffSis>=0?'+':'')+clp(t.diffSis),neg:t.diffSis<0,pos:t.diffSis>0,total:true}]),t.diffEf!==0||t.diffSis!==0?'diferencia':'cierre');}
 
 /* ============ NOTIFICACIÓN GERENTES ============ */
 async function notificarGerentes(turno){
@@ -4847,7 +4970,7 @@ async function notificarGerentes(turno){
     });
     if(!gerentes.length) return;
     const tienda=CFG.tienda?.nombre||'Kombi Store';
-    const emoji={'mañana':'☀️','tarde':'🌤','noche':'🌙'};
+    const emoji=emojiTurnoMap();
     const diffOk=turno.diffEf===0&&turno.diffSis===0;
     const tipo=diffOk?'cierre':'diferencia';
     const asunto=`${diffOk?'✅':'⚠️'} Cierre ${emoji[turno.turno]||''} ${turno.turno} — ${turno.sucursal} — ${fdate(turno.fecha)}`;
@@ -4873,7 +4996,7 @@ async function notificarGerentes(turno){
   }catch(e){console.warn('Notif gerentes:',e);}
 }
 
-function renderAjustes(){const t=CFG.tienda||{};const ajN=document.getElementById('ajNombre');if(ajN)ajN.value=t.nombre||'';const ajD=document.getElementById('ajDir');if(ajD)ajD.value=t.dir||'';const sl=CFG.sisLabels||{};const ajEf=document.getElementById('ajSisLblEf');if(ajEf)ajEf.value=sl.ef||'Efectivo';const ajTj=document.getElementById('ajSisLblTarj');if(ajTj)ajTj.value=sl.tarj||'Tarjetas / POS';const ajOt=document.getElementById('ajSisLblOtros');if(ajOt)ajOt.value=sl.otros||'Amipass, Edenred, etc.';renderAjSucList();renderPosTermList();renderAjCkList('apertura');renderAjCkList('cierre');renderPrecioHist();renderDiagnosticoSync();initToggleCardPOS();initDashCustom();if(CFG.gasUrl){const gi=document.getElementById('gasUrlInput');if(gi)gi.value=CFG.gasUrl;}}
+function renderAjustes(){const t=CFG.tienda||{};const ajN=document.getElementById('ajNombre');if(ajN)ajN.value=t.nombre||'';const ajD=document.getElementById('ajDir');if(ajD)ajD.value=t.dir||'';const sl=CFG.sisLabels||{};const ajEf=document.getElementById('ajSisLblEf');if(ajEf)ajEf.value=sl.ef||'Efectivo';const ajTj=document.getElementById('ajSisLblTarj');if(ajTj)ajTj.value=sl.tarj||'Tarjetas / POS';const ajOt=document.getElementById('ajSisLblOtros');if(ajOt)ajOt.value=sl.otros||'Amipass, Edenred, etc.';renderAjSucList();renderPosTermList();renderAjCkList('apertura');renderAjCkList('cierre');renderPrecioHist();renderDiagnosticoSync();initToggleCardPOS();initDashCustom();initTurnosConfig();if(CFG.gasUrl){const gi=document.getElementById('gasUrlInput');if(gi)gi.value=CFG.gasUrl;}}
 
 /* ============ TOGGLE COMPARACIÓN POS (solo superadmin) ============ */
 function mostrarComparacionPOS(){
