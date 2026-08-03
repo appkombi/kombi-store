@@ -710,6 +710,7 @@ tr:hover td{background:var(--g50)}
           <select class="sel" id="histFiltroTurno" onchange="renderHistorial()"><option value="">Todos los turnos</option><option value="mañana">☀️ Mañana</option><option value="tarde">🌤 Tarde</option><option value="noche">🌙 Noche</option></select>
           <button class="btn btn-s sm" onclick="exportHistorialCSV()">⬇ CSV</button>
           <button class="btn btn-s sm" onclick="exportHistorialExcel()">⬇ Excel</button>
+          <button class="btn btn-p sm hidden" id="btnNuevoTurno" onclick="abrirNuevoTurno()">+ Nuevo Turno</button>
         </div>
         <div id="histList"></div>
       </div>
@@ -1035,7 +1036,7 @@ tr:hover td{background:var(--g50)}
             <div class="card">
               <div class="ct">🔄 Kombi Sync — POS-XPRESS</div>
               <p class="fs13 text-gray mb4">Sincroniza ventas e inventario desde el sistema POS automáticamente.</p>
-              <div class="fld"><label class="lbl">URL Kombi Sync</label><input class="inp" type="url" id="syncUrlInput" placeholder="https://script.google.com/macros/s/…/exec" value="https://script.google.com/macros/s/AKfycbwxI3jdz9-cvetpD1ceYWdp7jUE8_DvgdgTEwCDTY92wvIjNpnNDFmW6pnO671TNuHt/exec"/></div>
+              <div class="fld"><label class="lbl">URL Kombi Sync</label><input class="inp" type="url" id="syncUrlInput" placeholder="https://script.google.com/macros/s/…/exec" value="https://script.google.com/macros/s/AKfycbz8RfrbOAvCJXW3V6JWxLFh3t4Kw3RNQFx88Eqj-LVC3-DP_68AemtdCIZvfgtGm9ii/exec"/></div>
               <div style="display:flex;gap:.5rem;flex-wrap:wrap">
                 <button class="btn btn-p" onclick="saveSyncUrl()">Guardar</button>
                 <button class="btn btn-s" onclick="syncPOS('status')">🔍 Verificar</button>
@@ -1127,11 +1128,52 @@ tr:hover td{background:var(--g50)}
   </div>
 </div>
 
+<div class="mb hidden" id="turnoEditModal">
+  <div class="modal" style="width:min(560px,calc(100vw - 2rem))">
+    <div class="mh"><span class="mt2-title" id="turnoEditTitle">Nuevo Turno</span><button class="btn btn-g sm" onclick="document.getElementById('turnoEditModal').classList.add('hidden')">✕</button></div>
+    <div class="g2">
+      <div class="fld"><label class="lbl">Fecha</label><input class="inp" type="date" id="teFecha"/></div>
+      <div class="fld"><label class="lbl">Turno</label><select class="sel w100" id="teTurno"><option value="mañana">☀️ Mañana</option><option value="tarde">🌤 Tarde</option><option value="noche">🌙 Noche</option></select></div>
+    </div>
+    <div class="g2">
+      <div class="fld"><label class="lbl">Sucursal</label><select class="sel w100" id="teSucursal"></select></div>
+      <div class="fld"><label class="lbl">Operador</label><input class="inp" id="teOperador" placeholder="Nombre del operador"/></div>
+    </div>
+    <div class="div"></div>
+    <div class="g2">
+      <div class="fld"><label class="lbl">Efectivo apertura</label><input class="inp" type="number" id="teEfAp" placeholder="0"/></div>
+      <div class="fld"><label class="lbl">Efectivo cierre</label><input class="inp" type="number" id="teEfCi" placeholder="0"/></div>
+    </div>
+    <div class="g2">
+      <div class="fld"><label class="lbl">Retiros</label><input class="inp" type="number" id="teRetiros" placeholder="0"/></div>
+      <div class="fld"><label class="lbl">Abonos</label><input class="inp" type="number" id="teAbonos" placeholder="0"/></div>
+    </div>
+    <div class="g2">
+      <div class="fld"><label class="lbl">POS Total</label><input class="inp" type="number" id="tePosTotal" placeholder="0"/></div>
+      <div class="fld"><label class="lbl">Transferencias</label><input class="inp" type="number" id="teTransf" placeholder="0"/></div>
+    </div>
+    <div class="div"></div>
+    <div class="fs12 text-gray mb2" style="text-transform:uppercase;font-weight:700;letter-spacing:.04em">Según sistema</div>
+    <div class="g2">
+      <div class="fld"><label class="lbl">Efectivo</label><input class="inp" type="number" id="teSisEf" placeholder="0"/></div>
+      <div class="fld"><label class="lbl">Tarjetas</label><input class="inp" type="number" id="teSisTarj" placeholder="0"/></div>
+    </div>
+    <div class="fld"><label class="lbl">Otros</label><input class="inp" type="number" id="teSisOtros" placeholder="0"/></div>
+    <div class="fld"><label class="lbl">Comentario</label><textarea class="inp" id="teComentario" rows="2"></textarea></div>
+    <div class="hidden" id="teResumen" style="background:var(--a50);border:1px solid var(--a200);border-radius:8px;padding:.75rem;margin-bottom:1rem;font-size:.8125rem"></div>
+    <div class="mf">
+      <button class="btn btn-s" onclick="document.getElementById('turnoEditModal').classList.add('hidden')">Cancelar</button>
+      <button class="btn btn-d hidden" id="teDeleteBtn" onclick="eliminarTurnoManual()">🗑 Eliminar</button>
+      <button class="btn btn-p" onclick="guardarTurnoManual()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div class="mb hidden" id="histModal">
   <div class="modal" style="width:min(620px,calc(100vw - 2rem))">
     <div class="mh"><span class="mt2-title" id="histModalTitle">Detalle del Turno</span><button class="btn btn-g sm" onclick="document.getElementById('histModal').classList.add('hidden')">✕</button></div>
     <div id="histModalBody"></div>
-    <div class="mf"><button class="btn btn-s" onclick="document.getElementById('histModal').classList.add('hidden')">Cerrar</button><button class="btn btn-p" onclick="enviarTurnoDesdeModal()">📧 Enviar</button></div>
+    <div class="mf"><button class="btn btn-s" onclick="document.getElementById('histModal').classList.add('hidden')">Cerrar</button><button class="btn btn-g hidden" id="btnEditarTurno" onclick="editarTurnoExistente()">✎ Editar</button><button class="btn btn-p" onclick="enviarTurnoDesdeModal()">📧 Enviar</button></div>
   </div>
 </div>
 
@@ -1729,7 +1771,7 @@ function showSec(id,el){
   document.getElementById(id)?.classList.add('active');
   document.querySelectorAll('.ni').forEach(b=>b.classList.remove('active'));
   el?.classList.add('active');
-  if(id==='ad-dash')renderDash();if(id==='ad-hist')renderHistorial();if(id==='ad-v'){renderVChart();renderVH();renderVContraste();}
+  if(id==='ad-dash')renderDash();if(id==='ad-hist'){renderHistorial();actualizarBotonesTurnoManual();}if(id==='ad-v'){renderVChart();renderVH();renderVContraste();}
   if(id==='ad-caja')renderCajaEstado();if(id==='ad-inv')renderInv();if(id==='ad-aj')renderAjustes();
   if(id==='ad-rep')renderAnalisis();
   if(id==='op-rep')initReponer();
@@ -1836,9 +1878,23 @@ function reqPinRetiro(){
 function renderRetList(){
   const c=document.getElementById('retList');if(!c)return;const hoy=RETIROS.filter(r=>r.fecha===today());
   if(!hoy.length){c.innerHTML='<p class="fs14 text-gray">Sin movimientos hoy</p>';return;}
-  c.innerHTML=hoy.map(r=>`<div class="mi"><div><div style="display:flex;align-items:center;gap:.375rem"><span class="mt-i ${r.tipo==='retiro'?'c-re':'c-ab'}">${r.tipo.toUpperCase()}</span>${r.categoria?`<span class="badge ba" style="font-size:.7rem">${r.categoria}</span>`:''}</div><div class="fs12 text-gray">${r.motivo||''} · ${r.operador||'—'} · ${r.hora}</div></div><span class="ma ${r.tipo==='retiro'?'c-re':'c-ab'}">${r.tipo==='retiro'?'-':'+'}${clp(r.monto)}</span></div>`).join('');
+  const puedeEliminar=esSuperAdmin();
+  c.innerHTML=hoy.map(r=>`<div class="mi"><div><div style="display:flex;align-items:center;gap:.375rem"><span class="mt-i ${r.tipo==='retiro'?'c-re':'c-ab'}">${r.tipo.toUpperCase()}</span>${r.categoria?`<span class="badge ba" style="font-size:.7rem">${r.categoria}</span>`:''}</div><div class="fs12 text-gray">${r.motivo||''} · ${r.operador||'—'} · ${r.hora}</div></div><div style="display:flex;align-items:center;gap:.5rem"><span class="ma ${r.tipo==='retiro'?'c-re':'c-ab'}">${r.tipo==='retiro'?'-':'+'}${clp(r.monto)}</span>${puedeEliminar?`<button onclick="eliminarRetiro('${r.id}')" style="background:none;border:none;color:var(--r500);cursor:pointer;font-size:1rem" title="Eliminar registro">🗑</button>`:''}</div></div>`).join('');
   const totRet=hoy.filter(r=>r.tipo==='retiro').reduce((a,r)=>a+r.monto,0),totAb=hoy.filter(r=>r.tipo==='abono').reduce((a,r)=>a+r.monto,0);
   document.getElementById('retTotal').textContent=clp(totRet);document.getElementById('abonoTotal').textContent=clp(totAb);
+}
+
+async function eliminarRetiro(id){
+  if(!esSuperAdmin()){toast('Solo el Super Admin puede eliminar movimientos');return;}
+  const r=RETIROS.find(x=>x.id===id);if(!r)return;
+  if(!confirm(`¿Eliminar este ${r.tipo} de ${clp(r.monto)} registrado por ${r.operador||'—'}?\n\nEsta acción no se puede deshacer.`))return;
+  try{
+    await db.collection('retiros').doc(id).delete();
+    RETIROS=RETIROS.filter(x=>x.id!==id);
+    renderRetList();
+    await auditLog('retiro',{accion:'eliminar',retiroId:id,tipo:r.tipo,monto:r.monto,operadorOriginal:r.operador});
+    toast('🗑 Movimiento eliminado');
+  }catch(e){toast('❌ Error: '+e.message);}
 }
 
 let ciStep=1;
@@ -2842,7 +2898,143 @@ function renderHistorial(){
   c.innerHTML=ts.map(t=>{const ok=t.diffEf===0&&t.diffSis===0;return`<div class="card mb4" style="border-left:4px solid ${ok?'var(--gr500)':'var(--r500)'}"><div class="flex jcb aic mb2"><div><span class="fw7">${fdate(t.fecha)}</span><span class="badge ba" style="margin-left:.5rem">${emoji[t.turno]||''} ${t.turno||'—'}</span><span class="fs13 text-gray" style="margin-left:.5rem">${t.horaAp||'—'} → ${t.horaCi||'—'}</span></div><div style="display:flex;gap:.5rem;align-items:center"><span class="badge ${ok?'bg':'br'}">${ok?'✓ Cuadra':'⚠ Dif.'}</span><button class="btn btn-s sm" onclick="verTurno('${t.id}')">Ver</button></div></div><div class="g4" style="gap:.5rem"><div><div class="fs12 text-gray">Ef. cierre</div><div class="fw7 mono">${clp(t.efCi)}</div></div><div><div class="fs12 text-gray">POS</div><div class="fw7 mono">${clp(t.posTotal)}</div></div><div><div class="fs12 text-gray">Dif. ef.</div><div class="fw7 mono ${t.diffEf===0?'text-green':t.diffEf>0?'text-amber':'text-red'}">${t.diffEf>=0?'+':''}${clp(t.diffEf)}</div></div><div><div class="fs12 text-gray">Dif. sis.</div><div class="fw7 mono ${t.diffSis===0?'text-green':t.diffSis>0?'text-amber':'text-red'}">${t.diffSis>=0?'+':''}${clp(t.diffSis)}</div></div></div><div class="fs12 text-gray mt2">📍 ${t.sucursal||'—'} · 👤 ${t.operador}${t.comentario?` · 💬 "${t.comentario.slice(0,50)}${t.comentario.length>50?'…':''}"`:''}</div></div>`;}).join('');
 }
 let _modalTurnoId=null;
-function verTurno(id){const t=TURNOS.find(x=>x.id===id);if(!t)return;_modalTurnoId=id;document.getElementById('histModalTitle').textContent=`Turno ${fdate(t.fecha)}`;document.getElementById('histModalBody').innerHTML=buildTurnoHTML(t);document.getElementById('histModal').classList.remove('hidden');}
+let _editTurnoId=null;
+function esSuperAdmin(){return (CU.rolActivo||CU.rol)==='superadmin';}
+
+function actualizarBotonesTurnoManual(){
+  const btnNuevo=document.getElementById('btnNuevoTurno');
+  if(btnNuevo)btnNuevo.classList.toggle('hidden',!esSuperAdmin());
+}
+
+function limpiarFormTurno(){
+  ['teFecha','teOperador','teEfAp','teEfCi','teRetiros','teAbonos','tePosTotal','teTransf','teSisEf','teSisTarj','teSisOtros','teComentario'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.value='';
+  });
+  const sel=document.getElementById('teSucursal');
+  if(sel)sel.innerHTML=SUCURSALES.map(s=>`<option value="${s.id}">${s.nombre}</option>`).join('');
+  document.getElementById('teFecha').value=today();
+  document.getElementById('teTurno').value='mañana';
+  document.getElementById('teResumen').classList.add('hidden');
+}
+
+function abrirNuevoTurno(){
+  if(!esSuperAdmin()){toast('Solo el Super Admin puede crear turnos manualmente');return;}
+  _editTurnoId=null;
+  document.getElementById('turnoEditTitle').textContent='Nuevo Turno';
+  document.getElementById('teDeleteBtn').classList.add('hidden');
+  limpiarFormTurno();
+  document.getElementById('turnoEditModal').classList.remove('hidden');
+}
+
+function editarTurnoExistente(){
+  if(!esSuperAdmin()){toast('Solo el Super Admin puede editar turnos');return;}
+  const t=TURNOS.find(x=>x.id===_modalTurnoId);
+  if(!t){toast('Turno no encontrado');return;}
+  _editTurnoId=t.id;
+  document.getElementById('turnoEditTitle').textContent=`Editar turno — ${fdate(t.fecha)}`;
+  document.getElementById('teDeleteBtn').classList.remove('hidden');
+  const sel=document.getElementById('teSucursal');
+  if(sel)sel.innerHTML=SUCURSALES.map(s=>`<option value="${s.id}" ${s.id===t.sucursalId?'selected':''}>${s.nombre}</option>`).join('');
+  document.getElementById('teFecha').value=t.fecha||today();
+  document.getElementById('teTurno').value=t.turno||'mañana';
+  document.getElementById('teOperador').value=t.operador||'';
+  document.getElementById('teEfAp').value=t.efAp||0;
+  document.getElementById('teEfCi').value=t.efCi||0;
+  document.getElementById('teRetiros').value=t.retiros||0;
+  document.getElementById('teAbonos').value=t.abonos||0;
+  document.getElementById('tePosTotal').value=t.posTotal||0;
+  document.getElementById('teTransf').value=t.transf||0;
+  document.getElementById('teSisEf').value=t.sis?.ef||0;
+  document.getElementById('teSisTarj').value=t.sis?.tarj||0;
+  document.getElementById('teSisOtros').value=t.sis?.otros||0;
+  document.getElementById('teComentario').value=t.comentario||'';
+  document.getElementById('histModal').classList.add('hidden');
+  document.getElementById('turnoEditModal').classList.remove('hidden');
+  calcularResumenTurnoManual();
+}
+
+function calcularResumenTurnoManual(){
+  const num=id=>parseFloat(document.getElementById(id)?.value)||0;
+  const efAp=num('teEfAp'),efCi=num('teEfCi'),retiros=num('teRetiros'),abonos=num('teAbonos');
+  const posTotal=num('tePosTotal'),transf=num('teTransf');
+  const sisEf=num('teSisEf'),sisTarj=num('teSisTarj'),sisOtros=num('teSisOtros');
+  const saldoEsp=efAp+abonos-retiros,diffEf=efCi-saldoEsp;
+  const totalReal=efCi+posTotal+transf,sisTotal=sisEf+sisTarj+sisOtros,diffSis=totalReal-sisTotal;
+  const r=document.getElementById('teResumen');
+  r.classList.remove('hidden');
+  r.innerHTML=`
+    <div style="display:flex;justify-content:space-between;margin-bottom:.25rem"><span>Saldo esperado</span><span class="mono fw6">${clp(saldoEsp)}</span></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:.25rem"><span>Dif. Efectivo</span><span class="mono fw7" style="color:${diffEf===0?'var(--gr600)':'var(--r600)'}">${diffEf>=0?'+':''}${clp(diffEf)}</span></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:.25rem"><span>Total contado</span><span class="mono fw6">${clp(totalReal)}</span></div>
+    <div style="display:flex;justify-content:space-between"><span>Dif. Sistema</span><span class="mono fw7" style="color:${diffSis===0?'var(--gr600)':'var(--r600)'}">${diffSis>=0?'+':''}${clp(diffSis)}</span></div>`;
+  return{saldoEsp,diffEf,totalReal,sisTotal,diffSis};
+}
+
+async function guardarTurnoManual(){
+  const sucId=document.getElementById('teSucursal').value;
+  const sucNombre=SUCURSALES.find(s=>s.id===sucId)?.nombre||'';
+  const fecha=document.getElementById('teFecha').value;
+  const turno=document.getElementById('teTurno').value;
+  const operador=document.getElementById('teOperador').value.trim();
+  if(!fecha||!operador){toast('Completa fecha y operador');return;}
+
+  const num=id=>parseFloat(document.getElementById(id)?.value)||0;
+  const efAp=num('teEfAp'),efCi=num('teEfCi'),retiros=num('teRetiros'),abonos=num('teAbonos');
+  const posTotal=num('tePosTotal'),transf=num('teTransf');
+  const sisEf=num('teSisEf'),sisTarj=num('teSisTarj'),sisOtros=num('teSisOtros');
+  const comentario=document.getElementById('teComentario').value.trim();
+  const calc=calcularResumenTurnoManual();
+
+  const data={
+    fecha,turno,sucursalId:sucId,sucursal:sucNombre,operador,
+    efAp,efCi,retiros,abonos,posTotal,transf,
+    saldoEsp:calc.saldoEsp,diffEf:calc.diffEf,
+    totalReal:calc.totalReal,sisTotal:calc.sisTotal,diffSis:calc.diffSis,
+    sis:{ef:sisEf,tarj:sisTarj,otros:sisOtros},
+    comentario,
+    editadoManualmente:true,editadoPor:CU.nombre,editadoEn:firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  try{
+    if(_editTurnoId){
+      await db.collection('turnos').doc(_editTurnoId).update(data);
+      const idx=TURNOS.findIndex(t=>t.id===_editTurnoId);
+      if(idx>=0)TURNOS[idx]={...TURNOS[idx],...data};
+      await auditLog('turno',{accion:'editar_manual',turnoId:_editTurnoId,sucursal:sucNombre,fecha});
+      toast('✅ Turno actualizado');
+    }else{
+      data.horaAp='—';data.horaCi='—';data.creadoManualmente=true;
+      data.timestamp=firebase.firestore.FieldValue.serverTimestamp();
+      const ref=await db.collection('turnos').add(data);
+      TURNOS.unshift({id:ref.id,...data});
+      await auditLog('turno',{accion:'crear_manual',turnoId:ref.id,sucursal:sucNombre,fecha});
+      toast('✅ Turno creado');
+    }
+    document.getElementById('turnoEditModal').classList.add('hidden');
+    renderHistorial();
+  }catch(e){toast('❌ Error: '+e.message);}
+}
+
+async function eliminarTurnoManual(){
+  if(!_editTurnoId)return;
+  if(!confirm('¿Eliminar este turno permanentemente? Esta acción no se puede deshacer.'))return;
+  try{
+    await db.collection('turnos').doc(_editTurnoId).delete();
+    TURNOS=TURNOS.filter(t=>t.id!==_editTurnoId);
+    await auditLog('turno',{accion:'eliminar',turnoId:_editTurnoId});
+    document.getElementById('turnoEditModal').classList.add('hidden');
+    renderHistorial();
+    toast('🗑 Turno eliminado');
+  }catch(e){toast('❌ Error: '+e.message);}
+}
+
+// Recalcular resumen en vivo mientras se edita
+['teEfAp','teEfCi','teRetiros','teAbonos','tePosTotal','teTransf','teSisEf','teSisTarj','teSisOtros'].forEach(id=>{
+  document.addEventListener('input',e=>{if(e.target && e.target.id===id)calcularResumenTurnoManual();});
+});
+
+
+function verTurno(id){const t=TURNOS.find(x=>x.id===id);if(!t)return;_modalTurnoId=id;document.getElementById('histModalTitle').textContent=`Turno ${fdate(t.fecha)}`;document.getElementById('histModalBody').innerHTML=buildTurnoHTML(t);document.getElementById('btnEditarTurno')?.classList.toggle('hidden',!esSuperAdmin());document.getElementById('histModal').classList.remove('hidden');}
 function buildTurnoHTML(t){
   const sec=l=>`<div style="font-size:.75rem;font-weight:700;color:var(--g400);text-transform:uppercase;letter-spacing:.06em;padding:.5rem 1rem .25rem">${l}</div>`;
   let html=`<p style="font-size:.8125rem;color:var(--g500);margin-bottom:1rem">📍 ${t.sucursal||'—'} · 👤 ${t.operador} · ${t.horaAp||'—'} → ${t.horaCi||'—'}</p>`;
@@ -4291,7 +4483,7 @@ function saveGasUrl(){const url=document.getElementById('gasUrlInput')?.value.tr
 async function testGasUrl(){const url=getGasUrl();if(!url){toast('Guarda la URL primero');return;}setGasStatus('🔄 Probando…','var(--g500)');try{await fetch(url,{method:'GET',mode:'no-cors'});setGasStatus('✅ URL alcanzable','var(--gr600)');}catch(e){setGasStatus('❌ Error','var(--r600)');}}
 
 /* ============ POS SYNC ============ */
-const SYNC_URL='https://script.google.com/macros/s/AKfycbxFAOVkqdXFthJvUiGSMgHk8IiDJc2J2N7R4_xrVsJaF9nRDXSNrhDKKMLDenFvQeAR/exec';
+const SYNC_URL='https://script.google.com/macros/s/AKfycbz8RfrbOAvCJXW3V6JWxLFh3t4Kw3RNQFx88Eqj-LVC3-DP_68AemtdCIZvfgtGm9ii/exec';
 
 function getSyncUrl(){return document.getElementById('syncUrlInput')?.value.trim()||CFG.syncUrl||SYNC_URL;}
 
