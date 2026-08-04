@@ -1025,14 +1025,14 @@ tr:hover td{background:var(--g50)}
               <div class="ct">🔗 Google Apps Script — Correos y fotos</div>
               <p class="fs13 text-gray mb4">URL para envío de correos a appkombi@gmail.com</p>
               <div class="fld"><label class="lbl">URL Web App</label><input class="inp" type="url" id="gasUrlInput" placeholder="https://script.google.com/macros/s/…/exec"/></div>
-              <div style="display:flex;gap:.75rem"><button class="btn btn-p" onclick="saveGasUrl()">Guardar</button><button class="btn btn-s" onclick="testGasUrl()">🧪 Probar</button></div>
+              <div style="display:flex;gap:.75rem;flex-wrap:wrap"><button class="btn btn-p" onclick="saveGasUrl()">Guardar</button><button class="btn btn-s" onclick="testGasUrl()">🧪 Probar conexión</button><button class="btn btn-s" onclick="enviarCorreoPrueba()">📧 Enviar correo de prueba</button></div>
               <div id="gasStatus" style="margin-top:.75rem;font-size:.8125rem"></div>
             </div>
 
             <div class="card">
               <div class="ct">🔄 Kombi Sync — POS-XPRESS</div>
               <p class="fs13 text-gray mb4">Sincroniza ventas e inventario desde el sistema POS automáticamente.</p>
-              <div class="fld"><label class="lbl">URL Kombi Sync</label><input class="inp" type="url" id="syncUrlInput" placeholder="https://script.google.com/macros/s/…/exec" value="https://script.google.com/macros/s/AKfycbz8RfrbOAvCJXW3V6JWxLFh3t4Kw3RNQFx88Eqj-LVC3-DP_68AemtdCIZvfgtGm9ii/exec"/></div>
+              <div class="fld"><label class="lbl">URL Kombi Sync</label><input class="inp" type="url" id="syncUrlInput" placeholder="https://script.google.com/macros/s/…/exec" value="https://script.google.com/macros/s/AKfycbwNjRfKLxj0aN0nmBWRoT8HhZs_20XCyrvn4-4RRnFYg5rt9X-eh4jt_6iNPCCC42AB/exec"/></div>
               <div style="display:flex;gap:.5rem;flex-wrap:wrap">
                 <button class="btn btn-p" onclick="saveSyncUrl()">Guardar</button>
                 <button class="btn btn-s" onclick="syncPOS('status')">🔍 Verificar</button>
@@ -4603,10 +4603,32 @@ function cancelarImportInv(){_importData=[];document.getElementById('invImportPr
 
 function getGasUrl(){return CFG.gasUrl||document.getElementById('gasUrlInput')?.value.trim()||'';}
 function saveGasUrl(){const url=document.getElementById('gasUrlInput')?.value.trim();if(!url||!url.startsWith('https://')){toast('URL inválida');return;}CFG.gasUrl=url;db.collection('config').doc('global').update({gasUrl:url});setGasStatus('✅ URL guardada','var(--gr600)');}
+async function enviarCorreoPrueba(){
+  const url=getGasUrl();
+  if(!url){toast('Guarda la URL del script primero');return;}
+  const cc=(await obtenerEmailsGerentes()).join(',');
+  const tienda=CFG.tienda?.nombre||'Kombi Store';
+  const rows=[
+    {header:'CORREO DE PRUEBA'},
+    {label:'Enviado por',value:CU.nombre},
+    {label:'Fecha y hora',value:new Date().toLocaleString('es-CL')},
+    {label:'Tienda',value:tienda},
+    {label:'Con copia a',value:cc?`${cc.split(',').length} gerente(s)`:'Sin gerentes configurados'},
+  ];
+  const ok=await enviarEmail(
+    `🧪 Correo de prueba — ${tienda}`,
+    `Este es un correo de prueba enviado manualmente desde Ajustes por ${CU.nombre}. Si lo recibiste, la configuración de correo está funcionando correctamente.`,
+    buildHTMLTable(rows),
+    'general',
+    cc
+  );
+  if(ok)setGasStatus(cc?`✅ Prueba enviada — con copia a ${cc.split(',').length} gerente(s)`:'✅ Prueba enviada — sin gerentes con copia (no hay usuarios con rol gerente activo)','var(--gr600)');
+}
+
 async function testGasUrl(){const url=getGasUrl();if(!url){toast('Guarda la URL primero');return;}setGasStatus('🔄 Probando…','var(--g500)');try{await fetch(url,{method:'GET',mode:'no-cors'});setGasStatus('✅ URL alcanzable','var(--gr600)');}catch(e){setGasStatus('❌ Error','var(--r600)');}}
 
 /* ============ POS SYNC ============ */
-const SYNC_URL='https://script.google.com/macros/s/AKfycbz8RfrbOAvCJXW3V6JWxLFh3t4Kw3RNQFx88Eqj-LVC3-DP_68AemtdCIZvfgtGm9ii/exec';
+const SYNC_URL='https://script.google.com/macros/s/AKfycbwNjRfKLxj0aN0nmBWRoT8HhZs_20XCyrvn4-4RRnFYg5rt9X-eh4jt_6iNPCCC42AB/exec';
 
 function getSyncUrl(){return document.getElementById('syncUrlInput')?.value.trim()||CFG.syncUrl||SYNC_URL;}
 
@@ -5196,6 +5218,7 @@ async function renderUsers(){
         <td><div style="display:flex;gap:.375rem">
           <button class="btn btn-s sm" onclick="editUser('${u.id}')">✎ Editar</button>
           <button class="btn ${u.activo?'btn-d':'btn-p'} sm" onclick="toggleUser('${u.id}',${u.activo})">${u.activo?'Desactivar':'Activar'}</button>
+          <button class="btn btn-d sm" onclick="eliminarUsuarioDirecto('${u.id}','${(u.nombre||'').replace(/'/g,"\\'")}')" title="Eliminar usuario">🗑</button>
         </div></td>
       </tr>`;
     }).join('');}
@@ -5297,6 +5320,17 @@ async function saveUser(){
       toast(`✅ Usuario ${nombre} creado — puede iniciar sesión con ${email}`);
     }
     closeUserModal();renderUsers();
+  }catch(e){toast('❌ Error: '+e.message);}
+}
+
+async function eliminarUsuarioDirecto(id,nombre){
+  if(id===CU.uid){toast('No puedes eliminar tu propio usuario');return;}
+  if(!confirm(`¿Eliminar permanentemente a ${nombre||'este usuario'}?\n\nEsta acción no se puede deshacer.`))return;
+  try{
+    await db.collection('usuarios').doc(id).update({activo:false,eliminado:true,eliminadoPor:CU.uid,eliminadoEn:firebase.firestore.FieldValue.serverTimestamp()});
+    await auditLog('usuario',{accion:'eliminar',uid:id,nombre});
+    renderUsers();
+    toast(`🗑 ${nombre||'Usuario'} eliminado`);
   }catch(e){toast('❌ Error: '+e.message);}
 }
 
