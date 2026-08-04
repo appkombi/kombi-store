@@ -4058,7 +4058,7 @@ async function enviarReposicionEmail(){
   const tienda=CFG.tienda?.nombre||'Kombi Store';
   const rows=[{header:`LISTA DE REPOSICIÓN — ${tienda} — ${today()}`},
     ...bajo.map(i=>({label:`${i.nombre} (${i.marca||'—'})`,value:`${i.stock}/${i.min} — Pedir: ${i.min-i.stock}`,neg:true}))];
-  await enviarEmail(`Reposición ${tienda}`,`${bajo.length} productos bajo mínimo`,buildHTMLTable(rows),'inventario');
+  await enviarEmail(`Reposición — ${tienda} — ${new Date().toLocaleDateString('es-CL')}`,`${bajo.length} productos bajo mínimo`,buildHTMLTable(rows),'inventario');
 }
 
 /* ============ METAS DE VENTA ============ */
@@ -4616,7 +4616,7 @@ async function enviarCorreoPrueba(){
     {label:'Con copia a',value:cc?`${cc.split(',').length} gerente(s)`:'Sin gerentes configurados'},
   ];
   const ok=await enviarEmail(
-    `🧪 Correo de prueba — ${tienda}`,
+    `Prueba — ${tienda} — ${new Date().toLocaleDateString('es-CL')}`,
     `Este es un correo de prueba enviado manualmente desde Ajustes por ${CU.nombre}. Si lo recibiste, la configuración de correo está funcionando correctamente.`,
     buildHTMLTable(rows),
     'general',
@@ -4963,7 +4963,7 @@ async function enviarEmailApertura(){
       {label:'Hora',value:AP.hora||timeNow()},
       {label:'Efectivo apertura',value:clp(totalBills(AP)),total:true},
     ];
-    await enviarEmail(`Apertura — ${sucNombre} (${turno})`,`${CU.nombre} abrió turno ${turno} en ${sucNombre}`,buildHTMLTable(rows),'diario',cc);
+    await enviarEmail(`Apertura — ${sucNombre} — ${turno} — ${today()}`,`${CU.nombre} abrió turno ${turno} en ${sucNombre}`,buildHTMLTable(rows),'diario',cc);
   }catch(e){console.warn('email apertura:',e);}
 }
 
@@ -5066,7 +5066,7 @@ async function enviarReporteDiario(){
 }
 function generarReporteInv(){const c=document.getElementById('repInvPreview');if(!c)return;c.classList.remove('hidden');const cats=[...new Set(INVENTARIO.map(i=>i.cat))];let html=`<div class="card" style="font-family:var(--mono);font-size:.8125rem;white-space:pre-wrap;line-height:1.7;background:var(--g50)"><strong>Inventario — ${new Date().toLocaleDateString('es-CL')}</strong>\n\n`;cats.forEach(cat=>{html+=cat.toUpperCase()+'\n';INVENTARIO.filter(i=>i.cat===cat).forEach(i=>{html+=`  ${i.nombre.padEnd(30)}${i.stock} u  ${clp(i.precio)}${i.stock<=i.min&&i.min>0?' ⚠':''}\n`;});html+='\n';});html+=`Total: ${INVENTARIO.length} | Bajo mínimo: ${INVENTARIO.filter(i=>i.stock<=i.min&&i.min>0).length}</div>`;c.innerHTML=html;}
 async function enviarReporteInv(){generarReporteInv();const tienda=CFG.tienda?.nombre||'Kombi Store',cats=[...new Set(INVENTARIO.map(i=>i.cat))],rows=[];cats.forEach(cat=>{rows.push({header:cat.toUpperCase()});INVENTARIO.filter(i=>i.cat===cat).forEach(i=>rows.push({label:i.nombre+(i.stock<=i.min&&i.min>0?' ⚠':''),value:`${i.stock} u — ${clp(i.precio)}`,neg:i.stock<=i.min&&i.min>0}));});await enviarEmail(`Inventario ${tienda}`,`Inventario ${new Date().toLocaleDateString('es-CL')}`,buildHTMLTable(rows),'inventario');}
-async function enviarTurnoDesdeModal(){const t=TURNOS.find(x=>x.id===_modalTurnoId);if(!t)return;const tienda=CFG.tienda?.nombre||'Kombi Store',emoji=emojiTurnoMap();await enviarEmail(`Cierre ${emoji[t.turno]||''} ${t.turno||''} — ${tienda} — ${fdate(t.fecha)}`,buildTurnoText(t),buildHTMLTable([{header:'EFECTIVO'},{label:'Apertura',value:clp(t.efAp)},{label:'Cierre',value:clp(t.efCi)},{label:'Retiros',value:'-'+clp(t.retiros),neg:true},{label:'Abonos',value:'+'+clp(t.abonos),pos:true},{label:'Diferencia',value:(t.diffEf>=0?'+':'')+clp(t.diffEf),neg:t.diffEf<0,pos:t.diffEf>0,total:true},{header:'TOTAL'},{label:'Total contado',value:clp(t.totalReal),total:true},{label:'Dif. Sistema',value:(t.diffSis>=0?'+':'')+clp(t.diffSis),neg:t.diffSis<0,pos:t.diffSis>0,total:true}]),t.diffEf!==0||t.diffSis!==0?'diferencia':'cierre');}
+async function enviarTurnoDesdeModal(){const t=TURNOS.find(x=>x.id===_modalTurnoId);if(!t)return;const tienda=CFG.tienda?.nombre||'Kombi Store',emoji=emojiTurnoMap();await enviarEmail(`Cierre — ${tienda} — ${t.turno||''} — ${fdate(t.fecha)}`,buildTurnoText(t),buildHTMLTable([{header:'EFECTIVO'},{label:'Apertura',value:clp(t.efAp)},{label:'Cierre',value:clp(t.efCi)},{label:'Retiros',value:'-'+clp(t.retiros),neg:true},{label:'Abonos',value:'+'+clp(t.abonos),pos:true},{label:'Diferencia',value:(t.diffEf>=0?'+':'')+clp(t.diffEf),neg:t.diffEf<0,pos:t.diffEf>0,total:true},{header:'TOTAL'},{label:'Total contado',value:clp(t.totalReal),total:true},{label:'Dif. Sistema',value:(t.diffSis>=0?'+':'')+clp(t.diffSis),neg:t.diffSis<0,pos:t.diffSis>0,total:true}]),t.diffEf!==0||t.diffSis!==0?'diferencia':'cierre');}
 
 /* ============ NOTIFICACIÓN GERENTES ============ */
 async function notificarGerentes(turno){
@@ -5083,7 +5083,7 @@ async function notificarGerentes(turno){
     const emoji=emojiTurnoMap();
     const diffOk=turno.diffEf===0&&turno.diffSis===0;
     const tipo=diffOk?'cierre':'diferencia';
-    const asunto=`${diffOk?'✅':'⚠️'} Cierre ${emoji[turno.turno]||''} ${turno.turno} — ${turno.sucursal} — ${fdate(turno.fecha)}`;
+    const asunto=`${diffOk?'Cierre':'Cierre con diferencia'} — ${turno.sucursal} — ${turno.turno} — ${fdate(turno.fecha)}`;
     const rows=[
       {header:`${turno.sucursal} · ${turno.operador} · ${turno.horaAp||'—'} → ${turno.horaCi||'—'}`},
       {label:'Efectivo apertura',value:clp(turno.efAp)},
