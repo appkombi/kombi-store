@@ -4952,8 +4952,94 @@ async function enviarEmail(asunto,cuerpoTexto,htmlBody,tipo='general',cc=''){
   catch(err){toast('❌ Error: '+err.message);return false;}
 }
 function buildHTMLTable(rows){return`<table style="width:100%;border-collapse:collapse;font-size:13px;margin:8px 0">${rows.map(r=>r.header?`<tr style="background:#F9FAFB"><td colspan="2" style="padding:10px 12px;font-weight:800;font-size:11px;color:#6B7280;text-transform:uppercase;border-bottom:2px solid #F59E0B">${r.header}</td></tr>`:`<tr style="border-bottom:1px solid #F3F4F6${r.total?';background:#FFFBEB;font-weight:700':''}"><td style="padding:8px 12px;color:${r.total?'#92400E':'#6B7280'}">${r.label}</td><td style="padding:8px 12px;text-align:right;font-family:monospace;color:${r.neg?'#DC2626':r.pos?'#16A34A':r.total?'#B45309':'#111827'};font-weight:${r.total?700:500}">${r.value}</td></tr>`).join('')}</table>`;}
-function generarReporteDiario(){const fecha=document.getElementById('repFecha').value||today(),t=TURNOS.find(x=>x.fecha===fecha),v=VENTAS.find(x=>x.fecha===fecha),c=document.getElementById('repPreview');if(!c)return;c.classList.remove('hidden');if(!t&&!v){c.innerHTML='<div class="card"><p class="fs14 text-gray">Sin datos</p></div>';return;}let html=`<div class="card" style="font-family:var(--mono);font-size:.8125rem;white-space:pre-wrap;line-height:1.7;background:var(--g50)"><strong>${CFG.tienda?.nombre||'Kombi Store'} — ${fdate(fecha)}</strong>\n\n`;if(v)html+=`VENTAS\n  Ef: ${clp(v.ef)} | POS: ${clp(v.pos)} | Transf: ${clp(v.tr)}\n  TOTAL: ${clp(v.total)}\n\n`;if(t)html+=`CAJA\n  Dif. ef: ${t.diffEf>=0?'+':''}${clp(t.diffEf)} ${t.diffEf===0?'✓':'⚠'}\n  Dif. sis: ${t.diffSis>=0?'+':''}${clp(t.diffSis)} ${t.diffSis===0?'✓':'⚠'}\n\n`;const bajo=INVENTARIO.filter(i=>i.stock<=i.min&&i.min>0);if(bajo.length)html+=`STOCK CRÍTICO\n`+bajo.map(i=>`  ${i.nombre}: ${i.stock}/${i.min}`).join('\n');html+='</div>';c.innerHTML=html;}
-async function enviarReporteDiario(){generarReporteDiario();const fecha=document.getElementById('repFecha').value||today(),t=TURNOS.find(x=>x.fecha===fecha),v=VENTAS.find(x=>x.fecha===fecha),tienda=CFG.tienda?.nombre||'Kombi Store';const rows=[];if(v){rows.push({header:'VENTAS'});['Efectivo','POS','Transf.','TOTAL'].forEach((l,i)=>rows.push({label:l,value:clp([v.ef,v.pos,v.tr,v.total][i]),total:i===3}));}if(t){rows.push({header:'CAJA'});rows.push({label:'Dif. efectivo',value:(t.diffEf>=0?'+':'')+clp(t.diffEf)+' '+(t.diffEf===0?'✓':'⚠'),neg:t.diffEf<0,pos:t.diffEf>0});rows.push({label:'Dif. sistema',value:(t.diffSis>=0?'+':'')+clp(t.diffSis)+' '+(t.diffSis===0?'✓':'⚠'),neg:t.diffSis<0,pos:t.diffSis>0});}const bajo=INVENTARIO.filter(i=>i.stock<=i.min&&i.min>0);if(bajo.length){rows.push({header:`⚠ STOCK CRÍTICO (${bajo.length})`});bajo.forEach(i=>rows.push({label:i.nombre,value:`${i.stock}/${i.min}`,neg:true}));}await enviarEmail(`Reporte ${tienda} — ${fecha}`,`Reporte ${fdate(fecha)}`,buildHTMLTable(rows),'diario');}
+async function generarReporteDiario(){
+  const fecha=document.getElementById('repFecha').value||today();
+  const t=TURNOS.filter(x=>x.fecha===fecha);
+  const v=VENTAS.find(x=>x.fecha===fecha);
+  const c=document.getElementById('repPreview');if(!c)return;
+  c.classList.remove('hidden');
+  c.innerHTML='<div class="card"><p class="fs14 text-gray">Generando…</p></div>';
+
+  // Traer datos del POS para esta fecha (todas las sucursales) — fuente automática,
+  // el reporte se genera igual aunque no haya venta manual ni cierre de turno.
+  const posPorSuc=[];
+  for(const suc of SUCURSALES){
+    try{const snap=await db.collection('ventasPOS').doc(fecha+'_'+suc.id).get();if(snap.exists)posPorSuc.push({nombre:suc.nombre,...snap.data()});}catch(e){}
+  }
+  const totalPOS=posPorSuc.reduce((a,s)=>a+(s.totalVenta||0),0);
+
+  let html=`<div class="card" style="font-family:var(--mono);font-size:.8125rem;white-space:pre-wrap;line-height:1.7;background:var(--g50)"><strong>${CFG.tienda?.nombre||'Kombi Store'} — ${fdate(fecha)}</strong>\n\n`;
+
+  html+=`SISTEMA (POS)\n`;
+  if(posPorSuc.length){
+    posPorSuc.forEach(s=>{html+=`  ${s.nombre}: ${clp(s.totalVenta||0)} (${s.totalBoletas||0} boletas)\n`;});
+    html+=`  TOTAL: ${clp(totalPOS)}\n\n`;
+  }else{
+    html+=`  Sin sincronización del POS para esta fecha.\n\n`;
+  }
+
+  html+=`VENTAS (registro manual)\n`;
+  html+=v?`  Ef: ${clp(v.ef)} | POS: ${clp(v.pos)} | Transf: ${clp(v.tr)}\n  TOTAL: ${clp(v.total)}\n\n`:`  Sin registro manual para esta fecha.\n\n`;
+
+  html+=`CAJA (cierres de turno)\n`;
+  if(t.length){
+    t.forEach(tu=>{html+=`  ${tu.sucursal||'—'} (${tu.turno||'—'}): Dif.ef ${tu.diffEf>=0?'+':''}${clp(tu.diffEf)} ${tu.diffEf===0?'✓':'⚠'} · Dif.sis ${tu.diffSis>=0?'+':''}${clp(tu.diffSis)} ${tu.diffSis===0?'✓':'⚠'}\n`;});
+  }else{
+    html+=`  Sin cierres de turno registrados para esta fecha.\n`;
+  }
+  html+='\n';
+
+  const bajo=INVENTARIO.filter(i=>i.stock<=i.min&&i.min>0);
+  html+=`STOCK CRÍTICO\n`;
+  html+=bajo.length?bajo.map(i=>`  ${i.nombre}: ${i.stock}/${i.min}`).join('\n'):'  Todo OK — sin productos bajo mínimo.';
+  html+='</div>';
+  c.innerHTML=html;
+}
+
+async function enviarReporteDiario(){
+  await generarReporteDiario();
+  const fecha=document.getElementById('repFecha').value||today();
+  const t=TURNOS.filter(x=>x.fecha===fecha);
+  const v=VENTAS.find(x=>x.fecha===fecha);
+  const tienda=CFG.tienda?.nombre||'Kombi Store';
+
+  const posPorSuc=[];
+  for(const suc of SUCURSALES){
+    try{const snap=await db.collection('ventasPOS').doc(fecha+'_'+suc.id).get();if(snap.exists)posPorSuc.push({nombre:suc.nombre,...snap.data()});}catch(e){}
+  }
+  const totalPOS=posPorSuc.reduce((a,s)=>a+(s.totalVenta||0),0);
+
+  const rows=[{header:`REPORTE DIARIO — ${fdate(fecha)}`}];
+
+  rows.push({header:'SISTEMA (POS)'});
+  if(posPorSuc.length){
+    posPorSuc.forEach(s=>rows.push({label:s.nombre,value:`${clp(s.totalVenta||0)} (${s.totalBoletas||0} bol.)`}));
+    rows.push({label:'TOTAL POS',value:clp(totalPOS),total:true});
+  }else{
+    rows.push({label:'Sin sync del POS',value:'—'});
+  }
+
+  rows.push({header:'VENTAS (registro manual)'});
+  if(v)['Efectivo','POS','Transf.','TOTAL'].forEach((l,i)=>rows.push({label:l,value:clp([v.ef,v.pos,v.tr,v.total][i]),total:i===3}));
+  else rows.push({label:'Sin registro manual',value:'—'});
+
+  rows.push({header:'CAJA (cierres de turno)'});
+  if(t.length){
+    t.forEach(tu=>{
+      rows.push({label:`${tu.sucursal||'—'} (${tu.turno||'—'}) Dif.ef`,value:(tu.diffEf>=0?'+':'')+clp(tu.diffEf)+' '+(tu.diffEf===0?'✓':'⚠'),neg:tu.diffEf<0,pos:tu.diffEf>0});
+      rows.push({label:`${tu.sucursal||'—'} (${tu.turno||'—'}) Dif.sis`,value:(tu.diffSis>=0?'+':'')+clp(tu.diffSis)+' '+(tu.diffSis===0?'✓':'⚠'),neg:tu.diffSis<0,pos:tu.diffSis>0});
+    });
+  }else{
+    rows.push({label:'Sin cierres registrados',value:'—'});
+  }
+
+  const bajo=INVENTARIO.filter(i=>i.stock<=i.min&&i.min>0);
+  rows.push({header:`STOCK CRÍTICO ${bajo.length?`(${bajo.length})`:''}`});
+  if(bajo.length)bajo.forEach(i=>rows.push({label:i.nombre,value:`${i.stock}/${i.min}`,neg:true}));
+  else rows.push({label:'Todo OK',value:'✓'});
+
+  await enviarEmail(`Reporte ${tienda} — ${fecha}`,`Reporte diario ${fdate(fecha)} — POS: ${clp(totalPOS)}`,buildHTMLTable(rows),'diario');
+}
 function generarReporteInv(){const c=document.getElementById('repInvPreview');if(!c)return;c.classList.remove('hidden');const cats=[...new Set(INVENTARIO.map(i=>i.cat))];let html=`<div class="card" style="font-family:var(--mono);font-size:.8125rem;white-space:pre-wrap;line-height:1.7;background:var(--g50)"><strong>Inventario — ${new Date().toLocaleDateString('es-CL')}</strong>\n\n`;cats.forEach(cat=>{html+=cat.toUpperCase()+'\n';INVENTARIO.filter(i=>i.cat===cat).forEach(i=>{html+=`  ${i.nombre.padEnd(30)}${i.stock} u  ${clp(i.precio)}${i.stock<=i.min&&i.min>0?' ⚠':''}\n`;});html+='\n';});html+=`Total: ${INVENTARIO.length} | Bajo mínimo: ${INVENTARIO.filter(i=>i.stock<=i.min&&i.min>0).length}</div>`;c.innerHTML=html;}
 async function enviarReporteInv(){generarReporteInv();const tienda=CFG.tienda?.nombre||'Kombi Store',cats=[...new Set(INVENTARIO.map(i=>i.cat))],rows=[];cats.forEach(cat=>{rows.push({header:cat.toUpperCase()});INVENTARIO.filter(i=>i.cat===cat).forEach(i=>rows.push({label:i.nombre+(i.stock<=i.min&&i.min>0?' ⚠':''),value:`${i.stock} u — ${clp(i.precio)}`,neg:i.stock<=i.min&&i.min>0}));});await enviarEmail(`Inventario ${tienda}`,`Inventario ${new Date().toLocaleDateString('es-CL')}`,buildHTMLTable(rows),'inventario');}
 async function enviarTurnoDesdeModal(){const t=TURNOS.find(x=>x.id===_modalTurnoId);if(!t)return;const tienda=CFG.tienda?.nombre||'Kombi Store',emoji=emojiTurnoMap();await enviarEmail(`Cierre ${emoji[t.turno]||''} ${t.turno||''} — ${tienda} — ${fdate(t.fecha)}`,buildTurnoText(t),buildHTMLTable([{header:'EFECTIVO'},{label:'Apertura',value:clp(t.efAp)},{label:'Cierre',value:clp(t.efCi)},{label:'Retiros',value:'-'+clp(t.retiros),neg:true},{label:'Abonos',value:'+'+clp(t.abonos),pos:true},{label:'Diferencia',value:(t.diffEf>=0?'+':'')+clp(t.diffEf),neg:t.diffEf<0,pos:t.diffEf>0,total:true},{header:'TOTAL'},{label:'Total contado',value:clp(t.totalReal),total:true},{label:'Dif. Sistema',value:(t.diffSis>=0?'+':'')+clp(t.diffSis),neg:t.diffSis<0,pos:t.diffSis>0,total:true}]),t.diffEf!==0||t.diffSis!==0?'diferencia':'cierre');}
