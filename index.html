@@ -4288,8 +4288,8 @@ function startRealTimeListeners(){
       renderNotifBanner(notifs);
     }, e=>{
       if(e.code==='failed-precondition'){
-        // Index not created yet — try without orderBy
-        console.warn('Notif index missing — create it in Firebase Console');
+        // Index not created yet — try without orderBy, pero mostramos el link real para crearlo
+        console.warn('Notif index missing. Link para crear el índice:',e.message);
         _unsubNotif=db.collection('notificaciones')
           .where('leida','==',false)
           .limit(20)
@@ -4970,7 +4970,9 @@ async function enviarEmailApertura(){
 async function enviarEmail(asunto,cuerpoTexto,htmlBody,tipo='general',cc=''){
   const url=getGasUrl();if(!url){toast('⚠ Configura la URL del script');return false;}
   try{toast('📤 Enviando…',6000);let iframe=document.getElementById('gas_iframe');if(!iframe){iframe=document.createElement('iframe');iframe.name='gas_iframe';iframe.id='gas_iframe';iframe.style.display='none';document.body.appendChild(iframe);}
-  const form=document.createElement('form');form.method='POST';form.action=url;form.target='gas_iframe';form.style.display='none';[{k:'asunto',v:asunto},{k:'cuerpo',v:cuerpoTexto},{k:'html',v:htmlBody},{k:'tipo',v:tipo},{k:'cc',v:cc}].forEach(({k,v})=>{const i=document.createElement('input');i.type='hidden';i.name=k;i.value=v;form.appendChild(i);});document.body.appendChild(form);form.submit();form.remove();setTimeout(()=>toast('✅ Correo enviado a appkombi@gmail.com',4000),1500);return true;}
+  const form=document.createElement('form');form.method='POST';form.action=url;form.target='gas_iframe';form.style.display='none';[{k:'asunto',v:asunto},{k:'cuerpo',v:cuerpoTexto},{k:'html',v:htmlBody},{k:'tipo',v:tipo},{k:'cc',v:cc}].forEach(({k,v})=>{const i=document.createElement('input');i.type='hidden';i.name=k;i.value=v;form.appendChild(i);});document.body.appendChild(form);form.submit();form.remove();
+  const ccCount=cc?cc.split(',').filter(Boolean).length:0;
+  setTimeout(()=>toast(ccCount?`✅ Enviado a appkombi@gmail.com + copia a ${ccCount} gerente(s): ${cc}`:'✅ Enviado a appkombi@gmail.com — SIN copia a gerentes (no se encontró ninguno activo con email)',6000),1500);return true;}
   catch(err){toast('❌ Error: '+err.message);return false;}
 }
 function buildHTMLTable(rows){return`<table style="width:100%;border-collapse:collapse;font-size:13px;margin:8px 0">${rows.map(r=>r.header?`<tr style="background:#F9FAFB"><td colspan="2" style="padding:10px 12px;font-weight:800;font-size:11px;color:#6B7280;text-transform:uppercase;border-bottom:2px solid #F59E0B">${r.header}</td></tr>`:`<tr style="border-bottom:1px solid #F3F4F6${r.total?';background:#FFFBEB;font-weight:700':''}"><td style="padding:8px 12px;color:${r.total?'#92400E':'#6B7280'}">${r.label}</td><td style="padding:8px 12px;text-align:right;font-family:monospace;color:${r.neg?'#DC2626':r.pos?'#16A34A':r.total?'#B45309':'#111827'};font-weight:${r.total?700:500}">${r.value}</td></tr>`).join('')}</table>`;}
