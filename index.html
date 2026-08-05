@@ -1032,7 +1032,7 @@ tr:hover td{background:var(--g50)}
             <div class="card">
               <div class="ct">🔄 Kombi Sync — POS-XPRESS</div>
               <p class="fs13 text-gray mb4">Sincroniza ventas e inventario desde el sistema POS automáticamente.</p>
-              <div class="fld"><label class="lbl">URL Kombi Sync</label><input class="inp" type="url" id="syncUrlInput" placeholder="https://script.google.com/macros/s/…/exec" value="https://script.google.com/macros/s/AKfycbwNjRfKLxj0aN0nmBWRoT8HhZs_20XCyrvn4-4RRnFYg5rt9X-eh4jt_6iNPCCC42AB/exec"/></div>
+              <div class="fld"><label class="lbl">URL Kombi Sync</label><input class="inp" type="url" id="syncUrlInput" placeholder="https://script.google.com/macros/s/…/exec" value="https://script.google.com/macros/s/AKfycbzrOW15mx70jGinNVahpe4XRlEN5fnd2k3w7P1tKm74TSC4ZkZecdHKmLfSjwQdBXT-/exec"/></div>
               <div style="display:flex;gap:.5rem;flex-wrap:wrap">
                 <button class="btn btn-p" onclick="saveSyncUrl()">Guardar</button>
                 <button class="btn btn-s" onclick="syncPOS('status')">🔍 Verificar</button>
@@ -4628,7 +4628,7 @@ async function enviarCorreoPrueba(){
 async function testGasUrl(){const url=getGasUrl();if(!url){toast('Guarda la URL primero');return;}setGasStatus('🔄 Probando…','var(--g500)');try{await fetch(url,{method:'GET',mode:'no-cors'});setGasStatus('✅ URL alcanzable','var(--gr600)');}catch(e){setGasStatus('❌ Error','var(--r600)');}}
 
 /* ============ POS SYNC ============ */
-const SYNC_URL='https://script.google.com/macros/s/AKfycbwNjRfKLxj0aN0nmBWRoT8HhZs_20XCyrvn4-4RRnFYg5rt9X-eh4jt_6iNPCCC42AB/exec';
+const SYNC_URL='https://script.google.com/macros/s/AKfycbzrOW15mx70jGinNVahpe4XRlEN5fnd2k3w7P1tKm74TSC4ZkZecdHKmLfSjwQdBXT-/exec';
 
 function getSyncUrl(){return document.getElementById('syncUrlInput')?.value.trim()||CFG.syncUrl||SYNC_URL;}
 
