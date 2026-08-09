@@ -36,7 +36,7 @@
 :root{
   --a50:#FFFBEB;--a100:#FEF3C7;--a200:#FDE68A;--a400:#FBBF24;--a500:#F59E0B;--a600:#D97706;--a700:#B45309;--a900:#78350F;
   --g50:#F9FAFB;--g100:#F3F4F6;--g200:#E5E7EB;--g300:#D1D5DB;--g400:#9CA3AF;--g500:#6B7280;--g600:#4B5563;--g700:#374151;--g800:#1F2937;--g900:#111827;
-  --gr100:#DCFCE7;--gr500:#22C55E;--gr600:#16A34A;
+  --gr100:#DCFCE7;--gr500:#22C55E;--gr600:#16A34A;--gr700:#15803D;
   --r100:#FEE2E2;--r500:#EF4444;--r600:#DC2626;
   --b100:#DBEAFE;--b500:#3B82F6;--b600:#2563EB;
   --mono:'JetBrains Mono',monospace;--rad:10px;
@@ -502,7 +502,7 @@ tr:hover td{background:var(--g50)}
       </div>
 
       <div class="section" id="op-ret">
-        <div class="ph"><h2>Retiros y Abonos</h2><p>Requiere autenticación</p></div>
+        <div class="ph"><h2>Retiros y Abonos</h2><p>Requiere foto de la factura o comprobante</p></div>
         <div style="max-width:580px">
           <div class="card">
             <div class="ct">Nuevo Movimiento</div>
@@ -510,7 +510,15 @@ tr:hover td{background:var(--g50)}
             <div class="fld"><label class="lbl">Categoría</label><select class="sel w100" id="retCategoria"><option value="Cambio">💰 Cambio</option><option value="Compra insumos">🛒 Compra insumos</option><option value="Traslado">🚗 Traslado</option><option value="Pago proveedor">📦 Pago proveedor</option><option value="Gasto operacional">🏪 Gasto operacional</option><option value="Otro">📝 Otro</option></select></div>
             <div class="fld"><label class="lbl">Monto (CLP)</label><input class="inp" type="number" id="retMonto" placeholder="0" min="0"/></div>
             <div class="fld"><label class="lbl">Detalle</label><input class="inp" type="text" id="retMotivo" placeholder="Información adicional"/></div>
-            <button class="btn btn-p w100" onclick="reqPinRetiro()">🔐 Autorizar y Registrar</button>
+            <div class="fld">
+              <label class="lbl">📸 Foto de la factura / comprobante</label>
+              <input type="file" id="retFotoInput" accept="image/*" capture="environment" style="display:none" onchange="previewRetFoto(this)"/>
+              <div id="retFotoPreview" onclick="document.getElementById('retFotoInput').click()" style="border:2px dashed var(--g300);border-radius:10px;padding:1rem;text-align:center;cursor:pointer;transition:all .2s">
+                <div style="font-size:1.5rem;margin-bottom:.25rem">📷</div>
+                <div class="fs13 text-gray">Toca para tomar foto</div>
+              </div>
+            </div>
+            <button class="btn btn-p w100" onclick="registrarRetiroConFoto()">📸 Registrar con Foto</button>
           </div>
           <div class="card mt4">
             <div class="ct">Historial del Turno</div>
@@ -536,10 +544,7 @@ tr:hover td{background:var(--g50)}
         <div style="max-width:680px">
           <div class="wp active" id="ciP1">
             <div class="card">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
-                <div class="ct" style="padding:0;margin:0">🖥️ Ventas según Sistema</div>
-                <button class="btn btn-s sm" id="btnTraerPOS" onclick="traerDatosPOS()">📥 Traer del POS</button>
-              </div>
+              <div class="ct">🖥️ Ventas según Sistema</div>
               <div id="posAutoStatus" class="hidden" style="background:var(--gr100);border:1px solid var(--gr500);border-radius:8px;padding:.625rem .875rem;margin-bottom:.75rem;font-size:.8125rem;color:var(--gr600)"></div>
               <div class="fld"><label class="lbl" id="ciSisLblEf">Efectivo</label><input class="inp" type="number" id="ciSisEf" placeholder="0" oninput="refreshCiSisTotal()"/></div>
               <div class="fld"><label class="lbl" id="ciSisLblTarj">Tarjetas / POS</label><input class="inp" type="number" id="ciSisTarj" placeholder="0" oninput="refreshCiSisTotal()"/></div>
@@ -1823,7 +1828,7 @@ function showSec(id,el){
   if(id==='ad-rep')renderAnalisis();
   if(id==='op-rep')initReponer();
   if(id==='sa-users')renderUsers();if(id==='sa-logs')renderLogs();
-  if(id==='op-ci'){window._ciPosTotal=undefined;window._ciDiffPos=0;renderCiPosInputs();renderCiMovFromRet();ciGoTo(1);const btnPOS=document.getElementById('btnTraerPOS');if(btnPOS)btnPOS.classList.toggle('hidden',!mostrarComparacionPOS());}
+  if(id==='op-ci'){window._ciPosTotal=undefined;window._ciDiffPos=0;renderCiPosInputs();renderCiMovFromRet();ciGoTo(1);}
   closeSidebar();
 }
 
@@ -1831,6 +1836,8 @@ function renderBills(cid,tgt){
   const c=document.getElementById(cid);if(!c)return;
   const obj=tgt==='AP'?AP:CI;
   c.innerHTML=BILLS.map(b=>`<div class="bi"><div class="bi-d">${clp(b)}</div><div style="display:flex;align-items:center;gap:.25rem"><span style="font-size:.75rem;color:var(--g400)">×</span><input class="bi-i" type="number" min="0" placeholder="0" value="${obj.bills[b]||''}" oninput="setBill(${b},'${tgt}',this.value)"/></div><div class="bi-s" id="bs_${tgt}_${b}">${obj.bills[b]?clp(b*obj.bills[b]):''}</div></div>`).join('');
+  const totEl=document.getElementById(tgt==='AP'?'apEfTotal':'ciEfTotal');
+  if(totEl)totEl.textContent=clp(totalBills(obj));
 }
 function setBill(d,t,v){const obj=t==='AP'?AP:CI;obj.bills[d]=parseInt(v)||0;const s=document.getElementById(`bs_${t}_${d}`);if(s)s.textContent=obj.bills[d]?clp(d*obj.bills[d]):'';if(t==='AP')document.getElementById('apEfTotal').textContent=clp(totalBills(AP));if(t==='CI')document.getElementById('ciEfTotal').textContent=clp(totalBills(CI));}
 
@@ -1896,11 +1903,81 @@ function renderCigCatalog(containerId,tgt){
   const c=document.getElementById(containerId);if(!c)return;
   const cat=INVENTARIO.filter(i=>i.cat==='Cigarros');
   if(!cat.length){c.innerHTML='<p class="fs13 text-gray">Sin cigarros en inventario.</p>';return;}
-  const obj=tgt==='AP'?AP:CI;const stored=obj.cigarros||[];const getQty=id=>{const f=stored.find(x=>x.id===id);return f?.stock??null;};
+  const obj=tgt==='AP'?AP:CI;const stored=obj.cigarros||[];
+  const getItem=id=>stored.find(x=>x.id===id)||null;
   const marcas=[...new Set(cat.map(x=>x.marca))];
-  c.innerHTML=marcas.map(m=>{const items=cat.filter(x=>x.marca===m);return`<div style="margin-bottom:1rem"><div style="font-size:.75rem;font-weight:800;color:var(--a700);text-transform:uppercase;letter-spacing:.06em;padding:.375rem 0;margin-bottom:.25rem;border-bottom:2px solid var(--a200)">${m}</div><table class="cig-table"><thead><tr><th>Producto</th><th style="text-align:right">Precio</th><th style="text-align:center;width:90px">Cant.</th></tr></thead><tbody>${items.map(cg=>{const qty=getQty(cg.id);const has=qty!==null;return`<tr><td>${cg.nombre}</td><td style="text-align:right;font-family:var(--mono);color:var(--g500)">${clp(cg.precio)}</td><td style="text-align:center"><input class="cig-inp" type="number" min="0" value="${has?qty:''}" placeholder="—" style="width:64px;text-align:center;${has?'background:var(--a50);border-color:var(--a400);font-weight:700':''}" oninput="setCigQty('${tgt}','${cg.id}','${cg.nombre}','${cg.marca}',${cg.precio},this)"/></td></tr>`;}).join('')}</tbody></table></div>`;}).join('');
+
+  c.innerHTML=marcas.map(m=>{
+    const items=cat.filter(x=>x.marca===m);
+    return`<div style="margin-bottom:1.25rem">
+      <div style="font-size:.75rem;font-weight:800;color:#fff;background:var(--a600);text-transform:uppercase;letter-spacing:.06em;padding:.4rem .625rem;border-radius:6px 6px 0 0">${m}</div>
+      <table class="cig-table" style="border:1px solid var(--g200);border-top:none;border-radius:0 0 8px 8px;overflow:hidden">
+        <thead><tr style="background:var(--g50)">
+          <th>Producto</th>
+          <th style="text-align:right">Precio</th>
+          <th style="text-align:center;width:76px">🏪 Exhib.</th>
+          <th style="text-align:center;width:76px">📦 Bodega</th>
+          <th style="text-align:center;width:64px">Total</th>
+        </tr></thead>
+        <tbody>${items.map((cg,idx)=>{
+          const it=getItem(cg.id);
+          const exh=it?.exhibicion??'';const bod=it?.bodega??'';
+          const total=(it?.exhibicion||0)+(it?.bodega||0);
+          const completo=it!=null;
+          const zebra=idx%2===1?'background:var(--g50)':'';
+          const inpStyle=(val)=>`width:60px;text-align:center;font-weight:700;${val!==''?'background:var(--gr100);border:1.5px solid var(--gr500);color:var(--gr700)':'background:#fff;border:1.5px solid var(--g300)'}`;
+          return`<tr style="${zebra}">
+            <td class="fw6">${cg.nombre}</td>
+            <td style="text-align:right;font-family:var(--mono);color:var(--g500)">${clp(cg.precio)}</td>
+            <td style="text-align:center">
+              <input class="cig-inp" type="number" min="0" value="${exh}" placeholder="—"
+                style="${inpStyle(exh)}"
+                oninput="setCigQty('${tgt}','${cg.id}','${cg.nombre}','${cg.marca}',${cg.precio},'exhibicion',this)"/>
+            </td>
+            <td style="text-align:center">
+              <input class="cig-inp" type="number" min="0" value="${bod}" placeholder="—"
+                style="${inpStyle(bod)}"
+                oninput="setCigQty('${tgt}','${cg.id}','${cg.nombre}','${cg.marca}',${cg.precio},'bodega',this)"/>
+            </td>
+            <td style="text-align:center">
+              <span style="display:inline-flex;align-items:center;gap:.3rem;font-family:var(--mono);font-weight:800;font-size:.9375rem;color:${completo?'var(--gr700)':'var(--g400)'}">
+                ${completo?'<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--gr500);color:#fff;font-size:.7rem;font-weight:900">✓</span>':'<span style="width:18px;height:18px;border-radius:50%;border:1.5px dashed var(--g300);display:inline-block"></span>'} ${total}
+              </span>
+            </td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>`;
+  }).join('');
 }
-function setCigQty(tgt,id,nombre,marca,precio,input){const val=input.value.trim();const stock=val===''?null:parseInt(val)||0;const obj=tgt==='AP'?AP:CI;if(!obj.cigarros)obj.cigarros=[];const idx=obj.cigarros.findIndex(x=>x.id===id);if(stock!==null){if(idx>=0)obj.cigarros[idx].stock=stock;else obj.cigarros.push({id,nombre,marca,precio,stock});input.style.background='var(--a50)';input.style.borderColor='var(--a400)';input.style.fontWeight='700';}else{if(idx>=0)obj.cigarros.splice(idx,1);input.style.background='';input.style.borderColor='';input.style.fontWeight='';}}
+
+function setCigQty(tgt,id,nombre,marca,precio,ubicacion,input){
+  const val=input.value.trim();
+  const cantidad=val===''?0:Math.max(0,parseInt(val)||0);
+  const obj=tgt==='AP'?AP:CI;
+  if(!obj.cigarros)obj.cigarros=[];
+  let idx=obj.cigarros.findIndex(x=>x.id===id);
+  if(idx<0){
+    obj.cigarros.push({id,nombre,marca,precio,exhibicion:0,bodega:0,stock:0});
+    idx=obj.cigarros.length-1;
+  }
+  obj.cigarros[idx][ubicacion]=cantidad;
+  obj.cigarros[idx].stock=(obj.cigarros[idx].exhibicion||0)+(obj.cigarros[idx].bodega||0);
+
+  const item=obj.cigarros[idx];
+  const tieneAlgunValor=val!==''; // este campo tiene valor ingresado
+  if(tieneAlgunValor){
+    input.style.background='var(--gr100)';input.style.border='1.5px solid var(--gr500)';input.style.color='var(--gr700)';
+  }else{
+    input.style.background='#fff';input.style.border='1.5px solid var(--g300)';input.style.color='';
+  }
+  // Actualizar celda Total de esa fila sin re-renderizar toda la tabla
+  const totalCell=input.closest('tr')?.querySelector('td:last-child span');
+  if(totalCell){
+    totalCell.style.color='var(--gr700)';
+    totalCell.textContent=`✓ ${item.stock}`;
+  }
+}
 
 function confetti(){const cv=document.getElementById('cc'),ctx=cv.getContext('2d');cv.width=innerWidth;cv.height=innerHeight;const ps=Array.from({length:120},()=>({x:Math.random()*cv.width,y:-10,vx:(Math.random()-.5)*4,vy:Math.random()*3+2,col:['#F59E0B','#22C55E','#3B82F6','#EF4444','#8B5CF6'][Math.floor(Math.random()*5)],r:Math.random()*6+3,a:Math.random()*Math.PI*2,sp:(Math.random()-.5)*.2}));let f=0;function draw(){ctx.clearRect(0,0,cv.width,cv.height);ps.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=.05;p.a+=p.sp;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.a);ctx.fillStyle=p.col;ctx.fillRect(-p.r,-p.r/2,p.r*2,p.r);ctx.restore();});if(++f<180)requestAnimationFrame(draw);else ctx.clearRect(0,0,cv.width,cv.height);}draw();}
 
@@ -1912,21 +1989,77 @@ async function confirmPin(){
   try{const cred=firebase.auth.EmailAuthProvider.credential(CU.email,v);await auth.currentUser.reauthenticateWithCredential(cred);document.getElementById('pinOverlay').classList.add('hidden');if(_pinCb){_pinCb();_pinCb=null;}}
   catch(e){document.getElementById('pinErr').classList.remove('hidden');document.getElementById('pinInput').value='';}
 }
-function reqPinRetiro(){
-  const monto=parseFloat(document.getElementById('retMonto').value)||0,tipo=document.getElementById('retTipo').value,categoria=document.getElementById('retCategoria').value;
-  if(!monto){toast('Ingresa un monto');return;}
-  reqPin(`Autorizar ${tipo==='retiro'?'Retiro':'Abono'}`,`Ingresa tu contraseña para ${clp(monto)}`,async()=>{
-    const motivo=document.getElementById('retMotivo').value;
-    const retiro={tipo,monto,categoria,motivo,operador:CU.nombre,uid:CU.uid,sucursalId:CU.sucursalActiva||CU.sucursalId||'',sucursal:CU.sucursalActivaNombre||CU.sucursalNombre||'',turno:CU.turnoActivo||CU.turno||'',hora:timeNow(),fecha:today(),timestamp:firebase.firestore.FieldValue.serverTimestamp()};
-    try{const ref=await db.collection('retiros').add(retiro);RETIROS.push({id:ref.id,...retiro});document.getElementById('retMonto').value='';document.getElementById('retMotivo').value='';renderRetList();await auditLog('retiro',{tipo,monto,categoria});toast(`✅ ${tipo==='retiro'?'Retiro':'Abono'} registrado`);}
-    catch(e){toast('❌ Error: '+e.message);}
-  });
+let _retFotoFile=null;
+
+function previewRetFoto(input){
+  const file=input.files[0];if(!file)return;
+  _retFotoFile=file;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    document.getElementById('retFotoPreview').innerHTML=`
+      <img src="${e.target.result}" style="width:100%;max-height:180px;object-fit:cover;border-radius:8px;display:block"/>
+      <div class="fs12 text-green" style="margin-top:.375rem;font-weight:600">✓ Foto lista — toca para cambiarla</div>`;
+    document.getElementById('retFotoPreview').style.borderColor='var(--gr500)';
+    document.getElementById('retFotoPreview').style.borderStyle='solid';
+  };
+  reader.readAsDataURL(file);
 }
+
+async function registrarRetiroConFoto(){
+  const monto=parseFloat(document.getElementById('retMonto').value)||0;
+  const tipo=document.getElementById('retTipo').value;
+  const categoria=document.getElementById('retCategoria').value;
+  const motivo=document.getElementById('retMotivo').value;
+  if(!monto){toast('Ingresa un monto');return;}
+  if(!_retFotoFile){toast('📸 Debes tomar una foto de la factura o comprobante');return;}
+
+  toast('📤 Subiendo foto…',6000);
+  let fotoUrl='';
+  try{
+    fotoUrl=await subirFotoADrive(
+      {id:'factura_'+Date.now(),photoFile:_retFotoFile,text:`${tipo}_${categoria}`},
+      CU.sucursalActivaNombre||CU.sucursalNombre||'',
+      CU.turnoActivo||CU.turno||'',
+      today()
+    );
+  }catch(e){console.warn('foto factura:',e);}
+
+  if(!fotoUrl){
+    // Respaldo: guardar como base64 si Drive falló
+    try{fotoUrl=await new Promise(res=>{const r=new FileReader();r.onload=ev=>res(ev.target.result);r.readAsDataURL(_retFotoFile);});}catch(e){}
+  }
+
+  const retiro={
+    tipo,monto,categoria,motivo,
+    fotoFactura:fotoUrl||'',
+    operador:CU.nombre,uid:CU.uid,
+    sucursalId:CU.sucursalActiva||CU.sucursalId||'',
+    sucursal:CU.sucursalActivaNombre||CU.sucursalNombre||'',
+    turno:CU.turnoActivo||CU.turno||'',
+    hora:timeNow(),fecha:today(),
+    timestamp:firebase.firestore.FieldValue.serverTimestamp()
+  };
+  try{
+    const ref=await db.collection('retiros').add(retiro);
+    RETIROS.push({id:ref.id,...retiro});
+    document.getElementById('retMonto').value='';
+    document.getElementById('retMotivo').value='';
+    document.getElementById('retFotoInput').value='';
+    _retFotoFile=null;
+    document.getElementById('retFotoPreview').innerHTML=`<div style="font-size:1.5rem;margin-bottom:.25rem">📷</div><div class="fs13 text-gray">Toca para tomar foto</div>`;
+    document.getElementById('retFotoPreview').style.borderColor='var(--g300)';
+    document.getElementById('retFotoPreview').style.borderStyle='dashed';
+    renderRetList();
+    await auditLog('retiro',{tipo,monto,categoria,conFoto:!!fotoUrl});
+    toast(`✅ ${tipo==='retiro'?'Retiro':'Abono'} registrado`);
+  }catch(e){toast('❌ Error: '+e.message);}
+}
+
 function renderRetList(){
   const c=document.getElementById('retList');if(!c)return;const hoy=RETIROS.filter(r=>r.fecha===today());
   if(!hoy.length){c.innerHTML='<p class="fs14 text-gray">Sin movimientos hoy</p>';return;}
   const puedeEliminar=esSuperAdmin();
-  c.innerHTML=hoy.map(r=>`<div class="mi"><div><div style="display:flex;align-items:center;gap:.375rem"><span class="mt-i ${r.tipo==='retiro'?'c-re':'c-ab'}">${r.tipo.toUpperCase()}</span>${r.categoria?`<span class="badge ba" style="font-size:.7rem">${r.categoria}</span>`:''}</div><div class="fs12 text-gray">${r.motivo||''} · ${r.operador||'—'} · ${r.hora}</div></div><div style="display:flex;align-items:center;gap:.5rem"><span class="ma ${r.tipo==='retiro'?'c-re':'c-ab'}">${r.tipo==='retiro'?'-':'+'}${clp(r.monto)}</span>${puedeEliminar?`<button onclick="eliminarRetiro('${r.id}')" style="background:none;border:none;color:var(--r500);cursor:pointer;font-size:1rem" title="Eliminar registro">🗑</button>`:''}</div></div>`).join('');
+  c.innerHTML=hoy.map(r=>`<div class="mi"><div><div style="display:flex;align-items:center;gap:.375rem"><span class="mt-i ${r.tipo==='retiro'?'c-re':'c-ab'}">${r.tipo.toUpperCase()}</span>${r.categoria?`<span class="badge ba" style="font-size:.7rem">${r.categoria}</span>`:''}${r.fotoFactura?`<a href="${r.fotoFactura}" target="_blank" onclick="event.stopPropagation()" style="font-size:.75rem;text-decoration:none" title="Ver comprobante">📸</a>`:''}</div><div class="fs12 text-gray">${r.motivo||''} · ${r.operador||'—'} · ${r.hora}</div></div><div style="display:flex;align-items:center;gap:.5rem"><span class="ma ${r.tipo==='retiro'?'c-re':'c-ab'}">${r.tipo==='retiro'?'-':'+'}${clp(r.monto)}</span>${puedeEliminar?`<button onclick="eliminarRetiro('${r.id}')" style="background:none;border:none;color:var(--r500);cursor:pointer;font-size:1rem" title="Eliminar registro">🗑</button>`:''}</div></div>`).join('');
   const totRet=hoy.filter(r=>r.tipo==='retiro').reduce((a,r)=>a+r.monto,0),totAb=hoy.filter(r=>r.tipo==='abono').reduce((a,r)=>a+r.monto,0);
   document.getElementById('retTotal').textContent=clp(totRet);document.getElementById('abonoTotal').textContent=clp(totAb);
 }
@@ -2602,17 +2735,46 @@ async function enviarCierre(){
 
     notificarGerentes({...turno,id:ref.id});
     confetti();
-    if(diffEf!==0||diffSis!==0||(diffPOS!==null&&diffPOS!==0)){
-      const msg=[];
-      if(diffEf!==0)msg.push(`Efectivo: ${diffEf>=0?'+':''}${clp(diffEf)}`);
-      if(diffSis!==0)msg.push(`vs Sistema: ${diffSis>=0?'+':''}${clp(diffSis)}`);
-      if(diffPOS!==null&&diffPOS!==0)msg.push(`vs POS: ${diffPOS>=0?'+':''}${clp(diffPOS)}`);
-      showDiffAlert(msg.join(' | '),diffEf<0||diffSis<0||(diffPOS!==null&&diffPOS<0));
-    } else {
-      toast('✅ Cierre enviado — caja cuadra perfectamente',4000);
-    }
+    lockCierre(turno,diffEf,diffSis,diffPOS);
   }catch(e){toast('❌ Error al guardar cierre: '+e.message,5000);}
 }
+
+function lockCierre(turno,diffEf,diffSis,diffPOS){
+  const sec=document.getElementById('op-ci');if(!sec)return;
+  const emoji=emojiTurnoMap();
+  const hayDiff=diffEf!==0||diffSis!==0||(diffPOS!==null&&diffPOS!==0);
+  const filas=[];
+  filas.push({l:'Efectivo contado',v:clp(turno.efCi)});
+  filas.push({l:'Diferencia efectivo',v:(diffEf>=0?'+':'')+clp(diffEf),ok:diffEf===0});
+  filas.push({l:'Total (Ef+POS+Transf)',v:clp(turno.totalReal)});
+  filas.push({l:'Diferencia sistema',v:(diffSis>=0?'+':'')+clp(diffSis),ok:diffSis===0});
+  if(diffPOS!==null)filas.push({l:'Diferencia vs POS',v:(diffPOS>=0?'+':'')+clp(diffPOS),ok:diffPOS===0});
+
+  sec.innerHTML=`
+    <div class="ph"><h2>Cierre de turno</h2><p>Fin del turno</p></div>
+    <div style="text-align:center;padding:3rem 1rem">
+      <div style="font-size:3rem;margin-bottom:1rem">${hayDiff?'⚠️':'✅'}</div>
+      <div style="font-size:1.375rem;font-weight:800;color:${hayDiff?'var(--a700)':'var(--gr600)'};margin-bottom:.375rem">
+        Cierre guardado con éxito
+      </div>
+      <div style="font-size:.9375rem;color:var(--g500);margin-bottom:1.5rem">
+        ${emoji[turno.turno]||''} Turno ${turno.turno} · ${turno.horaCi} · ${turno.sucursal}
+      </div>
+      <div style="background:#fff;border:1.5px solid ${hayDiff?'var(--a300,#FCD34D)':'var(--gr200,#BBF7D0)'};border-radius:14px;padding:1.25rem;max-width:400px;margin:0 auto 1.5rem;text-align:left;box-shadow:var(--shm)">
+        <div class="fw7 fs14" style="color:var(--g700);margin-bottom:.75rem;text-align:center">Resumen del cierre</div>
+        ${filas.map(f=>`
+          <div style="display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--g100);font-size:.875rem">
+            <span style="color:var(--g500)">${f.l}</span>
+            <span style="font-family:var(--mono);font-weight:700;color:${f.ok===undefined?'var(--g700)':f.ok?'var(--gr600)':'var(--r600)'}">${f.v}${f.ok!==undefined?(f.ok?' ✓':' ⚠'):''}</span>
+          </div>`).join('')}
+      </div>
+      ${hayDiff?`<div style="background:var(--a50);border:1px solid var(--a200);border-radius:10px;padding:.875rem 1.25rem;max-width:400px;margin:0 auto 1.5rem;font-size:.8125rem;color:var(--a700)">
+        Hubo diferencia en el arqueo — tu gerente ya recibió el detalle por correo.
+      </div>`:''}
+      <p style="font-size:.8125rem;color:var(--g400)">Tu turno quedó cerrado. Este módulo se desbloquea con tu próxima apertura.</p>
+    </div>`;
+}
+
 function showDiffAlert(msg,isNeg){const d=document.createElement('div');d.style.cssText=`position:fixed;top:64px;left:50%;transform:translateX(-50%);background:${isNeg?'var(--r500)':'var(--b500)'};color:#fff;padding:.875rem 1.5rem;border-radius:10px;font-weight:700;font-size:.9375rem;box-shadow:var(--shl);z-index:997;display:flex;align-items:center;gap:.75rem;max-width:calc(100vw - 2rem)`;d.innerHTML=`<span>${isNeg?'⚠️':'ℹ️'}</span><span>${msg}</span><button onclick="this.parentElement.remove()" style="background:rgba(255,255,255,.25);border:none;color:#fff;border-radius:6px;padding:.25rem .5rem;cursor:pointer;font-weight:700;margin-left:.5rem">✕</button>`;document.body.appendChild(d);setTimeout(()=>d.remove(),10000);}
 
 let _dashPeriod='dia';
@@ -4984,11 +5146,14 @@ async function generarReporteDiario(){
   c.classList.remove('hidden');
   c.innerHTML='<div class="card"><p class="fs14 text-gray">Generando…</p></div>';
 
-  // Traer datos del POS para esta fecha (todas las sucursales) — fuente automática,
-  // el reporte se genera igual aunque no haya venta manual ni cierre de turno.
+  // Traer datos del POS para esta fecha — TODAS las sucursales aparecen,
+  // marcando "Sin reporte" cuando no haya datos para esa fecha.
   const posPorSuc=[];
   for(const suc of SUCURSALES){
-    try{const snap=await db.collection('ventasPOS').doc(fecha+'_'+suc.id).get();if(snap.exists)posPorSuc.push({nombre:suc.nombre,...snap.data()});}catch(e){}
+    try{
+      const snap=await db.collection('ventasPOS').doc(fecha+'_'+suc.id).get();
+      posPorSuc.push(snap.exists?{nombre:suc.nombre,sinDatos:false,...snap.data()}:{nombre:suc.nombre,sinDatos:true,totalVenta:0,totalBoletas:0});
+    }catch(e){posPorSuc.push({nombre:suc.nombre,sinDatos:true,totalVenta:0,totalBoletas:0});}
   }
   const totalPOS=posPorSuc.reduce((a,s)=>a+(s.totalVenta||0),0);
 
@@ -4996,10 +5161,10 @@ async function generarReporteDiario(){
 
   html+=`SISTEMA (POS)\n`;
   if(posPorSuc.length){
-    posPorSuc.forEach(s=>{html+=`  ${s.nombre}: ${clp(s.totalVenta||0)} (${s.totalBoletas||0} boletas)\n`;});
+    posPorSuc.forEach(s=>{html+=s.sinDatos?`  ${s.nombre}: Sin reporte\n`:`  ${s.nombre}: ${clp(s.totalVenta||0)} (${s.totalBoletas||0} boletas)\n`;});
     html+=`  TOTAL: ${clp(totalPOS)}\n\n`;
   }else{
-    html+=`  Sin sincronización del POS para esta fecha.\n\n`;
+    html+=`  Sin sucursales configuradas.\n\n`;
   }
 
   html+=`VENTAS (registro manual)\n`;
@@ -5029,7 +5194,10 @@ async function enviarReporteDiario(){
 
   const posPorSuc=[];
   for(const suc of SUCURSALES){
-    try{const snap=await db.collection('ventasPOS').doc(fecha+'_'+suc.id).get();if(snap.exists)posPorSuc.push({nombre:suc.nombre,...snap.data()});}catch(e){}
+    try{
+      const snap=await db.collection('ventasPOS').doc(fecha+'_'+suc.id).get();
+      posPorSuc.push(snap.exists?{nombre:suc.nombre,sinDatos:false,...snap.data()}:{nombre:suc.nombre,sinDatos:true,totalVenta:0,totalBoletas:0});
+    }catch(e){posPorSuc.push({nombre:suc.nombre,sinDatos:true,totalVenta:0,totalBoletas:0});}
   }
   const totalPOS=posPorSuc.reduce((a,s)=>a+(s.totalVenta||0),0);
 
@@ -5037,10 +5205,10 @@ async function enviarReporteDiario(){
 
   rows.push({header:'SISTEMA (POS)'});
   if(posPorSuc.length){
-    posPorSuc.forEach(s=>rows.push({label:s.nombre,value:`${clp(s.totalVenta||0)} (${s.totalBoletas||0} bol.)`}));
+    posPorSuc.forEach(s=>rows.push({label:s.nombre,value:s.sinDatos?'Sin reporte':`${clp(s.totalVenta||0)} (${s.totalBoletas||0} bol.)`,neg:s.sinDatos}));
     rows.push({label:'TOTAL POS',value:clp(totalPOS),total:true});
   }else{
-    rows.push({label:'Sin sync del POS',value:'—'});
+    rows.push({label:'Sin sucursales configuradas',value:'—'});
   }
 
   rows.push({header:'VENTAS (registro manual)'});
