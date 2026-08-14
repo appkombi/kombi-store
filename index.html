@@ -607,10 +607,16 @@ tr:hover td{background:var(--g50)}
               <div class="fs12 text-gray" id="cuadraturaSub">Comparando lo que dice el POS contra lo declarado en el cierre de turno</div>
             </div>
             <div style="display:flex;gap:.375rem;align-items:center;flex-wrap:wrap">
-              <select class="sel sm" id="cuadFechaFiltro" onchange="renderCuadratura()" style="font-size:.8125rem">
+              <select class="sel sm" id="cuadFechaFiltro" onchange="onCambioFiltroCuadratura()" style="font-size:.8125rem">
                 <option value="hoy">Hoy</option>
                 <option value="ayer">Ayer</option>
                 <option value="semana">Últimos 7 días</option>
+                <option value="mes">Últimos 30 días</option>
+                <option value="custom">📅 Elegir fecha…</option>
+              </select>
+              <input type="date" id="cuadFechaCustom" class="inp sm hidden" style="max-width:150px;font-size:.8125rem;padding:.375rem .5rem" onchange="renderCuadratura()"/>
+              <select class="sel sm" id="cuadSucFiltro" onchange="renderCuadratura()" style="font-size:.8125rem">
+                <option value="">Todas las sucursales</option>
               </select>
               <button class="btn btn-s sm" onclick="syncPOS('sync_all');setTimeout(renderCuadratura,2500)">🔄 Actualizar</button>
             </div>
@@ -677,7 +683,7 @@ tr:hover td{background:var(--g50)}
             </select>
           </div>
           <!-- KPIs -->
-          <div class="g4 mb4" id="posKPIs"></div>
+          <div class="mb4" id="posKPIs" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1rem"></div>
           <!-- Gráficos -->
           <div class="g2 mb4">
             <div class="card" style="padding:.875rem">
@@ -692,8 +698,9 @@ tr:hover td{background:var(--g50)}
           <!-- Departamentos -->
           <div class="g2">
             <div class="card" style="padding:.875rem">
-              <div class="ct" style="padding:0;margin-bottom:.75rem">🏪 Ventas por departamento</div>
-              <div id="posDeptos"></div>
+              <div class="ct" style="padding:0;margin-bottom:.75rem">🏪 Ventas por departamento <span class="fs11 text-gray" style="font-weight:400">(toca una categoría)</span></div>
+              <div id="posDeptosList"></div>
+              <div id="posDeptosDetalle" class="hidden" style="margin-top:1rem;padding-top:1rem;border-top:1px dashed var(--g200)"></div>
             </div>
             <div class="card" style="padding:.875rem">
               <div class="ct" style="padding:0;margin-bottom:.75rem">🏬 Comparativa sucursales</div>
@@ -760,6 +767,7 @@ tr:hover td{background:var(--g50)}
           <button class="rep-tab" onclick="showInvTab('vencimientos',this)">📅 Vencimientos</button>
           <button class="rep-tab" onclick="showInvTab('movimientos',this)">📋 Movimientos</button>
           <button class="rep-tab" onclick="showInvTab('reposicion',this)">⚠️ Reposición</button>
+          <button class="rep-tab" onclick="showInvTab('traspasos',this)">🔀 Traspasos</button>
           <button class="rep-tab" onclick="showInvTab('historial',this)">🔄 Historial</button>
         </div>
 
@@ -950,6 +958,57 @@ tr:hover td{background:var(--g50)}
             </div>
           </div>
           <div id="invReposicionList"></div>
+        </div>
+
+        <!-- TAB TRASPASOS ENTRE SUCURSALES -->
+        <div id="invTabTraspasos" style="display:none">
+          <div class="card" style="margin-bottom:1rem">
+            <div class="ct">🔀 Nuevo Traspaso</div>
+            <div class="fld">
+              <label class="lbl">Producto</label>
+              <input class="inp" id="trProducto" list="trProdList" placeholder="Buscar producto…" oninput="actualizarStockTraspaso()"/>
+              <datalist id="trProdList"></datalist>
+            </div>
+            <div class="g2">
+              <div class="fld">
+                <label class="lbl">Desde (origen)</label>
+                <select class="sel w100" id="trSucOrigen" onchange="actualizarStockTraspaso()"></select>
+              </div>
+              <div class="fld">
+                <label class="lbl">Ubicación origen</label>
+                <select class="sel w100" id="trUbicOrigen" onchange="actualizarStockTraspaso()">
+                  <option value="exhibicion">🏪 Exhibición</option>
+                  <option value="bodega">📦 Bodega</option>
+                </select>
+              </div>
+            </div>
+            <div id="trStockOrigenInfo" class="fs12 text-gray mb2"></div>
+            <div style="text-align:center;font-size:1.25rem;color:var(--a500);margin:.5rem 0">⬇</div>
+            <div class="g2">
+              <div class="fld">
+                <label class="lbl">Hacia (destino)</label>
+                <select class="sel w100" id="trSucDestino" onchange="actualizarStockTraspaso()"></select>
+              </div>
+              <div class="fld">
+                <label class="lbl">Ubicación destino</label>
+                <select class="sel w100" id="trUbicDestino">
+                  <option value="bodega">📦 Bodega</option>
+                  <option value="exhibicion">🏪 Exhibición</option>
+                </select>
+              </div>
+            </div>
+            <div class="fld"><label class="lbl">Cantidad a trasladar</label><input class="inp" type="number" id="trCantidad" min="1" placeholder="0"/></div>
+            <div class="fld"><label class="lbl">Motivo (opcional)</label><input class="inp" id="trMotivo" placeholder="Ej: reposición urgente, redistribución"/></div>
+            <button class="btn btn-p w100" onclick="confirmarTraspaso()">✅ Confirmar traspaso</button>
+          </div>
+
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+              <div class="ct" style="margin:0;padding:0">📜 Historial de Traspasos</div>
+              <button class="btn btn-s sm" onclick="exportTraspasosExcel()">⬇ Excel</button>
+            </div>
+            <div id="traspasosHistorialList"></div>
+          </div>
         </div>
 
       </div>
@@ -2821,7 +2880,27 @@ function rangoFechasCuad(filtro){
     const a=new Date(hoy);a.setDate(a.getDate()-6);
     return[a.toISOString().slice(0,10),today()];
   }
+  if(filtro==='mes'){
+    const a=new Date(hoy);a.setDate(a.getDate()-29);
+    return[a.toISOString().slice(0,10),today()];
+  }
+  if(filtro==='custom'){
+    const f=document.getElementById('cuadFechaCustom')?.value||today();
+    return[f,f];
+  }
   return[today(),today()]; // hoy
+}
+
+function onCambioFiltroCuadratura(){
+  const filtro=document.getElementById('cuadFechaFiltro')?.value;
+  const inp=document.getElementById('cuadFechaCustom');
+  if(filtro==='custom'){
+    inp.classList.remove('hidden');
+    if(!inp.value)inp.value=today();
+  }else{
+    inp.classList.add('hidden');
+  }
+  renderCuadratura();
 }
 
 async function renderCuadratura(){
@@ -2830,6 +2909,19 @@ async function renderCuadratura(){
   if(!resumen||!list)return;
   const filtro=document.getElementById('cuadFechaFiltro')?.value||'hoy';
   const[desde,hasta]=rangoFechasCuad(filtro);
+  const sucFiltro=document.getElementById('cuadSucFiltro')?.value||'';
+
+  // Poblar filtro de sucursal una vez
+  const selSuc=document.getElementById('cuadSucFiltro');
+  if(selSuc&&selSuc.children.length<=1){
+    SUCURSALES.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.nombre;selSuc.appendChild(o);});
+  }
+
+  const sub=document.getElementById('cuadraturaSub');
+  if(sub){
+    const rangoTxt=desde===hasta?fdate(desde):`${fdate(desde)} — ${fdate(hasta)}`;
+    sub.textContent=`Comparando lo que dice el POS contra lo declarado en el cierre de turno · ${rangoTxt}`;
+  }
 
   resumen.innerHTML='<div class="sc"><div class="lbl">Cargando…</div></div>';
   list.innerHTML='';
@@ -2842,7 +2934,8 @@ async function renderCuadratura(){
     const fin=new Date(hasta+'T00:00');
     while(cur<=fin){fechas.push(cur.toISOString().slice(0,10));cur.setDate(cur.getDate()+1);}
 
-    for(const suc of SUCURSALES){
+    const sucsAConsultar=sucFiltro?SUCURSALES.filter(s=>s.id===sucFiltro):SUCURSALES;
+    for(const suc of sucsAConsultar){
       for(const f of fechas){
         try{
           const snap=await db.collection('ventasPOS').doc(f+'_'+suc.id).get();
@@ -2859,10 +2952,11 @@ async function renderCuadratura(){
         turnosRango=snap.docs.map(d=>({id:d.id,...d.data()}));
       }catch(e){}
     }
+    if(sucFiltro)turnosRango=turnosRango.filter(t=>t.sucursalId===sucFiltro);
 
     // 3. Agrupar por sucursal
     const bySuc={};
-    SUCURSALES.forEach(s=>{bySuc[s.id]={nombre:s.nombre,pos:0,posBoletas:0,operador:0,turnosCerrados:0,turnosConDiff:0,ultimoSync:null};});
+    sucsAConsultar.forEach(s=>{bySuc[s.id]={nombre:s.nombre,pos:0,posBoletas:0,operador:0,turnosCerrados:0,turnosConDiff:0,ultimoSync:null};});
 
     posDocs.forEach(p=>{
       if(!bySuc[p.sucId])bySuc[p.sucId]={nombre:p.sucNombre,pos:0,posBoletas:0,operador:0,turnosCerrados:0,turnosConDiff:0,ultimoSync:null};
@@ -3544,7 +3638,7 @@ function filterInv(v){renderInv(v);}
 
 /* ============ INV TABS ============ */
 function showInvTab(tab,el){
-  ['general','sucursal','conteo','vencimientos','movimientos','reposicion','historial'].forEach(t=>{
+  ['general','sucursal','conteo','vencimientos','movimientos','reposicion','traspasos','historial'].forEach(t=>{
     const d=document.getElementById('invTab'+t.charAt(0).toUpperCase()+t.slice(1));
     if(d)d.style.display=t===tab?'block':'none';
   });
@@ -3555,6 +3649,7 @@ function showInvTab(tab,el){
   if(tab==='vencimientos') initVencimientos();
   if(tab==='movimientos') initMovimientos();
   if(tab==='reposicion') renderReposicion();
+  if(tab==='traspasos') initTraspasos();
   if(tab==='historial') initHistorialRep();
   if(tab==='general'){_invCat='TODOS';renderInv();}
 }
@@ -3913,6 +4008,152 @@ async function aplicarAjusteConteo(){
     // Refrescar stock cache si está abierta la vista de sucursal
     if(_stockSucursal)_stockSucursal[_conteoSucursal]=updates;
   }catch(e){toast('❌ Error: '+e.message);}
+}
+
+/* ============ TRASPASOS ENTRE SUCURSALES ============ */
+let _trStockCache={};
+
+async function initTraspasos(){
+  const selOrigen=document.getElementById('trSucOrigen');
+  const selDestino=document.getElementById('trSucDestino');
+  if(selOrigen&&selOrigen.children.length===0){
+    SUCURSALES.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.nombre;selOrigen.appendChild(o);});
+    SUCURSALES.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.nombre;selDestino.appendChild(o);});
+    if(SUCURSALES.length>1)selDestino.value=SUCURSALES[1].id;
+  }
+  const dl=document.getElementById('trProdList');
+  if(dl)dl.innerHTML=INVENTARIO.map(p=>`<option value="${p.nombre}">`).join('');
+  _trStockCache={};
+  for(const suc of SUCURSALES){
+    try{const snap=await db.collection('stockSucursal').doc(suc.id).get();_trStockCache[suc.id]=snap.exists?snap.data():{};}catch(e){_trStockCache[suc.id]={};}
+  }
+  actualizarStockTraspaso();
+  renderTraspasosHistorial();
+}
+
+function actualizarStockTraspaso(){
+  const info=document.getElementById('trStockOrigenInfo');if(!info)return;
+  const nombreProd=document.getElementById('trProducto')?.value.trim();
+  const prod=INVENTARIO.find(p=>p.nombre.toLowerCase()===nombreProd?.toLowerCase());
+  const sucOrigen=document.getElementById('trSucOrigen')?.value;
+  const ubicOrigen=document.getElementById('trUbicOrigen')?.value;
+  if(!prod||!sucOrigen){info.textContent='';return;}
+  const stock=_trStockCache[sucOrigen]?.[prod.id]?.[ubicOrigen]||0;
+  const sucNombre=SUCURSALES.find(s=>s.id===sucOrigen)?.nombre||'';
+  info.innerHTML=`Disponible en ${sucNombre} (${ubicOrigen==='bodega'?'bodega':'exhibición'}): <strong style="color:${stock>0?'var(--gr600)':'var(--r600)'}">${stock} unidades</strong>`;
+}
+
+async function confirmarTraspaso(){
+  const nombreProd=document.getElementById('trProducto').value.trim();
+  const prod=INVENTARIO.find(p=>p.nombre.toLowerCase()===nombreProd.toLowerCase());
+  if(!prod){toast('Selecciona un producto válido de la lista');return;}
+
+  const sucOrigenId=document.getElementById('trSucOrigen').value;
+  const sucDestinoId=document.getElementById('trSucDestino').value;
+  const ubicOrigen=document.getElementById('trUbicOrigen').value;
+  const ubicDestino=document.getElementById('trUbicDestino').value;
+  const cantidad=parseInt(document.getElementById('trCantidad').value)||0;
+  const motivo=document.getElementById('trMotivo').value.trim();
+
+  if(sucOrigenId===sucDestinoId){toast('La sucursal de origen y destino deben ser distintas');return;}
+  if(!cantidad||cantidad<1){toast('Ingresa una cantidad válida');return;}
+
+  const stockOrigen=_trStockCache[sucOrigenId]?.[prod.id]?.[ubicOrigen]||0;
+  if(cantidad>stockOrigen){toast(`Stock insuficiente — solo hay ${stockOrigen} unidades disponibles en origen`);return;}
+
+  const sucOrigenNombre=SUCURSALES.find(s=>s.id===sucOrigenId)?.nombre||'';
+  const sucDestinoNombre=SUCURSALES.find(s=>s.id===sucDestinoId)?.nombre||'';
+
+  if(!confirm(`¿Confirmar traspaso?\n\n${cantidad} × ${prod.nombre}\n${sucOrigenNombre} (${ubicOrigen}) → ${sucDestinoNombre} (${ubicDestino})`))return;
+
+  try{
+    const refOrigen=db.collection('stockSucursal').doc(sucOrigenId);
+    const actualOrigen=_trStockCache[sucOrigenId]?.[prod.id]||{exhibicion:0,bodega:0,min:prod.min||0};
+    const nuevoOrigen={...actualOrigen};
+    nuevoOrigen[ubicOrigen]=Math.max(0,(actualOrigen[ubicOrigen]||0)-cantidad);
+    await refOrigen.set({[prod.id]:nuevoOrigen},{merge:true});
+
+    const refDestino=db.collection('stockSucursal').doc(sucDestinoId);
+    const actualDestino=_trStockCache[sucDestinoId]?.[prod.id]||{exhibicion:0,bodega:0,min:prod.min||0};
+    const nuevoDestino={...actualDestino};
+    nuevoDestino[ubicDestino]=(actualDestino[ubicDestino]||0)+cantidad;
+    await refDestino.set({[prod.id]:nuevoDestino},{merge:true});
+
+    await registrarMovimiento({
+      productoId:prod.id,productoNombre:prod.nombre,sku:prod.sku||'',
+      sucursalId:sucOrigenId,tipo:'traspaso_salida',cantidad:-cantidad,
+      ubicacion:ubicOrigen,motivo:`Traspaso a ${sucDestinoNombre}${motivo?' — '+motivo:''}`
+    });
+    await registrarMovimiento({
+      productoId:prod.id,productoNombre:prod.nombre,sku:prod.sku||'',
+      sucursalId:sucDestinoId,tipo:'traspaso_entrada',cantidad:cantidad,
+      ubicacion:ubicDestino,motivo:`Traspaso desde ${sucOrigenNombre}${motivo?' — '+motivo:''}`
+    });
+
+    await db.collection('traspasos').add({
+      productoId:prod.id,productoNombre:prod.nombre,sku:prod.sku||'',
+      sucursalOrigenId:sucOrigenId,sucursalOrigen:sucOrigenNombre,ubicacionOrigen:ubicOrigen,
+      sucursalDestinoId:sucDestinoId,sucursalDestino:sucDestinoNombre,ubicacionDestino:ubicDestino,
+      cantidad,motivo,
+      operador:CU.nombre,uid:CU.uid,
+      fecha:today(),hora:timeNow(),
+      timestamp:firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    _trStockCache[sucOrigenId][prod.id]=nuevoOrigen;
+    if(!_trStockCache[sucDestinoId])_trStockCache[sucDestinoId]={};
+    _trStockCache[sucDestinoId][prod.id]=nuevoDestino;
+
+    await auditLog('inventario',{accion:'traspaso',producto:prod.nombre,cantidad,origen:sucOrigenNombre,destino:sucDestinoNombre});
+
+    document.getElementById('trProducto').value='';
+    document.getElementById('trCantidad').value='';
+    document.getElementById('trMotivo').value='';
+    document.getElementById('trStockOrigenInfo').textContent='';
+
+    renderTraspasosHistorial();
+    toast(`✅ Traspaso completado: ${cantidad} unidades a ${sucDestinoNombre}`);
+  }catch(e){toast('❌ Error: '+e.message);}
+}
+
+async function renderTraspasosHistorial(){
+  const c=document.getElementById('traspasosHistorialList');if(!c)return;
+  c.innerHTML='<p class="fs13 text-gray">Cargando…</p>';
+  try{
+    const snap=await db.collection('traspasos').orderBy('timestamp','desc').limit(30).get();
+    if(snap.empty){c.innerHTML='<p class="fs13 text-gray">Sin traspasos registrados aún.</p>';return;}
+    c.innerHTML=`<div class="tw"><table>
+      <thead><tr><th>Fecha</th><th>Producto</th><th>Origen</th><th style="text-align:center"></th><th>Destino</th><th style="text-align:center">Cant.</th><th>Operador</th></tr></thead>
+      <tbody>${snap.docs.map(d=>{
+        const t=d.data();
+        return`<tr>
+          <td class="fs12 text-gray">${fdate(t.fecha)} ${t.hora||''}</td>
+          <td class="fw6 fs13">${t.productoNombre}</td>
+          <td class="fs13">🏬 ${t.sucursalOrigen} <span class="fs11 text-gray">(${t.ubicacionOrigen==='bodega'?'bodega':'exhib.'})</span></td>
+          <td style="text-align:center;color:var(--a500)">→</td>
+          <td class="fs13">🏬 ${t.sucursalDestino} <span class="fs11 text-gray">(${t.ubicacionDestino==='bodega'?'bodega':'exhib.'})</span></td>
+          <td style="text-align:center;font-family:var(--mono);font-weight:700;color:var(--a600)">${t.cantidad}</td>
+          <td class="fs12 text-gray">${t.operador}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>`;
+  }catch(e){c.innerHTML='<p class="fs13 text-gray">Error al cargar historial.</p>';}
+}
+
+async function exportTraspasosExcel(){
+  await loadXLSX();
+  const snap=await db.collection('traspasos').orderBy('timestamp','desc').limit(500).get();
+  if(snap.empty){toast('Sin traspasos para exportar');return;}
+  const rows=[['Fecha','Hora','Producto','SKU','Origen','Ubic. Origen','Destino','Ubic. Destino','Cantidad','Motivo','Operador']];
+  snap.docs.forEach(d=>{
+    const t=d.data();
+    rows.push([t.fecha,t.hora||'',t.productoNombre,t.sku||'',t.sucursalOrigen,t.ubicacionOrigen,t.sucursalDestino,t.ubicacionDestino,t.cantidad,t.motivo||'',t.operador]);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:12},{wch:8},{wch:30},{wch:12},{wch:16},{wch:12},{wch:16},{wch:12},{wch:10},{wch:24},{wch:16}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Traspasos');
+  XLSX.writeFile(wb,`traspasos_${today()}.xlsx`);
+  toast('✅ Excel descargado');
 }
 
 async function renderConteoHistorial(){
@@ -4919,10 +5160,21 @@ async function loadPOSData(){
       timeEl.textContent='Último sync: '+new Date(latest.syncAt).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
     }
 
+    // Datos de categorías (nlc_grupo) — colección separada de ventasPOS
+    const catDocs=[];
+    for(const sucId of sucs){
+      for(const fecha of fechas){
+        try{
+          const snap=await db.collection('ventasCategorias').doc(fecha+'_'+sucId).get();
+          if(snap.exists) catDocs.push({fecha,sucId,...snap.data()});
+        }catch(e){}
+      }
+    }
+
     renderPOSKPIs(allDocs,dias);
     renderPOSTendencia(allDocs,fechas,sucs);
     renderPOSMedios(allDocs);
-    renderPOSDeptos(allDocs);
+    renderPOSDeptos(catDocs,sucs);
     renderPOSSucursales(allDocs);
 
   }catch(e){console.warn('POS data:',e);}
@@ -4937,11 +5189,22 @@ function renderPOSKPIs(docs,dias){
   const deb=docs.reduce((a,d)=>a+(d.debito||0),0);
   const cred=docs.reduce((a,d)=>a+(d.credito||0),0);
   const otros=docs.reduce((a,d)=>a+(d.otros||0),0);
+  // Total vendido en cigarros — se saca del desglose por departamento de cada día
+  let cigarrosMonto=0,cigarrosCant=0;
+  docs.forEach(d=>{
+    try{
+      const deps=JSON.parse(d.departamentos||'[]');
+      deps.forEach(dep=>{
+        if(/^cigarro/i.test((dep.nombre||'').trim())){cigarrosMonto+=dep.monto||0;cigarrosCant+=dep.cantidad||0;}
+      });
+    }catch(e){}
+  });
   c.innerHTML=[
     {l:'Total ventas',v:clp(total),sub:boletas+' boletas',col:'var(--a500)'},
     {l:'Promedio diario',v:clp(prom),sub:'por día con datos',col:'var(--b500)'},
     {l:'Efectivo',v:clp(ef),sub:total?Math.round(ef/total*100)+'% del total':'—',col:'var(--gr500)'},
     {l:'Débito + Crédito',v:clp(deb+cred),sub:total?Math.round((deb+cred)/total*100)+'% del total':'—',col:'var(--g500)'},
+    {l:'🚬 Cigarros',v:clp(cigarrosMonto),sub:total?Math.round(cigarrosMonto/total*100)+'% del total · '+cigarrosCant+' und.':'—',col:'#B45309'},
   ].map(x=>`<div class="sc"><div class="lbl">${x.l}</div><div class="val" style="color:${x.col}">${x.v}</div><div class="sub">${x.sub}</div></div>`).join('');
 }
 
@@ -4981,6 +5244,7 @@ function renderPOSMedios(docs){
   const otros=docs.reduce((a,d)=>a+(d.otros||0),0);
   const total=ef+deb+cred+otros||1;
   if(!ef&&!deb&&!cred&&!otros){c.innerHTML='<p class="fs13 text-gray">Sin datos</p>';return;}
+  c.innerHTML=''; // limpiar antes de reconstruir — evita que se acumule en cada refresco
   [['💵 Efectivo',ef,'var(--a500)'],['💳 Débito',deb,'var(--b500)'],['🏦 Crédito',cred,'var(--gr500)'],['🎟 Otros',otros,'var(--g400)']].forEach(([l,v,col])=>{
     const pct=Math.round(v/total*100);
     c.innerHTML+=`<div style="margin-bottom:.625rem">
@@ -4993,32 +5257,102 @@ function renderPOSMedios(docs){
       </div>
     </div>`;
   });
+
+  // Desglose de "Otros" (AMIPASS, Edenred, etc.) si viene detallado
+  const detalle={};
+  docs.forEach(d=>{
+    try{
+      const arr=JSON.parse(d.otrosDetalle||'[]');
+      arr.forEach(x=>{detalle[x.nombre]=(detalle[x.nombre]||0)+x.monto;});
+    }catch(e){}
+  });
+  if(Object.keys(detalle).length){
+    c.innerHTML+=`<div style="margin-top:.5rem;padding-top:.5rem;border-top:1px dashed var(--g200)">
+      <div class="fs11 text-gray" style="margin-bottom:.375rem;text-transform:uppercase;letter-spacing:.03em">Detalle "Otros"</div>
+      ${Object.entries(detalle).map(([nom,v])=>`<div style="display:flex;justify-content:space-between;font-size:.75rem;padding:.15rem 0"><span class="text-gray">${nom}</span><span class="mono">${clp(v)}</span></div>`).join('')}
+    </div>`;
+  }
 }
 
-function renderPOSDeptos(docs){
-  const c=document.getElementById('posDeptos');if(!c)return;
-  // Aggregate departamentos across all docs
+let _posDeptosData=null; // cache del último cálculo, para poder abrir el detalle sin recargar
+
+function renderPOSDeptos(catDocs,sucs){
+  const c=document.getElementById('posDeptosList');if(!c)return;
+  document.getElementById('posDeptosDetalle')?.classList.add('hidden');
+
+  // Agregar por categoría, guardando desglose por fecha y por sucursal para el detalle
   const byDepto={};
-  docs.forEach(d=>{
-    let deptos=[];
-    try{deptos=JSON.parse(d.departamentos||'[]');}catch(e){}
-    deptos.forEach(dep=>{
-      if(!byDepto[dep.nombre])byDepto[dep.nombre]={monto:0,cantidad:0};
-      byDepto[dep.nombre].monto+=dep.monto;
-      byDepto[dep.nombre].cantidad+=dep.cantidad;
+  catDocs.forEach(d=>{
+    let cats=[];
+    try{cats=JSON.parse(d.categorias||'[]');}catch(e){}
+    cats.forEach(cat=>{
+      const nom=cat.nombre;
+      if(!byDepto[nom])byDepto[nom]={monto:0,cantidad:0,porFecha:{},porSuc:{}};
+      byDepto[nom].monto+=cat.monto||0;
+      byDepto[nom].cantidad+=cat.cantidad||0;
+      byDepto[nom].porFecha[d.fecha]=(byDepto[nom].porFecha[d.fecha]||0)+(cat.monto||0);
+      const sucNombre=SUCURSALES.find(s=>s.id===d.sucId)?.nombre||d.sucId;
+      byDepto[nom].porSuc[sucNombre]=(byDepto[nom].porSuc[sucNombre]||0)+(cat.monto||0);
     });
   });
+
   const sorted=Object.entries(byDepto).sort((a,b)=>b[1].monto-a[1].monto);
-  if(!sorted.length){c.innerHTML='<p class="fs13 text-gray">Sin datos</p>';return;}
+  _posDeptosData={byDepto:sorted,sucs};
+
+  if(!sorted.length){c.innerHTML='<p class="fs13 text-gray">Sin datos de categorías en este período.</p>';return;}
+
   const max=sorted[0][1].monto||1;
-  c.innerHTML=sorted.map(([nom,d])=>`
-    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
-      <div style="width:120px;font-size:.75rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${nom}">${nom}</div>
+  c.innerHTML=sorted.map(([nom,d],i)=>`
+    <div onclick="seleccionarCategoriaPOS(${i})" id="deptoRow_${i}" style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;cursor:pointer;padding:.25rem;border-radius:6px;transition:background .15s" onmouseover="this.style.background='var(--g50)'" onmouseout="this.style.background=''">
+      <div style="width:110px;font-size:.75rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${nom}">${nom}</div>
       <div style="flex:1;height:10px;background:var(--g100);border-radius:5px;overflow:hidden">
         <div style="height:100%;width:${Math.round(d.monto/max*100)}%;background:var(--a400);border-radius:5px"></div>
       </div>
       <div style="width:70px;font-size:.75rem;font-family:var(--mono);text-align:right">${clp(d.monto)}</div>
     </div>`).join('');
+}
+
+function seleccionarCategoriaPOS(idx){
+  if(!_posDeptosData)return;
+  document.querySelectorAll('[id^="deptoRow_"]').forEach(el=>el.style.background='');
+  document.getElementById('deptoRow_'+idx)?.style.setProperty('background','var(--a50)');
+
+  const[nom,d]=_posDeptosData.byDepto[idx];
+  const det=document.getElementById('posDeptosDetalle');
+  det.classList.remove('hidden');
+
+  const fechas=Object.keys(d.porFecha).sort();
+  const maxDia=Math.max(...Object.values(d.porFecha),1);
+  const promDia=fechas.length?Math.round(d.monto/fechas.length):0;
+  const sucOrdenadas=Object.entries(d.porSuc).sort((a,b)=>b[1]-a[1]);
+  const topSuc=sucOrdenadas[0];
+
+  det.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+      <div class="fw7 fs14">${nom}</div>
+      <button onclick="document.getElementById('posDeptosDetalle').classList.add('hidden');document.querySelectorAll('[id^=deptoRow_]').forEach(el=>el.style.background='')" style="background:none;border:none;color:var(--g400);cursor:pointer;font-size:1rem">✕</button>
+    </div>
+    <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:.75rem">
+      <div><div class="fs11 text-gray">Total período</div><div class="fw7 mono" style="color:var(--a600)">${clp(d.monto)}</div></div>
+      <div><div class="fs11 text-gray">Promedio/día</div><div class="fw7 mono">${clp(promDia)}</div></div>
+      <div><div class="fs11 text-gray">Unidades</div><div class="fw7 mono">${d.cantidad}</div></div>
+      ${topSuc&&sucOrdenadas.length>1?`<div><div class="fs11 text-gray">Top sucursal</div><div class="fw7" style="color:var(--gr600)">${topSuc[0]}</div></div>`:''}
+    </div>
+    ${fechas.length>1?`
+    <div class="fs11 text-gray mb2" style="text-transform:uppercase;letter-spacing:.03em">Tendencia</div>
+    <div class="cbars" style="height:70px;margin-bottom:.75rem">
+      ${fechas.map(f=>{
+        const v=d.porFecha[f];const h=Math.max(Math.round(v/maxDia*55),v>0?3:0);
+        return`<div class="cbw" title="${f}: ${clp(v)}"><div class="cbar" style="height:${h}px;background:var(--a400)"></div><div class="cbl" style="font-size:.5rem">${f.slice(8)}</div></div>`;
+      }).join('')}
+    </div>`:''}
+    ${sucOrdenadas.length>1?`
+    <div class="fs11 text-gray mb2" style="text-transform:uppercase;letter-spacing:.03em">Por sucursal</div>
+    ${sucOrdenadas.map(([s,v])=>`
+      <div style="display:flex;justify-content:space-between;font-size:.75rem;padding:.2rem 0">
+        <span>${s}</span><span class="mono">${clp(v)}</span>
+      </div>`).join('')}`:''}
+  `;
 }
 
 function renderPOSSucursales(docs){
