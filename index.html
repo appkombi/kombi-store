@@ -475,13 +475,11 @@ tr:hover td{background:var(--g50)}
         <div class="ph"><h2>📦 Reponer Stock</h2><p>Mueve unidades de bodega a exhibición</p></div>
 
         <!-- Filtros -->
-        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.75rem;align-items:center">
           <input class="inp" type="search" id="repBuscar" placeholder="Buscar producto…" style="max-width:220px" oninput="filterReponer(this.value)"/>
-          <select class="sel" id="repCatFiltro" onchange="renderReponer()">
-            <option value="">Todas las categorías</option>
-          </select>
           <button class="btn btn-s sm" onclick="toggleRepSoloBajos()">⚠️ Solo bajo mínimo</button>
         </div>
+        <div id="repCatTabs" style="display:flex;gap:.375rem;flex-wrap:wrap;margin-bottom:1rem"></div>
 
         <!-- Lista -->
         <div id="reponerList"></div>
@@ -771,20 +769,48 @@ tr:hover td{background:var(--g50)}
 
       <div class="section" id="ad-inv">
         <div class="ph"><h2>Inventario</h2><p>Gestión de stock y productos</p></div>
-        <!-- Tabs -->
-        <div style="display:flex;gap:.375rem;margin-bottom:1rem;border-bottom:2px solid var(--g200)">
-          <button class="rep-tab active" onclick="showInvTab('general',this)">📦 General</button>
-          <button class="rep-tab" onclick="showInvTab('sucursal',this)">🏬 Stock Sucursales</button>
-          <button class="rep-tab" onclick="showInvTab('conteo',this)">🔫 Conteo Físico</button>
-          <button class="rep-tab" onclick="showInvTab('vencimientos',this)">📅 Vencimientos</button>
-          <button class="rep-tab" onclick="showInvTab('movimientos',this)">📋 Movimientos</button>
-          <button class="rep-tab" onclick="showInvTab('reposicion',this)">⚠️ Reposición</button>
-          <button class="rep-tab" onclick="showInvTab('traspasos',this)">🔀 Traspasos</button>
-          <button class="rep-tab" onclick="showInvTab('historial',this)">🔄 Historial</button>
+
+        <!-- Buscador global -->
+        <div style="position:relative;margin-bottom:1rem">
+          <input class="inp" id="invBuscadorGlobal" placeholder="🔍 Buscar cualquier producto — precio, stock por tienda, acciones rápidas…" style="font-size:.9375rem;padding:.75rem 1rem" oninput="renderBuscadorGlobal()" onfocus="renderBuscadorGlobal()"/>
+          <div id="invBuscadorGlobalResultados" class="hidden" style="position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--g200);border-radius:10px;box-shadow:var(--shl);z-index:50;max-height:400px;overflow-y:auto;margin-top:.25rem"></div>
+        </div>
+
+        <!-- Tabs agrupadas -->
+        <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:1rem;border-bottom:2px solid var(--g200);padding-bottom:.75rem">
+          <div>
+            <div class="fs11 text-gray" style="text-transform:uppercase;letter-spacing:.04em;font-weight:700;margin-bottom:.375rem">🏠</div>
+            <div style="display:flex;gap:.375rem">
+              <button class="rep-tab active" onclick="showInvTab('inicio',this)">Inicio</button>
+            </div>
+          </div>
+          <div>
+            <div class="fs11 text-gray" style="text-transform:uppercase;letter-spacing:.04em;font-weight:700;margin-bottom:.375rem">📋 Catálogo</div>
+            <div style="display:flex;gap:.375rem;flex-wrap:wrap">
+              <button class="rep-tab" onclick="showInvTab('general',this)">General</button>
+            </div>
+          </div>
+          <div>
+            <div class="fs11 text-gray" style="text-transform:uppercase;letter-spacing:.04em;font-weight:700;margin-bottom:.375rem">📦 Operación</div>
+            <div style="display:flex;gap:.375rem;flex-wrap:wrap">
+              <button class="rep-tab" onclick="showInvTab('sucursal',this)">Stock Sucursales</button>
+              <button class="rep-tab" onclick="showInvTab('conteo',this)">Conteo Físico</button>
+              <button class="rep-tab" onclick="showInvTab('reposicion',this)">Reposición</button>
+              <button class="rep-tab" onclick="showInvTab('traspasos',this)">Traspasos</button>
+              <button class="rep-tab" onclick="showInvTab('vencimientos',this)">Vencimientos</button>
+              <button class="rep-tab" onclick="showInvTab('movimientos',this)">Movimientos</button>
+              <button class="rep-tab" onclick="showInvTab('historial',this)">Historial Repos.</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB INICIO -->
+        <div id="invTabInicio">
+          <div id="invInicioContent" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem"></div>
         </div>
 
         <!-- TAB GENERAL -->
-        <div id="invTabGeneral">
+        <div id="invTabGeneral" style="display:none">
           <!-- Estado del catálogo -->
           <div class="card" style="margin-bottom:1rem;padding:1rem" id="invEstadoCard">
             <div id="invEstadoContent"></div>
@@ -792,6 +818,9 @@ tr:hover td{background:var(--g50)}
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-wrap:wrap;gap:.5rem">
             <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
               <input class="inp" type="search" placeholder="Buscar…" style="max-width:200px" oninput="filterInv(this.value)"/>
+              <select class="sel sm" id="invSucFiltroGeneral" onchange="renderInv()" style="font-size:.8125rem">
+                <option value="">Stock: Todas las sucursales (suma real)</option>
+              </select>
               <div id="invCatTabs" style="display:flex;gap:.375rem;flex-wrap:wrap"></div>
             </div>
             <div style="display:flex;gap:.5rem;flex-wrap:wrap">
@@ -1044,6 +1073,7 @@ tr:hover td{background:var(--g50)}
           <button class="rep-tab" onclick="showRepTab('comparativa',this)">🏬 Comparativa Sucursales</button>
           <button class="rep-tab" onclick="showRepTab('topprod',this)">🏆 Top Productos</button>
           <button class="rep-tab" onclick="showRepTab('metricas',this)">📐 Métricas Comerciales</button>
+          <button class="rep-tab" onclick="showRepTab('compras',this)">📦 Compras Sugeridas</button>
           <button class="rep-tab" onclick="showRepTab('envio',this)">📧 Enviar Reportes</button>
         </div>
 
@@ -1173,6 +1203,33 @@ tr:hover td{background:var(--g50)}
               <p class="fs11 text-gray mb2">Productos que más se compran juntos en la misma boleta</p>
               <div id="mcCanasta"></div>
             </div>
+          </div>
+        </div>
+
+        <!-- TAB: COMPRAS SUGERIDAS -->
+        <div id="repTabCompras" style="display:none">
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
+            <select class="sel sm" id="csSucursal" onchange="renderComprasSugeridas()">
+              <option value="">Todas las sucursales</option>
+            </select>
+            <select class="sel sm" id="csHorizonte" onchange="renderComprasSugeridas()">
+              <option value="14">Cubrir próximos 14 días</option>
+              <option value="7">Cubrir próximos 7 días</option>
+              <option value="30">Cubrir próximos 30 días</option>
+            </select>
+            <button class="btn btn-s sm" onclick="exportComprasSugeridasExcel()">⬇ Excel</button>
+          </div>
+
+          <div class="card" style="margin-bottom:1rem">
+            <div class="ct">🛒 Sugerencia de pedido</div>
+            <p class="fs11 text-gray mb2">Calcula velocidad de venta real (últimos 30 días) y proyecta cuándo se agota cada producto — solo muestra los que necesitan reposición pronto.</p>
+            <div id="csSugerencia"></div>
+          </div>
+
+          <div class="card">
+            <div class="ct">📊 Análisis ABC (prioridad de compra)</div>
+            <p class="fs11 text-gray mb2">Clasificación clásica de inventario: <strong>A</strong> = productos que generan el 80% de la venta (nunca deben quebrarse), <strong>B</strong> = 15% siguiente, <strong>C</strong> = el 5% restante (baja prioridad).</p>
+            <div id="csABC"></div>
           </div>
         </div>
 
@@ -2651,7 +2708,7 @@ async function checkVencimientos(){
       </div>
     </div>
     <div style="display:flex;gap:.375rem;flex-shrink:0">
-      <button class="btn btn-s sm" onclick="showSec('ad-inv',document.querySelector('.ni[data-sec=ad-inv]'));setTimeout(()=>showInvTab('vencimientos',document.querySelectorAll('#ad-inv .rep-tab')[2]),100)">Ver</button>
+      <button class="btn btn-s sm" onclick="showSec('ad-inv',document.querySelector('.ni[data-sec=ad-inv]'));setTimeout(()=>showInvTab('vencimientos',document.querySelector('#ad-inv .rep-tab[onclick*=vencimientos]')),100)">Ver</button>
       <button onclick="this.closest('#vtoAlert').remove()" style="background:none;border:none;color:${esRojo?'var(--r500)':'#C2410C'};cursor:pointer;font-size:1rem">✕</button>
     </div>`;
   banner.prepend(div);
@@ -4139,8 +4196,152 @@ function catColor(cat){
   return CAT_COLORS[hash%CAT_COLORS.length];
 }
 
+/* ============ INVENTARIO — PANTALLA DE INICIO ============ */
+async function renderInvInicio(){
+  const c=document.getElementById('invInicioContent');if(!c)return;
+  c.innerHTML='<div class="card" style="grid-column:1/-1"><p class="fs13 text-gray">Calculando estado…</p></div>';
+
+  const tarjetas=[];
+
+  // 1. Stock bajo mínimo
+  try{
+    const bajoMin=INVENTARIO.filter(i=>i.stock<=i.min&&i.min>0);
+    tarjetas.push({
+      icono:'⚠️',color:bajoMin.length?'var(--r600)':'var(--gr600)',bg:bajoMin.length?'#FEF2F2':'#F0FDF4',border:bajoMin.length?'#FECACA':'#BBF7D0',
+      titulo:bajoMin.length?`${bajoMin.length} productos bajo mínimo`:'Todo el stock está OK',
+      sub:bajoMin.length?bajoMin.slice(0,3).map(p=>p.nombre).join(', ')+(bajoMin.length>3?'…':''):'Ningún producto necesita reposición urgente',
+      accion:'reposicion',accionLabel:'Ver reposición'
+    });
+  }catch(e){}
+
+  // 2. Vencimientos próximos
+  try{
+    const hoy=new Date();const en7=new Date();en7.setDate(en7.getDate()+7);
+    const snap=await db.collection('lotes').where('activo','==',true).get();
+    const proximos=snap.docs.map(d=>d.data()).filter(l=>{
+      if(!l.fechaVencimiento)return false;
+      const fv=new Date(l.fechaVencimiento);
+      return fv<=en7;
+    });
+    tarjetas.push({
+      icono:'📅',color:proximos.length?'#B45309':'var(--gr600)',bg:proximos.length?'#FFFBEB':'#F0FDF4',border:proximos.length?'#FDE68A':'#BBF7D0',
+      titulo:proximos.length?`${proximos.length} lotes vencen en 7 días`:'Sin vencimientos próximos',
+      sub:proximos.length?'Revisa antes de que se pierdan':'Todo controlado por ahora',
+      accion:'vencimientos',accionLabel:'Ver vencimientos'
+    });
+  }catch(e){
+    tarjetas.push({icono:'📅',color:'var(--g400)',bg:'var(--g50)',border:'var(--g200)',titulo:'Vencimientos',sub:'No se pudo calcular',accion:'vencimientos',accionLabel:'Ver vencimientos'});
+  }
+
+  // 3. Último conteo físico
+  try{
+    const snap=await db.collection('conteosFisicos').orderBy('timestamp','desc').limit(1).get();
+    if(snap.empty){
+      tarjetas.push({icono:'🔫',color:'var(--g400)',bg:'var(--g50)',border:'var(--g200)',titulo:'Sin conteos físicos aún',sub:'Nunca se ha hecho un conteo',accion:'conteo',accionLabel:'Hacer conteo'});
+    }else{
+      const ultimo=snap.docs[0].data();
+      const dias=Math.round((Date.now()-new Date(ultimo.fecha+'T12:00').getTime())/86400000);
+      tarjetas.push({
+        icono:'🔫',color:dias>14?'var(--r600)':dias>7?'#B45309':'var(--gr600)',bg:dias>14?'#FEF2F2':dias>7?'#FFFBEB':'#F0FDF4',border:dias>14?'#FECACA':dias>7?'#FDE68A':'#BBF7D0',
+        titulo:`Último conteo: hace ${dias} día${dias!==1?'s':''}`,
+        sub:`${ultimo.sucursal} · ${ultimo.ubicacion==='bodega'?'Bodega':'Exhibición'} · ${ultimo.operador}`,
+        accion:'conteo',accionLabel:'Hacer conteo'
+      });
+    }
+  }catch(e){}
+
+  // 4. Traspasos recientes
+  try{
+    const hace7=new Date();hace7.setDate(hace7.getDate()-7);
+    const snap=await db.collection('traspasos').where('fecha','>=',hace7.toISOString().slice(0,10)).get();
+    tarjetas.push({
+      icono:'🔀',color:'var(--b600)',bg:'#EFF6FF',border:'#BFDBFE',
+      titulo:`${snap.size} traspaso${snap.size!==1?'s':''} esta semana`,
+      sub:snap.size?'Entre sucursales':'Sin movimientos entre sucursales',
+      accion:'traspasos',accionLabel:'Ver historial'
+    });
+  }catch(e){}
+
+  // 5. Estado de conexión con el POS (reutiliza el mismo cálculo)
+  const desdePOS=INVENTARIO.filter(i=>i.origenPOS).length;
+  tarjetas.push({
+    icono:desdePOS>0?'✅':'🔌',color:desdePOS>0?'var(--gr600)':'var(--r600)',bg:desdePOS>0?'#F0FDF4':'#FEF2F2',border:desdePOS>0?'#BBF7D0':'#FECACA',
+    titulo:desdePOS>0?'Catálogo conectado al POS':'Catálogo no conectado',
+    sub:desdePOS>0?`${desdePOS} de ${INVENTARIO.length} productos sincronizados`:'Importa el catálogo real desde POS',
+    accion:'general',accionLabel:'Ver catálogo'
+  });
+
+  c.innerHTML=tarjetas.map(t=>`
+    <div style="background:${t.bg};border:1px solid ${t.border};border-radius:12px;padding:1.125rem;display:flex;flex-direction:column">
+      <div style="font-size:1.75rem;margin-bottom:.5rem">${t.icono}</div>
+      <div class="fw7 fs14" style="color:${t.color};margin-bottom:.25rem">${t.titulo}</div>
+      <div class="fs12 text-gray" style="margin-bottom:.875rem;flex:1">${t.sub}</div>
+      <button class="btn btn-s sm" style="align-self:flex-start" onclick="showInvTab('${t.accion}',document.querySelector('#ad-inv .rep-tab[onclick*=\\'${t.accion}\\']'))">${t.accionLabel} →</button>
+    </div>`).join('');
+}
+
+/* ============ BUSCADOR GLOBAL DE INVENTARIO ============ */
+let _bgStockCache=null;
+async function renderBuscadorGlobal(){
+  const q=(document.getElementById('invBuscadorGlobal')?.value||'').trim().toLowerCase();
+  const cont=document.getElementById('invBuscadorGlobalResultados');
+  if(!cont)return;
+  if(q.length<2){cont.classList.add('hidden');return;}
+
+  const matches=INVENTARIO.filter(i=>i.nombre.toLowerCase().includes(q)).slice(0,15);
+  if(!matches.length){
+    cont.classList.remove('hidden');
+    cont.innerHTML='<div style="padding:1rem;text-align:center;color:var(--g400);font-size:.8125rem">Sin resultados para "'+q+'"</div>';
+    return;
+  }
+
+  // Cargar stock por sucursal una vez (cache simple)
+  if(!_bgStockCache){
+    _bgStockCache={};
+    for(const suc of SUCURSALES){
+      try{const snap=await db.collection('stockSucursal').doc(suc.id).get();_bgStockCache[suc.id]=snap.exists?snap.data():{};}catch(e){_bgStockCache[suc.id]={};}
+    }
+  }
+
+  cont.classList.remove('hidden');
+  cont.innerHTML=matches.map(i=>{
+    const stockPorSuc=SUCURSALES.map(suc=>{
+      const d=_bgStockCache[suc.id]?.[i.id];
+      const tot=d?(d.exhibicion||0)+(d.bodega||0):0;
+      return`<span class="fs11" style="margin-right:.75rem"><strong>${suc.nombre}:</strong> ${tot}</span>`;
+    }).join('');
+    return`<div style="padding:.75rem 1rem;border-bottom:1px solid var(--g100)">
+      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:.375rem">
+        <div>
+          <div class="fw7 fs14">${i.nombre}</div>
+          <div class="fs11 text-gray">${i.cat}${i.marca?' · '+i.marca:''} · ${clp(i.precio)}</div>
+        </div>
+      </div>
+      <div style="margin-bottom:.5rem">${stockPorSuc}</div>
+      <div style="display:flex;gap:.5rem">
+        <button class="btn btn-s sm" onclick="cerrarBuscadorGlobal();showInvTab('reposicion',document.querySelector('#ad-inv .rep-tab[onclick*=reposicion]'))">📦 Reponer</button>
+        <button class="btn btn-s sm" onclick="cerrarBuscadorGlobal();showInvTab('traspasos',document.querySelector('#ad-inv .rep-tab[onclick*=traspasos]'));setTimeout(()=>abrirSelectorProducto('trProducto'),200)">🔀 Traspasar</button>
+        <button class="btn btn-s sm" onclick="cerrarBuscadorGlobal();editProd('${i.id}');showInvTab('general',document.querySelector('#ad-inv .rep-tab[onclick*=general]'))">✎ Editar</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function cerrarBuscadorGlobal(){
+  document.getElementById('invBuscadorGlobalResultados')?.classList.add('hidden');
+  document.getElementById('invBuscadorGlobal').value='';
+}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#invBuscadorGlobal')&&!e.target.closest('#invBuscadorGlobalResultados')){
+    document.getElementById('invBuscadorGlobalResultados')?.classList.add('hidden');
+  }
+});
+
 async function renderInvEstado(){
   const c=document.getElementById('invEstadoContent');if(!c)return;
+  const selSuc=document.getElementById('invSucFiltroGeneral');
+  if(selSuc&&selSuc.children.length<=1){
+    SUCURSALES.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent='Stock: '+s.nombre;selSuc.appendChild(o);});
+  }
   const total=INVENTARIO.length;
   const desdePOS=INVENTARIO.filter(i=>i.origenPOS).length;
   const cats=new Set(INVENTARIO.map(i=>i.cat)).size;
@@ -4180,11 +4381,32 @@ async function renderInvEstado(){
     </div>`;
 }
 
-function renderInv(search){
+async function renderInv(search){
   if(search!==undefined)_invSearch=search;
   const cats=['TODOS',...new Set(INVENTARIO.map(i=>i.cat).filter(Boolean))];
   const tabs=document.getElementById('invCatTabs');
   if(tabs)tabs.innerHTML=cats.map(cat=>`<button class="marca-tag ${_invCat===cat?'active':''}" onclick="_invCat='${cat}';renderInv()">${cat}${cat!=='TODOS'?` <span style="opacity:.6">(${INVENTARIO.filter(i=>i.cat===cat).length})</span>`:''}</button>`).join('');
+
+  const sucFiltro=document.getElementById('invSucFiltroGeneral')?.value||'';
+  let stockSuc={};
+  if(sucFiltro){
+    try{const snap=await db.collection('stockSucursal').doc(sucFiltro).get();stockSuc=snap.exists?snap.data():{};}catch(e){}
+  }else{
+    // "General" = suma real de todas las sucursales, no el campo viejo INVENTARIO.stock
+    for(const suc of SUCURSALES){
+      try{
+        const snap=await db.collection('stockSucursal').doc(suc.id).get();
+        if(!snap.exists)continue;
+        const data=snap.data();
+        Object.entries(data).forEach(([prodId,d])=>{
+          if(!stockSuc[prodId])stockSuc[prodId]={exhibicion:0,bodega:0,min:d.min||0};
+          stockSuc[prodId].exhibicion+=d.exhibicion||0;
+          stockSuc[prodId].bodega+=d.bodega||0;
+          stockSuc[prodId].min=Math.max(stockSuc[prodId].min,d.min||0);
+        });
+      }catch(e){}
+    }
+  }
 
   const b=document.getElementById('invBody');if(!b)return;
   let items=INVENTARIO;
@@ -4196,13 +4418,20 @@ function renderInv(search){
   }else{
     b.innerHTML=items.map(i=>{
       const cc=catColor(i.cat);
-      const bajoMin=i.stock<=i.min&&i.min>0;
+      let stockMostrado=i.stock,minMostrado=i.min,detalleUbic='';
+      if(Object.keys(stockSuc).length){
+        const d=stockSuc[i.id]||{exhibicion:0,bodega:0,min:i.min||0};
+        stockMostrado=(d.exhibicion||0)+(d.bodega||0);
+        minMostrado=d.min||i.min||0;
+        detalleUbic=`<div class="fs11 text-gray">🏪${d.exhibicion||0} 📦${d.bodega||0}</div>`;
+      }
+      const bajoMin=stockMostrado<=minMostrado&&minMostrado>0;
       return`<tr>
         <td class="fw6">${i.nombre}${i.perecible?'<span title="Producto perecible" style="margin-left:.375rem">📅</span>':''}${!i.origenPOS?'<span title="Cargado manualmente, no viene del POS" style="margin-left:.375rem;opacity:.5;font-size:.7rem">✎</span>':''}</td>
         <td class="text-gray fs13">${i.marca||'—'}</td>
         <td><span class="badge" style="background:${cc.bg};color:${cc.fg}">${i.cat}</span></td>
-        <td><span class="badge ${bajoMin?'br':'bg'}">${i.stock}</span></td>
-        <td class="text-gray fs13">${i.min}</td>
+        <td><span class="badge ${bajoMin?'br':'bg'}">${stockMostrado}</span>${detalleUbic}</td>
+        <td class="text-gray fs13">${minMostrado}</td>
         <td class="mono">${clp(i.precio)}</td>
         <td><div style="display:flex;gap:.375rem"><button class="btn btn-s sm" onclick="editProd('${i.id}')">✎</button><button class="btn btn-d sm" onclick="delProd('${i.id}')">✕</button></div></td>
       </tr>`;
@@ -4213,12 +4442,13 @@ function filterInv(v){renderInv(v);}
 
 /* ============ INV TABS ============ */
 function showInvTab(tab,el){
-  ['general','sucursal','conteo','vencimientos','movimientos','reposicion','traspasos','historial'].forEach(t=>{
+  ['inicio','general','sucursal','conteo','vencimientos','movimientos','reposicion','traspasos','historial'].forEach(t=>{
     const d=document.getElementById('invTab'+t.charAt(0).toUpperCase()+t.slice(1));
     if(d)d.style.display=t===tab?'block':'none';
   });
   document.querySelectorAll('#ad-inv .rep-tab').forEach(b=>b.classList.remove('active'));
   el?.classList.add('active');
+  if(tab==='inicio') renderInvInicio();
   if(tab==='sucursal') initStockSucursal();
   if(tab==='conteo') initConteoFisico();
   if(tab==='vencimientos') initVencimientos();
@@ -4762,13 +4992,6 @@ async function initReponer(){
     const doc=await db.collection('stockSucursal').doc(sucId).get();
     _repStockSuc=doc.exists?doc.data():{};
   }catch(e){_repStockSuc={};}
-  // Populate category filter
-  const sel=document.getElementById('repCatFiltro');
-  if(sel&&sel.children.length<=1){
-    [...new Set(INVENTARIO.map(i=>i.cat))].forEach(cat=>{
-      const o=document.createElement('option');o.value=cat;o.textContent=cat;sel.appendChild(o);
-    });
-  }
   _repPendientes={};
   renderReponer();
   renderHistorialHoy();
@@ -4777,11 +5000,15 @@ async function initReponer(){
 function toggleRepSoloBajos(){_repSoloBajos=!_repSoloBajos;renderReponer();}
 function filterReponer(v){_repBuscar=v;renderReponer();}
 
+let _repCat='';
 function renderReponer(){
   const c=document.getElementById('reponerList');if(!c)return;
-  const cat=document.getElementById('repCatFiltro')?.value||'';
+  const todasCats=[...new Set(INVENTARIO.map(p=>p.cat).filter(Boolean))];
+  const tabsEl=document.getElementById('repCatTabs');
+  if(tabsEl)tabsEl.innerHTML=['',...todasCats].map(cat=>`<button class="marca-tag ${_repCat===cat?'active':''}" onclick="_repCat='${cat}';renderReponer()">${cat||'Todas'}</button>`).join('');
+
   let prods=INVENTARIO;
-  if(cat) prods=prods.filter(p=>p.cat===cat);
+  if(_repCat) prods=prods.filter(p=>p.cat===_repCat);
   if(_repBuscar) prods=prods.filter(p=>p.nombre.toLowerCase().includes(_repBuscar.toLowerCase()));
   if(_repSoloBajos) prods=prods.filter(p=>{
     const d=_repStockSuc[p.id]||{exhibicion:0};
@@ -5392,7 +5619,7 @@ function renderPanelOperativo(aperturas){
 
 /* ============ BOOT (updated) ============ */
 function showRepTab(tab,el){
-  ['analisis','comparativa','topprod','metricas','envio'].forEach(t=>{
+  ['analisis','comparativa','topprod','metricas','compras','envio'].forEach(t=>{
     const el2=document.getElementById('repTab'+t.charAt(0).toUpperCase()+t.slice(1));
     if(el2)el2.style.display=t===tab?'block':'none';
   });
@@ -5402,6 +5629,7 @@ function showRepTab(tab,el){
   if(tab==='comparativa')renderComparativa();
   if(tab==='topprod')initTopProductos();
   if(tab==='metricas')initMetricasComerciales();
+  if(tab==='compras')initComprasSugeridas();
   if(tab==='envio'){document.getElementById('repFecha').value=today();if(CFG.gasUrl){const gi=document.getElementById('gasUrlInput');if(gi)gi.value=CFG.gasUrl;}}
 }
 
@@ -5478,6 +5706,143 @@ async function exportTopProductosExcel(){
   const ws=XLSX.utils.aoa_to_sheet(rows);
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Top Productos');
   XLSX.writeFile(wb,`top_productos_${today()}.xlsx`);
+  toast('✅ Excel descargado');
+}
+
+/* ============ COMPRAS SUGERIDAS ============ */
+async function initComprasSugeridas(){
+  const sel=document.getElementById('csSucursal');
+  if(sel&&sel.children.length<=1){
+    SUCURSALES.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.nombre;sel.appendChild(o);});
+  }
+  renderComprasSugeridas();
+}
+
+// Trae venta por producto de los últimos 30 días (para calcular velocidad de venta)
+async function _csVentasPorProducto(sucs){
+  const fechas=[];const hoy=new Date();
+  for(let i=0;i<30;i++){const d=new Date(hoy);d.setDate(d.getDate()-i);fechas.push(d.toISOString().slice(0,10));}
+  const porProducto={};
+  for(const sucId of sucs){
+    for(const f of fechas){
+      try{
+        const snap=await db.collection('ventasProductoDia').doc(f+'_'+sucId).get();
+        if(!snap.exists)continue;
+        JSON.parse(snap.data().productos||'[]').forEach(p=>{
+          const key=p.nombre.toLowerCase().trim();
+          if(!porProducto[key])porProducto[key]={nombre:p.nombre,cantidad:0,monto:0};
+          porProducto[key].cantidad+=p.cantidad||0;
+          porProducto[key].monto+=p.monto||0;
+        });
+      }catch(e){}
+    }
+  }
+  return porProducto;
+}
+
+let _csCache=[];
+async function renderComprasSugeridas(){
+  const cSug=document.getElementById('csSugerencia');
+  const cABC=document.getElementById('csABC');
+  if(!cSug||!cABC)return;
+  cSug.innerHTML='<p class="fs13 text-gray">Calculando…</p>';
+  cABC.innerHTML='<p class="fs13 text-gray">Calculando…</p>';
+
+  const sucFiltro=document.getElementById('csSucursal')?.value;
+  const sucs=sucFiltro?[sucFiltro]:SUCURSALES.map(s=>s.id);
+  const horizonte=parseInt(document.getElementById('csHorizonte')?.value||14);
+
+  const ventas=await _csVentasPorProducto(sucs);
+
+  // Cruzar con stock actual — sumar stockSucursal si hay filtro de sucursal, si no usar INVENTARIO.stock
+  let stockPorSuc={};
+  if(sucFiltro){
+    try{const snap=await db.collection('stockSucursal').doc(sucFiltro).get();stockPorSuc=snap.exists?snap.data():{};}catch(e){}
+  }
+
+  const analisis=[];
+  Object.values(ventas).forEach(v=>{
+    const inv=INVENTARIO.find(i=>i.nombre.toLowerCase().trim()===v.nombre.toLowerCase().trim());
+    if(!inv)return;
+    const velocidadDiaria=v.cantidad/30;
+    let stockActual=inv.stock;
+    if(sucFiltro){const d=stockPorSuc[inv.id];stockActual=d?(d.exhibicion||0)+(d.bodega||0):0;}
+    const diasRestantes=velocidadDiaria>0?Math.round(stockActual/velocidadDiaria*10)/10:null;
+    const sugerido=velocidadDiaria>0?Math.max(0,Math.ceil(velocidadDiaria*horizonte-stockActual)):0;
+    analisis.push({nombre:v.nombre,cat:inv.cat,velocidadDiaria,stockActual,diasRestantes,sugerido,monto30d:v.monto,precio:inv.precio});
+  });
+
+  _csCache=analisis;
+
+  // ── Sugerencia de pedido: solo productos con pocos días de cobertura ──
+  const urgentes=analisis.filter(a=>a.diasRestantes!==null&&a.diasRestantes<=horizonte&&a.sugerido>0)
+    .sort((a,b)=>a.diasRestantes-b.diasRestantes);
+
+  if(!urgentes.length){
+    cSug.innerHTML='<p class="fs13 text-gray">Ningún producto necesita reposición urgente en este horizonte — bien.</p>';
+  }else{
+    cSug.innerHTML=`<div class="tw"><table>
+      <thead><tr><th>Producto</th><th style="text-align:right">Stock</th><th style="text-align:right">Vel./día</th><th style="text-align:right">Se agota en</th><th style="text-align:right">Pedir</th></tr></thead>
+      <tbody>${urgentes.slice(0,40).map(a=>{
+        const critico=a.diasRestantes<=3;
+        return`<tr style="${critico?'background:var(--r50,#FEF2F2)':''}">
+          <td class="fw6 fs13">${a.nombre}</td>
+          <td style="text-align:right;font-family:var(--mono)">${a.stockActual}</td>
+          <td style="text-align:right;font-family:var(--mono);color:var(--g500)">${a.velocidadDiaria.toFixed(1)}</td>
+          <td style="text-align:right;font-family:var(--mono);font-weight:700;color:${critico?'var(--r600)':'var(--a600)'}">${a.diasRestantes}d${critico?' ⚠':''}</td>
+          <td style="text-align:right;font-family:var(--mono);font-weight:800;color:var(--gr600)">${a.sugerido} und.</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>
+    ${urgentes.length>40?`<p class="fs11 text-gray mt2">Mostrando 40 de ${urgentes.length}.</p>`:''}`;
+  }
+
+  // ── Análisis ABC ──
+  const ordenado=[...analisis].sort((a,b)=>b.monto30d-a.monto30d);
+  const totalMonto=ordenado.reduce((a,p)=>a+p.monto30d,0);
+  let acumulado=0;
+  const clasificados=ordenado.map(p=>{
+    acumulado+=p.monto30d;
+    const pctAcum=totalMonto?acumulado/totalMonto*100:0;
+    const clase=pctAcum<=80?'A':pctAcum<=95?'B':'C';
+    return{...p,pctAcum:Math.round(pctAcum*10)/10,clase};
+  });
+  const countA=clasificados.filter(p=>p.clase==='A').length;
+  const countB=clasificados.filter(p=>p.clase==='B').length;
+  const countC=clasificados.filter(p=>p.clase==='C').length;
+
+  cABC.innerHTML=`
+    <div style="display:flex;gap:1.5rem;margin-bottom:1rem;flex-wrap:wrap">
+      <div><span class="badge" style="background:#DCFCE7;color:#166534">A</span> <span class="fw7">${countA}</span> <span class="fs12 text-gray">productos = 80% de la venta</span></div>
+      <div><span class="badge" style="background:#FEF3C7;color:#92400E">B</span> <span class="fw7">${countB}</span> <span class="fs12 text-gray">= siguiente 15%</span></div>
+      <div><span class="badge" style="background:#F3F4F6;color:#374151">C</span> <span class="fw7">${countC}</span> <span class="fs12 text-gray">= último 5%, baja prioridad</span></div>
+    </div>
+    <div class="tw" style="max-height:400px;overflow-y:auto"><table>
+      <thead><tr><th></th><th>Producto</th><th style="text-align:right">Venta 30d</th><th style="text-align:right">% acum.</th></tr></thead>
+      <tbody>${clasificados.slice(0,60).map(p=>{
+        const col=p.clase==='A'?{bg:'#DCFCE7',fg:'#166534'}:p.clase==='B'?{bg:'#FEF3C7',fg:'#92400E'}:{bg:'#F3F4F6',fg:'#374151'};
+        return`<tr>
+          <td><span class="badge" style="background:${col.bg};color:${col.fg}">${p.clase}</span></td>
+          <td class="fs13">${p.nombre}</td>
+          <td style="text-align:right;font-family:var(--mono)">${clp(p.monto30d)}</td>
+          <td style="text-align:right;font-family:var(--mono);color:var(--g400)">${p.pctAcum}%</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>
+    ${clasificados.length>60?`<p class="fs11 text-gray mt2">Mostrando 60 de ${clasificados.length}.</p>`:''}
+    <p class="fs11 text-gray mt2">💡 Los productos clase A nunca deberían quebrarse — si alguno aparece también en "Sugerencia de pedido" arriba, es prioridad máxima.</p>`;
+}
+
+async function exportComprasSugeridasExcel(){
+  if(!_csCache.length){toast('Sin datos para exportar');return;}
+  await loadXLSX();
+  const rows=[['Producto','Categoría','Stock actual','Venta/día','Días restantes','Sugerido pedir','Venta 30 días']];
+  _csCache.sort((a,b)=>(a.diasRestantes??999)-(b.diasRestantes??999)).forEach(a=>{
+    rows.push([a.nombre,a.cat,a.stockActual,a.velocidadDiaria.toFixed(2),a.diasRestantes??'—',a.sugerido,a.monto30d]);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Compras Sugeridas');
+  XLSX.writeFile(wb,`compras_sugeridas_${today()}.xlsx`);
   toast('✅ Excel descargado');
 }
 
