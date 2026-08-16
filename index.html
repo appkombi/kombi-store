@@ -1617,7 +1617,7 @@ let CI={bills:{},pos:{},transf:0,cigarros:[],obs:'',sis:{},fotos:{},saved:false,
 const BILLS=[20000,10000,5000,2000,1000,500,200,100,50,10];
 
 const clp=n=>'$'+Number(n||0).toLocaleString('es-CL');
-const today=()=>new Date().toISOString().slice(0,10);
+const today=()=>new Date().toLocaleDateString('en-CA',{timeZone:'America/Santiago'});
 const timeNow=()=>new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
 const fdate=s=>{if(!s)return'—';return new Date(s+'T12:00').toLocaleDateString('es-CL',{day:'numeric',month:'short',year:'numeric'});};
 const totalBills=obj=>BILLS.reduce((a,b)=>a+(b*(obj.bills?.[b]||0)),0);
@@ -5577,10 +5577,19 @@ async function marcarTodasLeidas(){
 }
 
 /* ============ PANEL OPERATIVO ============ */
-function renderPanelOperativo(aperturas){
+async function renderPanelOperativo(aperturas){
   const c=document.getElementById('panelSucursales');if(!c)return;
   const upd=document.getElementById('panelUltActz');
   if(upd)upd.textContent='Actualizado: '+new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+
+  // Venta real del POS de hoy, por sucursal
+  const ventaHoy={};
+  for(const suc of SUCURSALES){
+    try{
+      const snap=await db.collection('ventasPOS').doc(today()+'_'+suc.id).get();
+      ventaHoy[suc.id]=snap.exists?{total:snap.data().totalVenta||0,boletas:snap.data().totalBoletas||0,syncAt:snap.data().syncAt}:null;
+    }catch(e){ventaHoy[suc.id]=null;}
+  }
 
   // Match aperturas with sucursales and check if cierre exists
   c.innerHTML=SUCURSALES.map(suc=>{
@@ -5610,8 +5619,17 @@ function renderPanelOperativo(aperturas){
       </div>`;
     });
     const tieneActivo=sucAps.length>0;
+    const vh=ventaHoy[suc.id];
+    const minsSync=vh?.syncAt?Math.round((Date.now()-new Date(vh.syncAt).getTime())/60000):null;
     return`<div class="card" style="border-left:4px solid ${tieneActivo?'var(--gr500)':'var(--g300)'}">
       <div class="fw7 fs14 mb2">🏬 ${suc.nombre}</div>
+      <div style="background:var(--a50);border-radius:8px;padding:.625rem .75rem;margin-bottom:.625rem">
+        <div class="fs11 text-gray" style="text-transform:uppercase;letter-spacing:.03em">💰 Venta hoy (POS)</div>
+        ${vh?`
+          <div class="fw7" style="font-size:1.125rem;color:var(--a600)">${clp(vh.total)}</div>
+          <div class="fs11 text-gray">${vh.boletas} boletas${minsSync!==null?` · sync hace ${minsSync<60?minsSync+'m':Math.round(minsSync/60)+'h'}`:''}</div>
+        `:`<div class="fs13 text-gray" style="font-style:italic">Sin sincronización del POS hoy aún</div>`}
+      </div>
       <div style="display:flex;flex-direction:column;gap:.375rem">${estadoTurnos.join('')}</div>
     </div>`;
   }).join('');
@@ -5671,7 +5689,23 @@ async function renderTopProductos(){
       }
     }
 
-    const ranking=Object.values(porProducto).sort((a,b)=>b.monto-a.monto).slice(0,50);
+    // Cruzar con catálogo: categoría + margen estimado (costo/precio)
+    let ranking=Object.values(porProducto).sort((a,b)=>b.monto-a.monto).slice(0,50);
+    const totalGeneral=Object.values(porProducto).reduce((a,p)=>a+p.monto,0);
+
+    ranking=ranking.map(p=>{
+      const inv=INVENTARIO.find(i=>i.nombre.toLowerCase().trim()===p.nombre.toLowerCase().trim());
+      const cat=inv?.cat||'—';
+      const ticketUnit=p.cantidad?Math.round(p.monto/p.cantidad):0;
+      let margenPct=null,margenMonto=null;
+      if(inv?.costo&&inv.precio&&inv.precio>0){
+        margenPct=Math.round((inv.precio-inv.costo)/inv.precio*100);
+        margenMonto=Math.round(p.monto*(margenPct/100));
+      }
+      const participacion=totalGeneral?Math.round(p.monto/totalGeneral*1000)/10:0;
+      return{...p,cat,ticketUnit,margenPct,margenMonto,participacion};
+    });
+
     _topProductosCache=ranking; // para exportar a Excel
 
     if(!ranking.length){
@@ -5681,18 +5715,23 @@ async function renderTopProductos(){
 
     const max=ranking[0].monto||1;
     c.innerHTML=`<div class="tw"><table>
-      <thead><tr><th></th><th>Producto</th><th style="text-align:right">Unidades</th><th style="text-align:right">Monto</th><th></th></tr></thead>
+      <thead><tr><th></th><th>Producto</th><th>Categoría</th><th style="text-align:right">Unidades</th><th style="text-align:right">Monto</th><th style="text-align:right">% total</th><th style="text-align:right">Margen</th><th></th></tr></thead>
       <tbody>${ranking.map((p,i)=>{
         const medalla=['🥇','🥈','🥉'][i]||(i+1);
+        const cc=typeof catColor==='function'?catColor(p.cat):{bg:'var(--g100)',fg:'var(--g600)'};
         return`<tr>
           <td class="fs12 text-gray" style="width:28px">${medalla}</td>
-          <td class="fw6 fs13">${p.nombre}</td>
+          <td class="fw6 fs13">${p.nombre}<div class="fs11 text-gray">Ticket: ${clp(p.ticketUnit)}/und.</div></td>
+          <td><span class="badge" style="background:${cc.bg};color:${cc.fg};font-size:.7rem">${p.cat}</span></td>
           <td style="text-align:right;font-family:var(--mono)">${p.cantidad}</td>
           <td style="text-align:right;font-family:var(--mono);font-weight:700;color:var(--a600)">${clp(p.monto)}</td>
-          <td style="width:100px"><div style="height:8px;background:var(--g100);border-radius:4px;overflow:hidden"><div style="height:100%;width:${Math.round(p.monto/max*100)}%;background:var(--a400)"></div></div></td>
+          <td style="text-align:right;font-family:var(--mono);color:var(--g500)">${p.participacion}%</td>
+          <td style="text-align:right;font-family:var(--mono);font-weight:700;color:${p.margenPct===null?'var(--g300)':p.margenPct<20?'var(--r600)':'var(--gr600)'}">${p.margenPct!==null?p.margenPct+'%':'s/d'}</td>
+          <td style="width:80px"><div style="height:8px;background:var(--g100);border-radius:4px;overflow:hidden"><div style="height:100%;width:${Math.round(p.monto/max*100)}%;background:var(--a400)"></div></div></td>
         </tr>`;
       }).join('')}</tbody>
-    </table></div>`;
+    </table></div>
+    <p class="fs11 text-gray mt2">💡 Margen en rojo (&lt;20%) en un producto top de venta = mucho volumen, poca ganancia real — candidato a revisar precio.</p>`;
   }catch(e){
     c.innerHTML='<p class="fs13 text-gray">Error al cargar.</p>';
   }
@@ -5702,7 +5741,8 @@ let _topProductosCache=[];
 async function exportTopProductosExcel(){
   if(!_topProductosCache.length){toast('Sin datos para exportar');return;}
   await loadXLSX();
-  const rows=[['#','Producto','Unidades','Monto'],...(_topProductosCache.map((p,i)=>[i+1,p.nombre,p.cantidad,p.monto]))];
+  const rows=[['#','Producto','Categoría','Unidades','Monto','% del total','Ticket unitario','Margen %','Margen $'],
+    ...(_topProductosCache.map((p,i)=>[i+1,p.nombre,p.cat||'—',p.cantidad,p.monto,p.participacion+'%',p.ticketUnit,p.margenPct!==null?p.margenPct+'%':'s/d',p.margenMonto??'s/d']))];
   const ws=XLSX.utils.aoa_to_sheet(rows);
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Top Productos');
   XLSX.writeFile(wb,`top_productos_${today()}.xlsx`);
