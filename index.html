@@ -861,7 +861,10 @@ tr:hover td{background:var(--g50)}
               <div class="fld" style="margin:0"><label class="lbl">Ubicación a contar</label><select class="sel w100" id="conteoUbicacion" onchange="cambiarSucursalConteo()"><option value="exhibicion">🏪 Exhibición</option><option value="bodega">📦 Bodega</option></select></div>
             </div>
             <label class="lbl">Escanea o escribe el código de barras</label>
-            <input class="inp" id="conteoScanInput" placeholder="Esperando pistoleo… (Enter para confirmar)" style="font-size:1.125rem;padding:.875rem;font-family:var(--mono);border:2px solid var(--a400)" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();procesarScan(this.value);this.value='';}"/>
+            <div style="display:flex;gap:.5rem">
+              <input class="inp" id="conteoScanInput" placeholder="Esperando pistoleo… (Enter para confirmar)" style="font-size:1.125rem;padding:.875rem;font-family:var(--mono);border:2px solid var(--a400);flex:1" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();procesarScan(this.value);this.value='';}"/>
+              <button class="btn btn-s" onclick="abrirSelectorProducto(null,'conteo')" title="Elegir de la lista por categoría">📋</button>
+            </div>
             <div class="fs12 text-gray mt2">También puedes escribir el código manualmente y presionar Enter. Un pistolero USB/Bluetooth escribe el código y presiona Enter automáticamente.</div>
           </div>
 
@@ -966,7 +969,10 @@ tr:hover td{background:var(--g50)}
             <div class="ct">🔀 Nuevo Traspaso</div>
             <div class="fld">
               <label class="lbl">Producto</label>
-              <input class="inp" id="trProducto" list="trProdList" placeholder="Buscar producto…" oninput="actualizarStockTraspaso()"/>
+              <div style="display:flex;gap:.5rem">
+                <input class="inp" id="trProducto" list="trProdList" placeholder="Buscar producto…" oninput="actualizarStockTraspaso()" style="flex:1"/>
+                <button class="btn btn-s" onclick="abrirSelectorProducto('trProducto')" title="Elegir de la lista por categoría">📋</button>
+              </div>
               <datalist id="trProdList"></datalist>
             </div>
             <div class="g2">
@@ -1124,6 +1130,13 @@ tr:hover td{background:var(--g50)}
               <div id="repInvPreview" class="hidden" style="margin-top:1rem"></div>
             </div>
             <div class="card">
+              <div class="ct">📰 Informe Ejecutivo Semanal</div>
+              <p class="fs13 text-gray mb4">Ventas por sucursal, cuadratura y ranking de operadores de los últimos 7 días.</p>
+              <div style="display:flex;gap:.75rem"><button class="btn btn-p" onclick="generarInformeSemanal()">Ver</button><button class="btn btn-s" onclick="enviarInformeSemanal()">📧 Enviar</button></div>
+              <div id="repSemanalPreview" class="hidden" style="margin-top:1rem"></div>
+              <div id="repSemanalStatus" style="margin-top:.5rem;font-size:.8125rem"></div>
+            </div>
+            <div class="card">
               <div class="ct">💾 Backup a Google Sheets</div>
               <p class="fs13 text-gray mb4">Exporta los últimos 100 turnos y ventas a una hoja de cálculo en Google Drive automáticamente.</p>
               <button class="btn btn-p" onclick="backupToSheets()">📊 Enviar backup ahora</button>
@@ -1181,7 +1194,17 @@ tr:hover td{background:var(--g50)}
           <div class="card"><div class="ct">🖥️ Etiquetas Sistema</div><div class="fld"><label class="lbl">Efectivo</label><input class="inp" type="text" id="ajSisLblEf"/></div><div class="fld"><label class="lbl">Tarjetas/POS</label><input class="inp" type="text" id="ajSisLblTarj"/></div><div class="fld"><label class="lbl">Otros</label><input class="inp" type="text" id="ajSisLblOtros"/></div><button class="btn btn-p" onclick="saveSisLabels()">Guardar</button></div>
           <div class="card"><div class="ct">✅ Checklist Apertura</div><div id="ajCkApList" style="margin-bottom:1rem"></div><div style="display:flex;gap:.5rem;margin-bottom:.75rem"><input class="inp" type="text" id="ajCkApNew" placeholder="Nuevo ítem"/><button class="btn btn-p" onclick="addCkItem('apertura')">+</button></div><button class="btn btn-s w100" onclick="saveCkList('apertura')">💾 Guardar checklist apertura</button></div>
           <div class="card"><div class="ct">📸 Checklist Cierre</div><div id="ajCkCiList" style="margin-bottom:1rem"></div><div style="display:flex;gap:.5rem;margin-bottom:.75rem"><input class="inp" type="text" id="ajCkCiNew" placeholder="Nuevo ítem"/><button class="btn btn-p" onclick="addCkItem('cierre')">+</button></div><button class="btn btn-s w100" onclick="saveCkList('cierre')">💾 Guardar checklist cierre</button></div>
-          <div class="card"><div class="ct">📈 Historial de Precios</div><div id="ajPrecioHist"></div></div>
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+              <div class="ct" style="margin:0;padding:0">📈 Historial de Precios</div>
+              <div style="display:flex;gap:.375rem">
+                <button class="marca-tag active" id="precioHistBtn_todos" onclick="setPrecioHistFuente('todos')">Todos</button>
+                <button class="marca-tag" id="precioHistBtn_manual" onclick="setPrecioHistFuente('manual')">✎ Manual</button>
+                <button class="marca-tag" id="precioHistBtn_pos" onclick="setPrecioHistFuente('pos')">🖥️ Desde POS</button>
+              </div>
+            </div>
+            <div id="ajPrecioHist"></div>
+          </div>
         </div>
       </div>
 
@@ -1202,6 +1225,15 @@ tr:hover td{background:var(--g50)}
       </div>
 
     </main>
+  </div>
+</div>
+
+<div class="mb hidden" id="productPickerModal">
+  <div class="modal" style="width:min(480px,calc(100vw - 2rem));max-height:85vh;display:flex;flex-direction:column">
+    <div class="mh"><span class="mt2-title">Elegir producto</span><button class="btn btn-g sm" onclick="document.getElementById('productPickerModal').classList.add('hidden')">✕</button></div>
+    <input class="inp" id="ppBuscar" placeholder="Buscar por nombre…" style="margin-bottom:.75rem" oninput="renderProductPicker()"/>
+    <div id="ppCatTabs" style="display:flex;gap:.375rem;flex-wrap:wrap;margin-bottom:.75rem;overflow-x:auto"></div>
+    <div id="ppList" style="overflow-y:auto;flex:1;min-height:200px"></div>
   </div>
 </div>
 
@@ -3170,6 +3202,95 @@ function resetSession(){_sessionStart=Date.now();_warnShown=false;toast('✅ Ses
 // Las reglas se configuran en Firebase Console — ver comentario abajo
 
 /* ============ 15. BACKUP A GOOGLE SHEETS ============ */
+/* ============ INFORME EJECUTIVO SEMANAL ============ */
+async function _datosInformeSemanal(){
+  const hasta=today();
+  const d=new Date();d.setDate(d.getDate()-6);
+  const desde=d.toISOString().slice(0,10);
+  const fechas=[];
+  let cur=new Date(desde+'T00:00');const fin=new Date(hasta+'T00:00');
+  while(cur<=fin){fechas.push(cur.toISOString().slice(0,10));cur.setDate(cur.getDate()+1);}
+
+  // Ventas por sucursal (POS)
+  const bySuc={};
+  SUCURSALES.forEach(s=>bySuc[s.id]={nombre:s.nombre,pos:0,boletas:0,operador:0});
+  for(const suc of SUCURSALES){
+    for(const f of fechas){
+      try{
+        const snap=await db.collection('ventasPOS').doc(f+'_'+suc.id).get();
+        if(snap.exists){bySuc[suc.id].pos+=snap.data().totalVenta||0;bySuc[suc.id].boletas+=snap.data().totalBoletas||0;}
+      }catch(e){}
+    }
+  }
+
+  // Turnos de la semana
+  let turnosSemana=[];
+  try{
+    const snap=await db.collection('turnos').where('fecha','>=',desde).where('fecha','<=',hasta).get();
+    turnosSemana=snap.docs.map(d=>d.data());
+  }catch(e){}
+  turnosSemana.forEach(t=>{if(bySuc[t.sucursalId])bySuc[t.sucursalId].operador+=t.totalReal||0;});
+
+  // Ranking de operadores (% cuadratura)
+  const porOp={};
+  turnosSemana.forEach(t=>{
+    const n=t.operador||'—';
+    if(!porOp[n])porOp[n]={turnos:0,conDiff:0};
+    porOp[n].turnos++;
+    if((t.diffEf||0)!==0||(t.diffSis||0)!==0)porOp[n].conDiff++;
+  });
+  const ranking=Object.entries(porOp).map(([n,d])=>({n,...d,pct:Math.round((d.turnos-d.conDiff)/d.turnos*100)})).sort((a,b)=>b.pct-a.pct);
+
+  const totalPOS=Object.values(bySuc).reduce((a,s)=>a+s.pos,0);
+  const totalOp=Object.values(bySuc).reduce((a,s)=>a+s.operador,0);
+
+  return{desde,hasta,bySuc,ranking,totalPOS,totalOp,turnosSemana};
+}
+
+async function generarInformeSemanal(){
+  const c=document.getElementById('repSemanalPreview');if(!c)return;
+  c.classList.remove('hidden');
+  c.innerHTML='<div class="card"><p class="fs14 text-gray">Generando…</p></div>';
+  const d=await _datosInformeSemanal();
+
+  let html=`<div class="card" style="font-family:var(--mono);font-size:.8125rem;white-space:pre-wrap;line-height:1.7;background:var(--g50)"><strong>${CFG.tienda?.nombre||'Kombi Store'} — Semana ${fdate(d.desde)} al ${fdate(d.hasta)}</strong>\n\n`;
+  html+=`VENTAS POR SUCURSAL (Sistema)\n`;
+  Object.values(d.bySuc).forEach(s=>{html+=`  ${s.nombre}: ${clp(s.pos)} (${s.boletas} boletas) · Operador: ${clp(s.operador)}\n`;});
+  html+=`  TOTAL: Sistema ${clp(d.totalPOS)} · Operador ${clp(d.totalOp)}\n\n`;
+  html+=`RANKING OPERADORES (% cuadratura)\n`;
+  if(d.ranking.length)d.ranking.forEach(r=>{html+=`  ${r.n}: ${r.pct}% (${r.turnos} turnos${r.conDiff?`, ${r.conDiff} con diferencia`:''})\n`;});
+  else html+=`  Sin turnos cerrados esta semana.\n`;
+  html+='</div>';
+  c.innerHTML=html;
+}
+
+async function enviarInformeSemanal(){
+  const st=document.getElementById('repSemanalStatus');
+  if(st)st.innerHTML='<span style="color:var(--a600)">⏳ Armando informe…</span>';
+  await generarInformeSemanal();
+  try{
+    const d=await _datosInformeSemanal();
+    const tienda=CFG.tienda?.nombre||'Kombi Store';
+    const cc=(await obtenerEmailsGerentes()).join(',');
+
+    const rows=[
+      {header:`INFORME EJECUTIVO SEMANAL — ${fdate(d.desde)} al ${fdate(d.hasta)}`},
+      {label:'Total Sistema (POS)',value:clp(d.totalPOS),total:true},
+      {label:'Total Operador (cierres)',value:clp(d.totalOp)},
+      {header:'POR SUCURSAL'},
+      ...Object.values(d.bySuc).filter(s=>s.pos||s.operador).map(s=>({label:s.nombre,value:`Sistema ${clp(s.pos)} (${s.boletas} bol.) / Operador ${clp(s.operador)}`})),
+      {header:'RANKING OPERADORES (% cuadratura)'},
+      ...(d.ranking.length?d.ranking.slice(0,10).map(r=>({label:r.n,value:`${r.pct}% (${r.turnos} turnos)`,neg:r.pct<70})):[{label:'Sin turnos cerrados esta semana',value:'—'}]),
+    ];
+
+    await enviarEmail(`Informe Semanal — ${tienda} — ${d.desde} al ${d.hasta}`,`Semana ${fdate(d.desde)} al ${fdate(d.hasta)}: Sistema ${clp(d.totalPOS)} / Operador ${clp(d.totalOp)}`,buildHTMLTable(rows),'diario',cc);
+
+    if(st)st.innerHTML=`<span style="color:var(--gr600)">✅ Informe enviado${cc?` — con copia a ${cc.split(',').length} gerente(s)`:''}</span>`;
+  }catch(e){
+    if(st)st.innerHTML='<span style="color:var(--r600)">❌ Error: '+e.message+'</span>';
+  }
+}
+
 async function backupToSheets(){
   const url=getGasUrl();if(!url){toast('Configura la URL del script primero');return;}
   toast('📊 Enviando backup a Sheets…',8000);
@@ -3262,6 +3383,64 @@ async function agregarTurnoConfig(){
   await guardarTurnosConfigDB(nuevaLista);
   ['tcNuevoLabel','tcNuevoEmoji','tcNuevoInicio','tcNuevoFin'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   renderTurnosConfigList();
+}
+
+/* ============ SELECTOR DE PRODUCTO POR CATEGORÍA (reutilizable) ============ */
+let _ppCallbackFieldId=null;
+let _ppModo='campo'; // 'campo' = rellena un input | 'conteo' = suma directo al conteo físico
+let _ppCat='TODOS';
+
+function abrirSelectorProducto(fieldId,modo='campo'){
+  _ppCallbackFieldId=fieldId;
+  _ppModo=modo;
+  _ppCat='TODOS';
+  document.getElementById('ppBuscar').value='';
+  document.getElementById('productPickerModal').classList.remove('hidden');
+  renderProductPicker();
+  setTimeout(()=>document.getElementById('ppBuscar')?.focus(),150);
+}
+
+function renderProductPicker(){
+  const cats=['TODOS',...new Set(INVENTARIO.map(i=>i.cat).filter(Boolean))];
+  const tabs=document.getElementById('ppCatTabs');
+  if(tabs)tabs.innerHTML=cats.map(cat=>`<button class="marca-tag ${_ppCat===cat?'active':''}" onclick="_ppCat='${cat}';renderProductPicker()" style="white-space:nowrap">${cat}</button>`).join('');
+
+  const buscar=(document.getElementById('ppBuscar')?.value||'').toLowerCase();
+  let items=INVENTARIO;
+  if(_ppCat!=='TODOS')items=items.filter(i=>i.cat===_ppCat);
+  if(buscar)items=items.filter(i=>i.nombre.toLowerCase().includes(buscar));
+  items=items.slice(0,150);
+
+  const list=document.getElementById('ppList');
+  if(!items.length){list.innerHTML='<p class="fs13 text-gray" style="padding:1rem 0">Sin productos en esta categoría.</p>';return;}
+  list.innerHTML=items.map(i=>`
+    <div onclick="elegirProductoPicker('${i.id}','${i.nombre.replace(/'/g,"\\'")}')" style="display:flex;justify-content:space-between;align-items:center;padding:.625rem .375rem;border-bottom:1px solid var(--g100);cursor:pointer" onmouseover="this.style.background='var(--g50)'" onmouseout="this.style.background=''">
+      <div>
+        <div class="fw6 fs13">${i.nombre}</div>
+        <div class="fs11 text-gray">${i.cat}${i.marca?' · '+i.marca:''}</div>
+      </div>
+      <div class="fs12 mono text-gray">${clp(i.precio)}</div>
+    </div>`).join('');
+}
+
+function elegirProductoPicker(prodId,nombre){
+  if(_ppModo==='conteo'){
+    const prod=INVENTARIO.find(p=>p.id===prodId);
+    if(prod){
+      if(!_conteoItems[prod.id])_conteoItems[prod.id]={producto:prod,cantidad:0};
+      _conteoItems[prod.id].cantidad++;
+      renderConteoScanList();
+      toast(`✓ ${prod.nombre} agregado`);
+    }
+  }else if(_ppCallbackFieldId){
+    const field=document.getElementById(_ppCallbackFieldId);
+    if(field){
+      field.value=nombre;
+      field.dispatchEvent(new Event('input',{bubbles:true}));
+      field.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+  }
+  document.getElementById('productPickerModal').classList.add('hidden');
 }
 
 function esSuperAdmin(){return (CU.rolActivo||CU.rol)==='superadmin';}
@@ -5699,7 +5878,71 @@ async function saveCkList(cat){
 }
 async function addCkItem(cat){const inputId=cat==='apertura'?'ajCkApNew':'ajCkCiNew';const text=document.getElementById(inputId)?.value.trim();if(!text){toast('Ingresa texto');return;}const newItem={id:'u'+Date.now(),text,done:false};if(cat==='cierre')newItem.photo=null;if(cat==='apertura')CK_APERTURA.push(newItem);else CK_CIERRE.push(newItem);document.getElementById(inputId).value='';const field=cat==='apertura'?'ckApertura':'ckCierre';await db.collection('config').doc('global').update({[field]:cat==='apertura'?CK_APERTURA:CK_CIERRE});renderAjCkList(cat);toast('✅ Ítem agregado');}
 async function delCkItem(cat,i){if(cat==='apertura')CK_APERTURA.splice(i,1);else CK_CIERRE.splice(i,1);const field=cat==='apertura'?'ckApertura':'ckCierre';await db.collection('config').doc('global').update({[field]:cat==='apertura'?CK_APERTURA:CK_CIERRE});renderAjCkList(cat);}
-async function renderPrecioHist(){const c=document.getElementById('ajPrecioHist');if(!c)return;try{const snap=await db.collection('historialPrecios').orderBy('timestamp','desc').limit(30).get();const hist=snap.docs.map(d=>d.data());if(!hist.length){c.innerHTML='<p class="fs13 text-gray">Sin cambios de precio.</p>';return;}c.innerHTML=`<div class="tw"><table><thead><tr><th>Producto</th><th style="text-align:right">Antes</th><th style="text-align:right">Después</th><th style="text-align:right">Dif.</th><th>Fecha</th></tr></thead><tbody>${hist.map(h=>{const diff=h.precioNuevo-h.precioAnterior;return`<tr><td class="fw6 fs13">${h.nombre}</td><td style="text-align:right;font-family:var(--mono);color:var(--g400)">${clp(h.precioAnterior||h.precio)}</td><td style="text-align:right;font-family:var(--mono);font-weight:700">${clp(h.precioNuevo)}</td><td style="text-align:right"><span class="badge ${diff>0?'br':'bg'}">${diff>0?'+':''}${clp(diff)}</span></td><td class="fs12 text-gray">${h.fecha} ${h.hora}</td></tr>`;}).join('')}</tbody></table></div>`;}catch(e){c.innerHTML='<p class="fs13 text-gray">Error al cargar.</p>';}}
+let _precioHistFuente='todos';
+function setPrecioHistFuente(f){
+  _precioHistFuente=f;
+  ['todos','manual','pos'].forEach(k=>document.getElementById('precioHistBtn_'+k)?.classList.toggle('active',k===f));
+  renderPrecioHist();
+}
+
+async function renderPrecioHist(){
+  const c=document.getElementById('ajPrecioHist');if(!c)return;
+  c.innerHTML='<p class="fs13 text-gray">Cargando…</p>';
+  try{
+    const filas=[];
+
+    // Fuente 1: ediciones manuales del admin
+    if(_precioHistFuente==='todos'||_precioHistFuente==='manual'){
+      const snap=await db.collection('historialPrecios').orderBy('timestamp','desc').limit(30).get();
+      snap.docs.forEach(d=>{
+        const h=d.data();
+        filas.push({
+          nombre:h.nombre,precioAnterior:h.precioAnterior||h.precio,precioNuevo:h.precioNuevo,
+          fecha:h.fecha,hora:h.hora||'',fuente:'✎ Manual',fuenteCol:'var(--b600)',
+          sortKey:(h.fecha||'')+(h.hora||'')
+        });
+      });
+    }
+
+    // Fuente 2: cambios detectados automáticamente por el sync del POS
+    if(_precioHistFuente==='todos'||_precioHistFuente==='pos'){
+      const snap=await db.collection('historialPreciosPOS').orderBy('syncAt','desc').limit(15).get();
+      snap.docs.forEach(d=>{
+        const h=d.data();
+        let cambios=[];
+        try{cambios=JSON.parse(h.cambios||'[]');}catch(e){}
+        cambios.forEach(cb=>{
+          filas.push({
+            nombre:cb.nombre,precioAnterior:cb.precioAnterior,precioNuevo:cb.precioNuevo,
+            fecha:h.fecha,hora:'',fuente:'🖥️ '+(h.sucursal||'POS'),fuenteCol:'var(--gr600)',
+            sortKey:(h.fecha||'')+(h.syncAt||'')
+          });
+        });
+      });
+    }
+
+    if(!filas.length){c.innerHTML='<p class="fs13 text-gray">Sin cambios de precio registrados.</p>';return;}
+
+    filas.sort((a,b)=>b.sortKey.localeCompare(a.sortKey));
+
+    c.innerHTML=`<div class="tw"><table>
+      <thead><tr><th>Producto</th><th style="text-align:right">Antes</th><th style="text-align:right">Después</th><th style="text-align:right">Dif.</th><th>Fuente</th><th>Fecha</th></tr></thead>
+      <tbody>${filas.slice(0,60).map(h=>{
+        const diff=(h.precioNuevo||0)-(h.precioAnterior||0);
+        const diffPct=h.precioAnterior?Math.round(diff/h.precioAnterior*1000)/10:0;
+        return`<tr>
+          <td class="fw6 fs13">${h.nombre}</td>
+          <td style="text-align:right;font-family:var(--mono);color:var(--g400)">${clp(h.precioAnterior)}</td>
+          <td style="text-align:right;font-family:var(--mono);font-weight:700">${clp(h.precioNuevo)}</td>
+          <td style="text-align:right"><span class="badge ${diff>0?'br':'bg'}">${diff>0?'+':''}${clp(diff)} (${diffPct>0?'+':''}${diffPct}%)</span></td>
+          <td class="fs12" style="color:${h.fuenteCol}">${h.fuente}</td>
+          <td class="fs12 text-gray">${h.fecha} ${h.hora}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>
+    ${filas.length>60?`<p class="fs11 text-gray mt2">Mostrando los 60 más recientes de ${filas.length}.</p>`:''}`;
+  }catch(e){c.innerHTML='<p class="fs13 text-gray">Error al cargar.</p>';}
+}
 
 async function renderUsers(){
   const c=document.getElementById('usersBody');if(!c)return;c.innerHTML='<tr><td colspan="7" class="text-gray">Cargando…</td></tr>';
