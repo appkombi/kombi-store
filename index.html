@@ -31,6 +31,7 @@
 <link rel="manifest" href="manifest.json"/>
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23B45309'/><text y='.9em' font-size='80' x='10'>🛒</text></svg>"/>
 <title>Kombi Store</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%23B45309%22/><text x=%2250%22 y=%2270%22 font-family=%22Arial,Helvetica,sans-serif%22 font-size=%2260%22 font-weight=%22800%22 fill=%22%23ffffff%22 text-anchor=%22middle%22>K</text></svg>"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"/>
 <style>
 :root{
@@ -662,6 +663,17 @@ tr:hover td{background:var(--g50)}
           <div class="card"><div class="ct">💸 Retiros por categoría</div><div id="dashRetirosCat"></div></div>
           <div class="card"><div class="ct">🏬 Ventas por sucursal (mes)</div><div id="dashVentasSuc"></div></div>
         </div>
+        <!-- OPORTUNIDADES COMERCIALES -->
+        <div class="card mt4" id="wgtOportunidades">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.875rem">
+            <div>
+              <div class="fw7 fs15">💡 Oportunidades Comerciales</div>
+              <div class="fs12 text-gray">Calculado con datos reales de ventas — cada tarjeta explica de dónde sale</div>
+            </div>
+            <button class="btn btn-s sm" onclick="renderOportunidadesComerciales()">🔄 Recalcular</button>
+          </div>
+          <div id="oportunidadesContent" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem"></div>
+        </div>
         <!-- POS SYNC PANEL -->
         <div class="card mt4" id="posSyncPanel">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">
@@ -1026,6 +1038,8 @@ tr:hover td{background:var(--g50)}
         <div style="display:flex;gap:.375rem;margin-bottom:1.25rem;border-bottom:2px solid var(--g200);padding-bottom:-.5rem">
           <button class="rep-tab active" onclick="showRepTab('analisis',this)">📊 Análisis de Ventas</button>
           <button class="rep-tab" onclick="showRepTab('comparativa',this)">🏬 Comparativa Sucursales</button>
+          <button class="rep-tab" onclick="showRepTab('topprod',this)">🏆 Top Productos</button>
+          <button class="rep-tab" onclick="showRepTab('metricas',this)">📐 Métricas Comerciales</button>
           <button class="rep-tab" onclick="showRepTab('envio',this)">📧 Enviar Reportes</button>
         </div>
 
@@ -1086,6 +1100,76 @@ tr:hover td{background:var(--g50)}
             <button class="btn btn-s sm" onclick="renderComparativa()">🔄 Actualizar</button>
           </div>
           <div id="cmpContent"></div>
+        </div>
+
+        <!-- TAB: TOP PRODUCTOS -->
+        <div id="repTabTopprod" style="display:none">
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
+            <select class="sel sm" id="tpPeriodo" onchange="renderTopProductos()">
+              <option value="7">Últimos 7 días</option>
+              <option value="30" selected>Últimos 30 días</option>
+              <option value="90">Últimos 90 días</option>
+            </select>
+            <select class="sel sm" id="tpSucursal" onchange="renderTopProductos()">
+              <option value="">Todas las sucursales</option>
+            </select>
+            <button class="btn btn-s sm" onclick="exportTopProductosExcel()">⬇ Excel</button>
+          </div>
+          <div class="card">
+            <div class="ct">🏆 Productos más vendidos (por monto)</div>
+            <div id="tpList"></div>
+          </div>
+        </div>
+
+        <!-- TAB: MÉTRICAS COMERCIALES -->
+        <div id="repTabMetricas" style="display:none">
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
+            <select class="sel sm" id="mcPeriodo" onchange="renderMetricasComerciales()">
+              <option value="7">Últimos 7 días</option>
+              <option value="30" selected>Últimos 30 días</option>
+              <option value="90">Últimos 90 días</option>
+            </select>
+            <select class="sel sm" id="mcSucursal" onchange="renderMetricasComerciales()">
+              <option value="">Todas las sucursales</option>
+            </select>
+          </div>
+
+          <div class="card" style="margin-bottom:1rem">
+            <div class="ct">📅 Comparativo Mensual</div>
+            <p class="fs11 text-gray mb2">Mes en curso vs mismo tramo del mes anterior — mismos días para comparar parejo</p>
+            <div id="mcMensual"></div>
+          </div>
+
+          <div class="g2" style="margin-bottom:1rem">
+            <div class="card">
+              <div class="ct">🎫 Ticket Promedio</div>
+              <div id="mcTicket"></div>
+            </div>
+            <div class="card">
+              <div class="ct">🔄 Rotación de Inventario</div>
+              <p class="fs11 text-gray mb2">Unidades vendidas ÷ stock actual — más alto = se mueve rápido, más bajo = capital parado</p>
+              <div id="mcRotacion"></div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-bottom:1rem">
+            <div class="ct">📈 Elasticidad de Precio</div>
+            <p class="fs11 text-gray mb2">Compara el volumen vendido antes/después de un cambio de precio detectado</p>
+            <div id="mcElasticidad"></div>
+          </div>
+
+          <div class="g2">
+            <div class="card">
+              <div class="ct">🕐 Hora Pico de Venta</div>
+              <p class="fs11 text-gray mb2">Empezamos a capturar esto recién — se va llenando con el backfill histórico</p>
+              <div id="mcHoraPico"></div>
+            </div>
+            <div class="card">
+              <div class="ct">🛒 Canasta de Compra</div>
+              <p class="fs11 text-gray mb2">Productos que más se compran juntos en la misma boleta</p>
+              <div id="mcCanasta"></div>
+            </div>
+          </div>
         </div>
 
         <!-- TAB: ENVÍO -->
@@ -2877,7 +2961,7 @@ function renderDash(){
   const stk=INVENTARIO.filter(i=>i.stock<=i.min&&i.min>0).length,retH=RETIROS.filter(r=>r.fecha===today()&&r.tipo==='retiro').reduce((a,r)=>a+r.monto,0);
   s.innerHTML=[{l:'Ventas período',v:clp(total),sub:`${v.length} registros`,col:'var(--a500)'},{l:'Promedio diario',v:clp(avg),sub:'del período',col:'var(--b500)'},{l:'Stock crítico',v:stk,sub:'bajo mínimo',col:stk?'var(--r500)':'var(--gr500)'},{l:'Retiros hoy',v:clp(retH),sub:`${RETIROS.filter(r=>r.fecha===today()).length} mov.`,col:'var(--g500)'}].map(x=>`<div class="sc"><div class="lbl">${x.l}</div><div class="val" style="color:${x.col}">${x.v}</div><div class="sub">${x.sub}</div></div>`).join('');
   renderDashChart(v);renderDashCompo(v);renderDashCigs();renderDashStock();renderDashTL();
-  renderMetaVentas();renderDashRetirosCat();renderDashVentasSuc();
+  renderMetaVentas();renderDashRetirosCat();renderDashVentasSuc();renderOportunidadesComerciales();
   checkVencimientos();
 
   // Cuadratura y panel POS — solo si el superadmin los dejó activados
@@ -2898,6 +2982,228 @@ function renderDash(){
     if(window._posRefreshTimer){clearInterval(window._posRefreshTimer);window._posRefreshTimer=null;}
   }
   aplicarDashWidgets();
+}
+
+/* ============ OPORTUNIDADES COMERCIALES ============ */
+async function cargarCatalogoCompleto(sucId){
+  try{
+    const metaSnap=await db.collection('syncPOS').doc(sucId).get();
+    if(!metaSnap.exists)return[];
+    const partes=metaSnap.data().partes||1;
+    let productos=[];
+    for(let i=0;i<partes;i++){
+      const chunk=await db.collection('catalogoPOS').doc(`${sucId}_${i}`).get();
+      if(chunk.exists){try{productos=productos.concat(JSON.parse(chunk.data().productos||'[]'));}catch(e){}}
+    }
+    return productos;
+  }catch(e){return[];}
+}
+
+async function renderOportunidadesComerciales(){
+  const c=document.getElementById('oportunidadesContent');if(!c)return;
+  c.innerHTML='<div class="card" style="grid-column:1/-1"><p class="fs13 text-gray">Calculando…</p></div>';
+
+  const tarjetas=[];
+
+  // Rango: últimos 30 días
+  const fechas=[];
+  const hoy=new Date();
+  for(let i=0;i<30;i++){const d=new Date(hoy);d.setDate(d.getDate()-i);fechas.push(d.toISOString().slice(0,10));}
+
+  // ── 1 y 2: Top productos + productos sin venta (desde ventasProductoDia) ──
+  try{
+    const porProducto={};
+    for(const suc of SUCURSALES){
+      for(const f of fechas){
+        try{
+          const snap=await db.collection('ventasProductoDia').doc(f+'_'+suc.id).get();
+          if(!snap.exists)continue;
+          JSON.parse(snap.data().productos||'[]').forEach(p=>{
+            const key=p.nombre.toLowerCase().trim();
+            if(!porProducto[key])porProducto[key]={nombre:p.nombre,cantidad:0,monto:0};
+            porProducto[key].cantidad+=p.cantidad||0;
+            porProducto[key].monto+=p.monto||0;
+          });
+        }catch(e){}
+      }
+    }
+    const vendidosSet=new Set(Object.keys(porProducto));
+    const topVendidos=Object.values(porProducto).sort((a,b)=>b.monto-a.monto).slice(0,15);
+
+    // 1. Producto estrella con stock bajo
+    const estrellasConRiesgo=[];
+    topVendidos.forEach(tv=>{
+      const inv=INVENTARIO.find(i=>i.nombre.toLowerCase().trim()===tv.nombre.toLowerCase().trim());
+      if(inv&&inv.min>0&&inv.stock<=inv.min)estrellasConRiesgo.push({...tv,stock:inv.stock,min:inv.min});
+    });
+
+    tarjetas.push({
+      titulo:'⚠️ Productos estrella con stock bajo',
+      color:'var(--r600)',bg:'#FEF2F2',border:'#FECACA',
+      explicacion:'Están entre los más vendidos del mes, pero el stock está en o bajo el mínimo — riesgo de quiebre.',
+      contenido: estrellasConRiesgo.length
+        ? estrellasConRiesgo.slice(0,5).map(p=>`<div style="display:flex;justify-content:space-between;font-size:.8125rem;padding:.3rem 0;border-bottom:1px solid rgba(0,0,0,.05)"><span class="fw6">${p.nombre}</span><span class="mono" style="color:var(--r600)">${p.stock}/${p.min}</span></div>`).join('')
+        : '<p class="fs13 text-gray">Ningún producto top está bajo mínimo ahora mismo — bien.</p>'
+    });
+
+    // 2. Productos sin venta reciente (dentro del catálogo actual, con stock, que no aparecen en ventasProductoDia)
+    const sinVenta=INVENTARIO.filter(i=>i.stock>0&&!vendidosSet.has(i.nombre.toLowerCase().trim())).slice(0,8);
+    tarjetas.push({
+      titulo:'📦 Con stock pero sin venta en 30 días',
+      color:'var(--g600)',bg:'var(--g50)',border:'var(--g200)',
+      explicacion:'Tienen stock disponible pero no aparecen en ninguna boleta del último mes — candidatos a promoción, reubicación o descontinuar.',
+      contenido: sinVenta.length
+        ? sinVenta.map(p=>`<div style="display:flex;justify-content:space-between;font-size:.8125rem;padding:.3rem 0;border-bottom:1px solid rgba(0,0,0,.05)"><span class="fw6">${p.nombre}</span><span class="mono text-gray">${p.stock} und.</span></div>`).join('')
+        + (INVENTARIO.filter(i=>i.stock>0&&!vendidosSet.has(i.nombre.toLowerCase().trim())).length>8?`<p class="fs11 text-gray mt2">+${INVENTARIO.filter(i=>i.stock>0&&!vendidosSet.has(i.nombre.toLowerCase().trim())).length-8} más</p>`:'')
+        : '<p class="fs13 text-gray">Todo lo que tiene stock se ha vendido en el último mes.</p>'
+    });
+  }catch(e){console.warn('oportunidades 1-2:',e);}
+
+  // ── 3: Categoría con mejor margen ──
+  try{
+    let margenPorCat={};
+    for(const suc of SUCURSALES){
+      const catalogo=await cargarCatalogoCompleto(suc.id);
+      catalogo.forEach(p=>{
+        if(!p.precio||p.precio<=0||!p.costo||p.costo<=0)return;
+        const pct=(p.precio-p.costo)/p.precio;
+        if(!margenPorCat[p.cat])margenPorCat[p.cat]={sum:0,n:0};
+        margenPorCat[p.cat].sum+=pct;margenPorCat[p.cat].n++;
+      });
+    }
+    const catsOrdenadas=Object.entries(margenPorCat)
+      .map(([cat,d])=>({cat,pct:d.n?d.sum/d.n:0}))
+      .filter(c=>c.pct>0)
+      .sort((a,b)=>b.pct-a.pct)
+      .slice(0,5);
+
+    tarjetas.push({
+      titulo:'💹 Categorías con mejor margen',
+      color:'var(--gr600)',bg:'#F0FDF4',border:'#BBF7D0',
+      explicacion:'Margen promedio (precio − costo) de los productos del catálogo, por categoría — ahí conviene empujar más venta.',
+      contenido: catsOrdenadas.length
+        ? catsOrdenadas.map(c=>`<div style="display:flex;justify-content:space-between;font-size:.8125rem;padding:.3rem 0;border-bottom:1px solid rgba(0,0,0,.05)"><span class="fw6">${c.cat}</span><span class="mono" style="color:var(--gr600);font-weight:700">${Math.round(c.pct*100)}%</span></div>`).join('')
+        : '<p class="fs13 text-gray">Sin datos de costo suficientes en el catálogo para calcular margen.</p>'
+    });
+  }catch(e){console.warn('oportunidades 3:',e);}
+
+  // ── 4: Mejor día de la semana ──
+  try{
+    const diasSemana=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+    const porDia={};
+    for(const suc of SUCURSALES){
+      for(const f of fechas){
+        try{
+          const snap=await db.collection('ventasPOS').doc(f+'_'+suc.id).get();
+          if(!snap.exists)continue;
+          const dow=new Date(f+'T12:00').getDay();
+          if(!porDia[dow])porDia[dow]={suma:0,n:0};
+          porDia[dow].suma+=snap.data().totalVenta||0;
+          porDia[dow].n++;
+        }catch(e){}
+      }
+    }
+    const promPorDia=Object.entries(porDia).map(([dow,d])=>({dia:diasSemana[dow],prom:d.n?d.suma/d.n:0})).sort((a,b)=>b.prom-a.prom);
+    const mejor=promPorDia[0],peor=promPorDia[promPorDia.length-1];
+
+    tarjetas.push({
+      titulo:'📅 Mejor día de la semana',
+      color:'var(--b600)',bg:'#EFF6FF',border:'#BFDBFE',
+      explicacion:'Promedio de venta por día de la semana en los últimos 30 días — útil para planificar stock y turnos.',
+      contenido: promPorDia.length
+        ? `<div style="margin-bottom:.5rem"><span class="fw7" style="color:var(--b600)">${mejor?.dia}</span> es el día con más venta en promedio (${clp(mejor?.prom||0)})</div>`
+        + (peor&&peor.dia!==mejor?.dia?`<div class="fs12 text-gray">${peor.dia} es el más bajo (${clp(peor.prom)})</div>`:'')
+        + promPorDia.map(d=>`<div style="display:flex;justify-content:space-between;font-size:.75rem;padding:.2rem 0"><span>${d.dia}</span><span class="mono">${clp(Math.round(d.prom))}</span></div>`).join('')
+        : '<p class="fs13 text-gray">Sin suficientes datos históricos todavía.</p>'
+    });
+  }catch(e){console.warn('oportunidades 4:',e);}
+
+  // ── 5: Sugerencia de precio (productos con poca elasticidad = margen para subir) ──
+  try{
+    const snap=await db.collection('historialPreciosPOS').orderBy('syncAt','desc').limit(15).get();
+    let candidatos=[];
+    for(const d of snap.docs){
+      const h=d.data();
+      let cbs=[];try{cbs=JSON.parse(h.cambios||'[]');}catch(e){}
+      for(const cb of cbs.slice(0,5)){
+        const fechaCambio=new Date(h.fecha+'T12:00');
+        const antes=[],despues=[];
+        for(let i=1;i<=5;i++){const dd=new Date(fechaCambio);dd.setDate(dd.getDate()-i);antes.push(dd.toISOString().slice(0,10));}
+        for(let i=1;i<=5;i++){const dd=new Date(fechaCambio);dd.setDate(dd.getDate()+i);despues.push(dd.toISOString().slice(0,10));}
+        let qA=0,qD=0,nA=0,nD=0;
+        for(const f of antes){try{const s=await db.collection('ventasProductoDia').doc(f+'_'+h.sucursalId).get();if(s.exists){const p=JSON.parse(s.data().productos||'[]').find(x=>x.nombre.toLowerCase().trim()===cb.nombre.toLowerCase().trim());if(p){qA+=p.cantidad;nA++;}}}catch(e){}}
+        for(const f of despues){try{const s=await db.collection('ventasProductoDia').doc(f+'_'+h.sucursalId).get();if(s.exists){const p=JSON.parse(s.data().productos||'[]').find(x=>x.nombre.toLowerCase().trim()===cb.nombre.toLowerCase().trim());if(p){qD+=p.cantidad;nD++;}}}catch(e){}}
+        if(qA>0&&nA&&nD&&cb.precioAnterior){
+          const pctQ=(qD/nD-qA/nA)/(qA/nA)*100;
+          const pctP=(cb.precioNuevo-cb.precioAnterior)/cb.precioAnterior*100;
+          if(pctP!==0){const elas=pctQ/pctP;if(Math.abs(elas)<0.5)candidatos.push({nombre:cb.nombre,elas:Math.round(elas*100)/100});}
+        }
+      }
+    }
+    tarjetas.push({
+      titulo:'💰 Margen para subir precio',
+      color:'#B45309',bg:'#FFFBEB',border:'#FDE68A',
+      explicacion:'Productos donde un cambio de precio reciente casi no afectó cuánto se vendió (elasticidad baja) — hay espacio para ajustar precio sin perder venta.',
+      contenido: candidatos.length
+        ? candidatos.slice(0,5).map(p=>`<div style="display:flex;justify-content:space-between;font-size:.8125rem;padding:.3rem 0;border-bottom:1px solid rgba(0,0,0,.05)"><span class="fw6">${p.nombre}</span><span class="mono" style="color:#B45309">elast. ${p.elas}</span></div>`).join('')
+        : '<p class="fs13 text-gray">Aún no hay suficientes cambios de precio con datos de venta para sugerir esto.</p>'
+    });
+  }catch(e){console.warn('oportunidades 5:',e);}
+
+  // ── 6: Hora pico → refuerzo de personal ──
+  try{
+    const porHora={};
+    for(const suc of SUCURSALES){
+      for(const f of fechas){
+        try{
+          const snap=await db.collection('ventasHoraDia').doc(f+'_'+suc.id).get();
+          if(!snap.exists)continue;
+          const h=JSON.parse(snap.data().porHora||'{}');
+          Object.entries(h).forEach(([hr,d])=>{if(!porHora[hr])porHora[hr]={monto:0};porHora[hr].monto+=d.monto||0;});
+        }catch(e){}
+      }
+    }
+    const horas=Object.entries(porHora).sort((a,b)=>b[1].monto-a[1].monto);
+    tarjetas.push({
+      titulo:'🕐 Hora pico — refuerza personal',
+      color:'var(--b600)',bg:'#EFF6FF',border:'#BFDBFE',
+      explicacion:'Horas con más venta en los últimos 30 días — conviene tener más gente en caja en esos bloques.',
+      contenido: horas.length
+        ? horas.slice(0,3).map(([hr,d])=>`<div style="display:flex;justify-content:space-between;font-size:.8125rem;padding:.3rem 0;border-bottom:1px solid rgba(0,0,0,.05)"><span class="fw6">${hr}:00 - ${parseInt(hr)+1}:00</span><span class="mono" style="color:var(--b600)">${clp(d.monto)}</span></div>`).join('')
+        : '<p class="fs13 text-gray">Se está acumulando este dato — vuelve a revisar en unos días.</p>'
+    });
+  }catch(e){console.warn('oportunidades 6:',e);}
+
+  // ── 7: Canasta → promo cruzada ──
+  try{
+    const pares={};
+    for(const suc of SUCURSALES){
+      for(const f of fechas){
+        try{
+          const snap=await db.collection('canastaDia').doc(f+'_'+suc.id).get();
+          if(!snap.exists)continue;
+          const p=JSON.parse(snap.data().pares||'{}');
+          Object.entries(p).forEach(([k,v])=>{pares[k]=(pares[k]||0)+v;});
+        }catch(e){}
+      }
+    }
+    const topPar=Object.entries(pares).sort((a,b)=>b[1]-a[1])[0];
+    tarjetas.push({
+      titulo:'🛒 Oportunidad de combo',
+      color:'#7C3AED',bg:'#F5F3FF',border:'#DDD6FE',
+      explicacion:'El par de productos que más se compra junto en la misma boleta — candidato natural para un combo o ubicarlos juntos en el mostrador.',
+      contenido: topPar
+        ? `<div class="fw7 fs14">${topPar[0].replace('|||',' + ')}</div><div class="fs12 text-gray mt2">Comprados juntos ${topPar[1]} veces en el período</div>`
+        : '<p class="fs13 text-gray">Se está acumulando este dato — vuelve a revisar en unos días.</p>'
+    });
+  }catch(e){console.warn('oportunidades 7:',e);}
+
+  c.innerHTML=tarjetas.map(t=>`
+    <div style="background:${t.bg};border:1px solid ${t.border};border-radius:12px;padding:1rem">
+      <div class="fw7 fs14" style="color:${t.color};margin-bottom:.25rem">${t.titulo}</div>
+      <div class="fs11 text-gray" style="margin-bottom:.625rem">${t.explicacion}</div>
+      ${t.contenido}
+    </div>`).join('');
 }
 
 /* ============ CUADRATURA POS vs OPERADOR ============ */
@@ -3009,13 +3315,18 @@ async function renderCuadratura(){
     const totalPOS=Object.values(bySuc).reduce((a,s)=>a+s.pos,0);
     const totalOp=Object.values(bySuc).reduce((a,s)=>a+s.operador,0);
     const diffTotal=totalOp-totalPOS;
-    const sucursalesConDatos=Object.values(bySuc).filter(s=>s.pos>0||s.operador>0).length;
+    const sucursalesConAmbos=Object.values(bySuc).filter(s=>s.pos>0&&s.operador>0).length;
     const sucursalesConDiff=Object.values(bySuc).filter(s=>s.pos>0&&s.operador>0&&Math.abs(s.operador-s.pos)>0).length;
+
+    let diffSub;
+    if(sucursalesConDiff)diffSub=`${sucursalesConDiff} sucursal${sucursalesConDiff>1?'es':''} con diferencia`;
+    else if(sucursalesConAmbos)diffSub='todo cuadra';
+    else diffSub='sin cierres registrados aún para comparar';
 
     resumen.innerHTML=[
       {l:'💻 Total Sistema (POS)',v:clp(totalPOS),sub:'suma de todas las sucursales',col:'var(--b600)'},
       {l:'👤 Total Operador',v:clp(totalOp),sub:'declarado en cierres',col:'var(--a600)'},
-      {l:'⚖️ Diferencia',v:(diffTotal>=0?'+':'')+clp(diffTotal),sub:sucursalesConDiff?`${sucursalesConDiff} sucursal${sucursalesConDiff>1?'es':''} con diferencia`:'todo cuadra',col:diffTotal===0?'var(--gr600)':'var(--r600)'},
+      {l:'⚖️ Diferencia',v:sucursalesConAmbos?(diffTotal>=0?'+':'')+clp(diffTotal):'—',sub:diffSub,col:!sucursalesConAmbos?'var(--g400)':diffTotal===0?'var(--gr600)':'var(--r600)'},
     ].map(x=>`<div class="sc"><div class="lbl">${x.l}</div><div class="val" style="color:${x.col};font-size:1.25rem">${x.v}</div><div class="sub">${x.sub}</div></div>`).join('');
 
     // 5. Detalle por sucursal
@@ -4996,7 +5307,7 @@ function renderPanelOperativo(aperturas){
 
 /* ============ BOOT (updated) ============ */
 function showRepTab(tab,el){
-  ['analisis','comparativa','envio'].forEach(t=>{
+  ['analisis','comparativa','topprod','metricas','envio'].forEach(t=>{
     const el2=document.getElementById('repTab'+t.charAt(0).toUpperCase()+t.slice(1));
     if(el2)el2.style.display=t===tab?'block':'none';
   });
@@ -5004,7 +5315,345 @@ function showRepTab(tab,el){
   el.classList.add('active');
   if(tab==='analisis')renderAnalisis();
   if(tab==='comparativa')renderComparativa();
+  if(tab==='topprod')initTopProductos();
+  if(tab==='metricas')initMetricasComerciales();
   if(tab==='envio'){document.getElementById('repFecha').value=today();if(CFG.gasUrl){const gi=document.getElementById('gasUrlInput');if(gi)gi.value=CFG.gasUrl;}}
+}
+
+/* ============ TOP PRODUCTOS VENDIDOS ============ */
+async function initTopProductos(){
+  const sel=document.getElementById('tpSucursal');
+  if(sel&&sel.children.length<=1){
+    SUCURSALES.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.nombre;sel.appendChild(o);});
+  }
+  renderTopProductos();
+}
+
+async function renderTopProductos(){
+  const c=document.getElementById('tpList');if(!c)return;
+  c.innerHTML='<p class="fs13 text-gray">Cargando…</p>';
+
+  const dias=parseInt(document.getElementById('tpPeriodo')?.value||30);
+  const sucFiltro=document.getElementById('tpSucursal')?.value||'';
+  const sucs=sucFiltro?[sucFiltro]:SUCURSALES.map(s=>s.id);
+
+  const fechas=[];
+  const hoy=new Date();
+  for(let i=0;i<dias;i++){const d=new Date(hoy);d.setDate(d.getDate()-i);fechas.push(d.toISOString().slice(0,10));}
+
+  try{
+    const porProducto={};
+    for(const sucId of sucs){
+      for(const fecha of fechas){
+        try{
+          const snap=await db.collection('ventasProductoDia').doc(fecha+'_'+sucId).get();
+          if(!snap.exists)continue;
+          const productos=JSON.parse(snap.data().productos||'[]');
+          productos.forEach(p=>{
+            if(!porProducto[p.nombre])porProducto[p.nombre]={nombre:p.nombre,cantidad:0,monto:0};
+            porProducto[p.nombre].cantidad+=p.cantidad||0;
+            porProducto[p.nombre].monto+=p.monto||0;
+          });
+        }catch(e){}
+      }
+    }
+
+    const ranking=Object.values(porProducto).sort((a,b)=>b.monto-a.monto).slice(0,50);
+    _topProductosCache=ranking; // para exportar a Excel
+
+    if(!ranking.length){
+      c.innerHTML='<p class="fs13 text-gray">Sin datos de productos vendidos para este período — puede que el histórico de boletas aún esté procesándose.</p>';
+      return;
+    }
+
+    const max=ranking[0].monto||1;
+    c.innerHTML=`<div class="tw"><table>
+      <thead><tr><th></th><th>Producto</th><th style="text-align:right">Unidades</th><th style="text-align:right">Monto</th><th></th></tr></thead>
+      <tbody>${ranking.map((p,i)=>{
+        const medalla=['🥇','🥈','🥉'][i]||(i+1);
+        return`<tr>
+          <td class="fs12 text-gray" style="width:28px">${medalla}</td>
+          <td class="fw6 fs13">${p.nombre}</td>
+          <td style="text-align:right;font-family:var(--mono)">${p.cantidad}</td>
+          <td style="text-align:right;font-family:var(--mono);font-weight:700;color:var(--a600)">${clp(p.monto)}</td>
+          <td style="width:100px"><div style="height:8px;background:var(--g100);border-radius:4px;overflow:hidden"><div style="height:100%;width:${Math.round(p.monto/max*100)}%;background:var(--a400)"></div></div></td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>`;
+  }catch(e){
+    c.innerHTML='<p class="fs13 text-gray">Error al cargar.</p>';
+  }
+}
+
+let _topProductosCache=[];
+async function exportTopProductosExcel(){
+  if(!_topProductosCache.length){toast('Sin datos para exportar');return;}
+  await loadXLSX();
+  const rows=[['#','Producto','Unidades','Monto'],...(_topProductosCache.map((p,i)=>[i+1,p.nombre,p.cantidad,p.monto]))];
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Top Productos');
+  XLSX.writeFile(wb,`top_productos_${today()}.xlsx`);
+  toast('✅ Excel descargado');
+}
+
+/* ============ MÉTRICAS COMERCIALES ============ */
+async function initMetricasComerciales(){
+  const sel=document.getElementById('mcSucursal');
+  if(sel&&sel.children.length<=1){
+    SUCURSALES.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.nombre;sel.appendChild(o);});
+  }
+  renderMetricasComerciales();
+}
+
+function _mcFechas(dias){
+  const fechas=[];const hoy=new Date();
+  for(let i=0;i<dias;i++){const d=new Date(hoy);d.setDate(d.getDate()-i);fechas.push(d.toISOString().slice(0,10));}
+  return fechas;
+}
+function _mcSucs(){
+  const f=document.getElementById('mcSucursal')?.value;
+  return f?[f]:SUCURSALES.map(s=>s.id);
+}
+
+async function renderMetricasComerciales(){
+  const dias=parseInt(document.getElementById('mcPeriodo')?.value||30);
+  const fechas=_mcFechas(dias);
+  const sucs=_mcSucs();
+  renderComparativoMensual(sucs);
+  renderTicketPromedio(fechas,sucs,dias);
+  renderRotacionInventario(fechas,sucs,dias);
+  renderElasticidadPrecio(fechas,sucs);
+  renderHoraPico(fechas,sucs);
+  renderCanastaCompra(fechas,sucs);
+}
+
+// ── 0. Comparativo mensual (mes en curso vs mismo tramo mes anterior) ──
+async function renderComparativoMensual(sucs){
+  const c=document.getElementById('mcMensual');if(!c)return;
+  c.innerHTML='<p class="fs13 text-gray">Cargando…</p>';
+
+  const hoy=new Date();
+  const diaDelMes=hoy.getDate();
+
+  // Mes actual: día 1 hasta hoy
+  const fechasActual=[];
+  for(let d=1;d<=diaDelMes;d++){
+    const f=new Date(hoy.getFullYear(),hoy.getMonth(),d);
+    fechasActual.push(f.toISOString().slice(0,10));
+  }
+  // Mismo tramo del mes anterior (mismos N días, para comparar parejo)
+  const mesAnt=new Date(hoy.getFullYear(),hoy.getMonth()-1,1);
+  const fechasAnterior=[];
+  for(let d=1;d<=diaDelMes;d++){
+    const f=new Date(mesAnt.getFullYear(),mesAnt.getMonth(),d);
+    fechasAnterior.push(f.toISOString().slice(0,10));
+  }
+
+  async function sumar(fechas){
+    let total=0;
+    for(const sucId of sucs){
+      for(const f of fechas){
+        try{const snap=await db.collection('ventasPOS').doc(f+'_'+sucId).get();if(snap.exists)total+=snap.data().totalVenta||0;}catch(e){}
+      }
+    }
+    return total;
+  }
+
+  const[totalActual,totalAnterior]=await Promise.all([sumar(fechasActual),sumar(fechasAnterior)]);
+  const variacion=totalAnterior>0?Math.round((totalActual-totalAnterior)/totalAnterior*1000)/10:null;
+
+  const nombreMesActual=hoy.toLocaleDateString('es-CL',{month:'long'});
+  const nombreMesAnterior=mesAnt.toLocaleDateString('es-CL',{month:'long'});
+
+  c.innerHTML=`
+    <div style="display:flex;gap:2rem;flex-wrap:wrap;align-items:center;margin-bottom:.5rem">
+      <div><div class="fs11 text-gray">${nombreMesActual} (días 1-${diaDelMes})</div><div class="fw7" style="font-size:1.375rem;color:var(--a600)">${clp(totalActual)}</div></div>
+      <div><div class="fs11 text-gray">${nombreMesAnterior} (mismo tramo)</div><div class="fw7" style="font-size:1.375rem;color:var(--g500)">${clp(totalAnterior)}</div></div>
+      ${variacion!==null?`<div><div class="fs11 text-gray">Variación</div><div class="fw7" style="font-size:1.375rem;color:${variacion>=0?'var(--gr600)':'var(--r600)'}">${variacion>=0?'+':''}${variacion}%</div></div>`:''}
+    </div>
+    ${variacion!==null?`<p class="fs12" style="color:${variacion>=0?'var(--gr600)':'var(--r600)'}">${variacion>=0?'📈 Vas mejor que el mes pasado en el mismo tramo.':'📉 Vas más abajo que el mes pasado — vale la pena revisar qué cambió.'}</p>`:'<p class="fs12 text-gray">Sin datos suficientes del mes anterior para comparar.</p>'}`;
+}
+
+// ── 1. Ticket promedio ──
+async function renderTicketPromedio(fechas,sucs,dias){
+  const c=document.getElementById('mcTicket');if(!c)return;
+  c.innerHTML='<p class="fs13 text-gray">Cargando…</p>';
+  let totalVenta=0,totalBoletas=0;
+  const porDia=[];
+  for(const f of fechas){
+    let vDia=0,bDia=0;
+    for(const sucId of sucs){
+      try{
+        const snap=await db.collection('ventasPOS').doc(f+'_'+sucId).get();
+        if(snap.exists){vDia+=snap.data().totalVenta||0;bDia+=snap.data().totalBoletas||0;}
+      }catch(e){}
+    }
+    totalVenta+=vDia;totalBoletas+=bDia;
+    if(vDia||bDia)porDia.push({fecha:f,ticket:bDia?Math.round(vDia/bDia):0});
+  }
+  const ticketProm=totalBoletas?Math.round(totalVenta/totalBoletas):0;
+  porDia.sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  const max=Math.max(...porDia.map(p=>p.ticket),1);
+
+  c.innerHTML=`
+    <div style="display:flex;gap:1.5rem;margin-bottom:1rem">
+      <div><div class="fs11 text-gray">Ticket promedio</div><div class="fw7" style="font-size:1.5rem;color:var(--a600)">${clp(ticketProm)}</div></div>
+      <div><div class="fs11 text-gray">Total boletas</div><div class="fw7" style="font-size:1.25rem">${totalBoletas}</div></div>
+    </div>
+    ${porDia.length>1?`<div class="cbars" style="height:70px">
+      ${porDia.slice(-14).map(p=>`<div class="cbw" title="${p.fecha}: ${clp(p.ticket)}"><div class="cbar" style="height:${Math.max(Math.round(p.ticket/max*55),3)}px"></div><div class="cbl">${p.fecha.slice(8)}</div></div>`).join('')}
+    </div>`:''}`;
+}
+
+// ── 2. Rotación de inventario ──
+async function renderRotacionInventario(fechas,sucs,dias){
+  const c=document.getElementById('mcRotacion');if(!c)return;
+  c.innerHTML='<p class="fs13 text-gray">Cargando…</p>';
+  const porProducto={};
+  for(const sucId of sucs){
+    for(const f of fechas){
+      try{
+        const snap=await db.collection('ventasProductoDia').doc(f+'_'+sucId).get();
+        if(!snap.exists)continue;
+        JSON.parse(snap.data().productos||'[]').forEach(p=>{
+          const key=p.nombre.toLowerCase().trim();
+          if(!porProducto[key])porProducto[key]={nombre:p.nombre,cantidad:0};
+          porProducto[key].cantidad+=p.cantidad||0;
+        });
+      }catch(e){}
+    }
+  }
+  const conRotacion=Object.values(porProducto).map(p=>{
+    const inv=INVENTARIO.find(i=>i.nombre.toLowerCase().trim()===p.nombre.toLowerCase().trim());
+    const stock=inv?.stock||0;
+    return{...p,stock,rotacion:stock>0?Math.round(p.cantidad/stock*10)/10:null};
+  }).filter(p=>p.rotacion!==null).sort((a,b)=>b.rotacion-a.rotacion);
+
+  if(!conRotacion.length){c.innerHTML='<p class="fs13 text-gray">Sin datos suficientes para calcular rotación.</p>';return;}
+
+  const altaRot=conRotacion.slice(0,5);
+  const bajaRot=conRotacion.slice(-5).reverse();
+
+  c.innerHTML=`
+    <div class="fs11 text-gray mb2" style="text-transform:uppercase;letter-spacing:.03em;color:var(--gr600)">Mayor rotación (se mueve rápido)</div>
+    ${altaRot.map(p=>`<div style="display:flex;justify-content:space-between;font-size:.75rem;padding:.2rem 0"><span>${p.nombre}</span><span class="mono fw7" style="color:var(--gr600)">${p.rotacion}x</span></div>`).join('')}
+    <div class="fs11 text-gray mb2 mt2" style="text-transform:uppercase;letter-spacing:.03em;color:var(--r600)">Menor rotación (capital parado)</div>
+    ${bajaRot.map(p=>`<div style="display:flex;justify-content:space-between;font-size:.75rem;padding:.2rem 0"><span>${p.nombre}</span><span class="mono fw7" style="color:var(--r600)">${p.rotacion}x</span></div>`).join('')}`;
+}
+
+// ── 3. Elasticidad de precio ──
+async function renderElasticidadPrecio(fechas,sucs){
+  const c=document.getElementById('mcElasticidad');if(!c)return;
+  c.innerHTML='<p class="fs13 text-gray">Cargando…</p>';
+
+  // Traer cambios de precio recientes (POS) para las sucursales en scope
+  let cambios=[];
+  try{
+    const snap=await db.collection('historialPreciosPOS').orderBy('syncAt','desc').limit(20).get();
+    snap.docs.forEach(d=>{
+      const h=d.data();
+      if(sucs.length&&!sucs.includes(h.sucursalId))return;
+      try{JSON.parse(h.cambios||'[]').forEach(cb=>cambios.push({...cb,fecha:h.fecha,sucId:h.sucursalId}));}catch(e){}
+    });
+  }catch(e){}
+
+  if(!cambios.length){c.innerHTML='<p class="fs13 text-gray">Sin cambios de precio detectados recientemente para calcular elasticidad.</p>';return;}
+
+  // Para cada cambio, comparar venta diaria promedio 5 días antes vs 5 días después
+  const resultados=[];
+  for(const cb of cambios.slice(0,10)){
+    const fechaCambio=new Date(cb.fecha+'T12:00');
+    const antes=[],despues=[];
+    for(let i=1;i<=5;i++){const d=new Date(fechaCambio);d.setDate(d.getDate()-i);antes.push(d.toISOString().slice(0,10));}
+    for(let i=1;i<=5;i++){const d=new Date(fechaCambio);d.setDate(d.getDate()+i);despues.push(d.toISOString().slice(0,10));}
+
+    let qAntes=0,qDespues=0,diasAntes=0,diasDespues=0;
+    for(const f of antes){
+      try{const snap=await db.collection('ventasProductoDia').doc(f+'_'+cb.sucId).get();
+        if(snap.exists){const p=JSON.parse(snap.data().productos||'[]').find(x=>x.nombre.toLowerCase().trim()===cb.nombre.toLowerCase().trim());if(p){qAntes+=p.cantidad;diasAntes++;}}
+      }catch(e){}
+    }
+    for(const f of despues){
+      try{const snap=await db.collection('ventasProductoDia').doc(f+'_'+cb.sucId).get();
+        if(snap.exists){const p=JSON.parse(snap.data().productos||'[]').find(x=>x.nombre.toLowerCase().trim()===cb.nombre.toLowerCase().trim());if(p){qDespues+=p.cantidad;diasDespues++;}}
+      }catch(e){}
+    }
+    if(qAntes>0&&diasAntes&&diasDespues){
+      const promAntes=qAntes/diasAntes,promDespues=qDespues/diasDespues;
+      const pctQ=Math.round((promDespues-promAntes)/promAntes*1000)/10;
+      const pctP=cb.precioAnterior?Math.round((cb.precioNuevo-cb.precioAnterior)/cb.precioAnterior*1000)/10:0;
+      const elasticidad=pctP!==0?Math.round(pctQ/pctP*100)/100:null;
+      resultados.push({nombre:cb.nombre,pctP,pctQ,elasticidad,fecha:cb.fecha});
+    }
+  }
+
+  if(!resultados.length){c.innerHTML='<p class="fs13 text-gray">No hay suficiente venta diaria antes/después de los cambios detectados para calcular esto con confianza todavía.</p>';return;}
+
+  c.innerHTML=`<div class="tw"><table>
+    <thead><tr><th>Producto</th><th style="text-align:right">Δ Precio</th><th style="text-align:right">Δ Volumen</th><th style="text-align:right">Elasticidad</th></tr></thead>
+    <tbody>${resultados.map(r=>`<tr>
+      <td class="fw6 fs13">${r.nombre}</td>
+      <td style="text-align:right;font-family:var(--mono);color:${r.pctP>=0?'var(--r600)':'var(--gr600)'}">${r.pctP>=0?'+':''}${r.pctP}%</td>
+      <td style="text-align:right;font-family:var(--mono);color:${r.pctQ>=0?'var(--gr600)':'var(--r600)'}">${r.pctQ>=0?'+':''}${r.pctQ}%</td>
+      <td style="text-align:right;font-family:var(--mono);font-weight:700">${r.elasticidad!==null?r.elasticidad:'—'}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>
+  <p class="fs11 text-gray mt2">Elasticidad negativa alta (ej: -2) = subir precio hace caer mucho la venta. Cerca de 0 = el precio casi no afecta cuánto se vende.</p>`;
+}
+
+// ── 4. Hora pico ──
+async function renderHoraPico(fechas,sucs){
+  const c=document.getElementById('mcHoraPico');if(!c)return;
+  c.innerHTML='<p class="fs13 text-gray">Cargando…</p>';
+  const porHora={};
+  for(const sucId of sucs){
+    for(const f of fechas){
+      try{
+        const snap=await db.collection('ventasHoraDia').doc(f+'_'+sucId).get();
+        if(!snap.exists)continue;
+        const h=JSON.parse(snap.data().porHora||'{}');
+        Object.entries(h).forEach(([hr,d])=>{
+          if(!porHora[hr])porHora[hr]={monto:0,boletas:0};
+          porHora[hr].monto+=d.monto||0;porHora[hr].boletas+=d.boletas||0;
+        });
+      }catch(e){}
+    }
+  }
+  const horas=Object.entries(porHora).sort((a,b)=>parseInt(a[0])-parseInt(b[0]));
+  if(!horas.length){c.innerHTML='<p class="fs13 text-gray">Aún no hay datos por hora — se va llenando con el sync diario y el backfill histórico.</p>';return;}
+  const max=Math.max(...horas.map(h=>h[1].monto),1);
+  const pico=horas.reduce((a,b)=>b[1].monto>a[1].monto?b:a);
+  c.innerHTML=`
+    <div style="margin-bottom:.75rem"><span class="fw7" style="color:var(--b600)">${pico[0]}:00 hrs</span> es la hora con más venta (${clp(pico[1].monto)})</div>
+    <div class="cbars" style="height:70px">
+      ${horas.map(([hr,d])=>`<div class="cbw" title="${hr}:00 — ${clp(d.monto)}"><div class="cbar" style="height:${Math.max(Math.round(d.monto/max*55),d.monto>0?3:0)}px;background:var(--b400)"></div><div class="cbl">${hr}</div></div>`).join('')}
+    </div>`;
+}
+
+// ── 5. Canasta de compra ──
+async function renderCanastaCompra(fechas,sucs){
+  const c=document.getElementById('mcCanasta');if(!c)return;
+  c.innerHTML='<p class="fs13 text-gray">Cargando…</p>';
+  const pares={};
+  for(const sucId of sucs){
+    for(const f of fechas){
+      try{
+        const snap=await db.collection('canastaDia').doc(f+'_'+sucId).get();
+        if(!snap.exists)continue;
+        const p=JSON.parse(snap.data().pares||'{}');
+        Object.entries(p).forEach(([k,v])=>{pares[k]=(pares[k]||0)+v;});
+      }catch(e){}
+    }
+  }
+  const top=Object.entries(pares).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  if(!top.length){c.innerHTML='<p class="fs13 text-gray">Aún no hay suficientes datos de canasta — se va llenando con el sync diario y el backfill histórico.</p>';return;}
+  c.innerHTML=top.map(([k,v])=>{
+    const[a,b]=k.split('|||');
+    return`<div style="display:flex;justify-content:space-between;align-items:center;font-size:.75rem;padding:.3rem 0;border-bottom:1px solid var(--g100)">
+      <span>${a} <span class="text-gray">+</span> ${b}</span>
+      <span class="badge ba">${v}x juntos</span>
+    </div>`;
+  }).join('');
 }
 
 /* ============ ANALYTICS ============ */
@@ -5350,7 +5999,7 @@ async function loadPOSData(){
       }
     }
 
-    renderPOSKPIs(allDocs,dias);
+    renderPOSKPIs(allDocs,dias,catDocs);
     renderPOSTendencia(allDocs,fechas,sucs);
     renderPOSMedios(allDocs);
     renderPOSDeptos(catDocs,sucs);
@@ -5359,7 +6008,7 @@ async function loadPOSData(){
   }catch(e){console.warn('POS data:',e);}
 }
 
-function renderPOSKPIs(docs,dias){
+function renderPOSKPIs(docs,dias,catDocs){
   const c=document.getElementById('posKPIs');if(!c)return;
   const total=docs.reduce((a,d)=>a+d.totalVenta,0);
   const boletas=docs.reduce((a,d)=>a+d.totalBoletas,0);
@@ -5368,13 +6017,14 @@ function renderPOSKPIs(docs,dias){
   const deb=docs.reduce((a,d)=>a+(d.debito||0),0);
   const cred=docs.reduce((a,d)=>a+(d.credito||0),0);
   const otros=docs.reduce((a,d)=>a+(d.otros||0),0);
-  // Total vendido en cigarros — se saca del desglose por departamento de cada día
+  // Total vendido en cigarros — viene de ventasCategorias (nlc_grupo), NO de
+  // ventasPOS.departamentos (ese campo queda vacío con el formato Gran Z/arqueo-z.pdf)
   let cigarrosMonto=0,cigarrosCant=0;
-  docs.forEach(d=>{
+  (catDocs||[]).forEach(d=>{
     try{
-      const deps=JSON.parse(d.departamentos||'[]');
-      deps.forEach(dep=>{
-        if(/^cigarro/i.test((dep.nombre||'').trim())){cigarrosMonto+=dep.monto||0;cigarrosCant+=dep.cantidad||0;}
+      const cats=JSON.parse(d.categorias||'[]');
+      cats.forEach(cat=>{
+        if(/^cigarro/i.test((cat.nombre||'').trim())){cigarrosMonto+=cat.monto||0;cigarrosCant+=cat.cantidad||0;}
       });
     }catch(e){}
   });
@@ -5574,6 +6224,7 @@ const DASH_WIDGETS=[
   {key:'ventasChart',label:'📈 Ventas y composición',el:'wgtVentasChart'},
   {key:'cigStockAct',label:'🚬 Cigarros, stock crítico y actividad',el:'wgtCigStockAct'},
   {key:'retirosVentas',label:'💸 Retiros por categoría y ventas por sucursal',el:'wgtRetirosVentas'},
+  {key:'oportunidades',label:'💡 Oportunidades comerciales',el:'wgtOportunidades'},
 ];
 
 function getDashWidgetConfig(){return CFG.dashWidgets||{};}
