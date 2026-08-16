@@ -785,6 +785,10 @@ tr:hover td{background:var(--g50)}
 
         <!-- TAB GENERAL -->
         <div id="invTabGeneral">
+          <!-- Estado del catálogo -->
+          <div class="card" style="margin-bottom:1rem;padding:1rem" id="invEstadoCard">
+            <div id="invEstadoContent"></div>
+          </div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-wrap:wrap;gap:.5rem">
             <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
               <input class="inp" type="search" placeholder="Buscar…" style="max-width:200px" oninput="filterInv(this.value)"/>
@@ -1984,9 +1988,10 @@ async function loadRetiros(sucId){
 }
 async function loadTurnos(sucId){
   try{
+    const rolAct=CU.rolActivo||CU.rol;
     const sid=sucId||CU.sucursalActiva||CU.sucursalId||'';
     let q=db.collection('turnos').orderBy('fecha','desc').limit(60);
-    if(CU.rol!=='superadmin'&&CU.rol!=='gerente') q=q.where('sucursalId','==',sid);
+    if(rolAct!=='superadmin'&&rolAct!=='gerente') q=q.where('sucursalId','==',sid);
     const snap=await q.get();TURNOS=snap.docs.map(d=>({id:d.id,...d.data()}));
   }catch(e){console.error('Turnos:',e);}
 }
@@ -4123,7 +4128,87 @@ function totalBillsObj(bills){
 
 
 let _invCat='TODOS',_invSearch='';
-function renderInv(search){if(search!==undefined)_invSearch=search;const cats=['TODOS',...new Set(INVENTARIO.map(i=>i.cat).filter(Boolean))];const tabs=document.getElementById('invCatTabs');if(tabs)tabs.innerHTML=cats.map(cat=>`<button class="marca-tag ${_invCat===cat?'active':''}" onclick="_invCat='${cat}';renderInv()">${cat}</button>`).join('');const b=document.getElementById('invBody');if(!b)return;let items=INVENTARIO;if(_invCat!=='TODOS')items=items.filter(i=>i.cat===_invCat);if(_invSearch)items=items.filter(i=>i.nombre.toLowerCase().includes(_invSearch.toLowerCase())||(i.marca||'').toLowerCase().includes(_invSearch.toLowerCase()));b.innerHTML=items.map(i=>`<tr><td class="fw6">${i.nombre}${i.perecible?'<span title="Producto perecible" style="margin-left:.375rem">📅</span>':''}</td><td class="text-gray fs13">${i.marca||'—'}</td><td><span class="badge ${i.cat==='Cigarros'?'ba':''}" style="${i.cat!=='Cigarros'?'background:var(--g100);color:var(--g600)':''}">${i.cat}</span></td><td><span class="badge ${i.stock<=i.min&&i.min>0?'br':'bg'}">${i.stock}</span></td><td class="text-gray fs13">${i.min}</td><td class="mono">${clp(i.precio)}</td><td><div style="display:flex;gap:.375rem"><button class="btn btn-s sm" onclick="editProd('${i.id}')">✎</button><button class="btn btn-d sm" onclick="delProd('${i.id}')">✕</button></div></td></tr>`).join('');}
+// Paleta de colores consistente por categoría (mismo texto = mismo color siempre)
+const CAT_COLORS=[
+  {bg:'#FEF3C7',fg:'#92400E'},{bg:'#DBEAFE',fg:'#1E40AF'},{bg:'#DCFCE7',fg:'#166534'},
+  {bg:'#FCE7F3',fg:'#9D174D'},{bg:'#EDE9FE',fg:'#5B21B6'},{bg:'#FEE2E2',fg:'#991B1B'},
+  {bg:'#E0F2FE',fg:'#075985'},{bg:'#FFEDD5',fg:'#9A3412'},{bg:'#F3F4F6',fg:'#374151'},
+];
+function catColor(cat){
+  let hash=0;for(let i=0;i<(cat||'').length;i++)hash=(hash*31+cat.charCodeAt(i))>>>0;
+  return CAT_COLORS[hash%CAT_COLORS.length];
+}
+
+async function renderInvEstado(){
+  const c=document.getElementById('invEstadoContent');if(!c)return;
+  const total=INVENTARIO.length;
+  const desdePOS=INVENTARIO.filter(i=>i.origenPOS).length;
+  const cats=new Set(INVENTARIO.map(i=>i.cat)).size;
+  const valorTotal=INVENTARIO.reduce((a,i)=>a+(i.stock*i.precio||0),0);
+
+  // Última sincronización real por sucursal (desde syncPOS)
+  let ultimoSync=null,sucSync='';
+  for(const suc of SUCURSALES){
+    try{
+      const snap=await db.collection('syncPOS').doc(suc.id).get();
+      if(snap.exists){
+        const s=snap.data();
+        if(!ultimoSync||(s.syncAt&&s.syncAt>ultimoSync)){ultimoSync=s.syncAt;sucSync=suc.nombre;}
+      }
+    }catch(e){}
+  }
+
+  const conectado=desdePOS>0;
+  const minsDesdeSync=ultimoSync?Math.round((Date.now()-new Date(ultimoSync).getTime())/60000):null;
+
+  c.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem">
+      <div style="display:flex;align-items:center;gap:.625rem">
+        <span style="width:10px;height:10px;border-radius:50%;background:${conectado?'var(--gr500)':'var(--r500)'};display:inline-block"></span>
+        <div>
+          <div class="fw7 fs14">${conectado?'Catálogo conectado al POS':'⚠ Catálogo NO conectado al POS'}</div>
+          <div class="fs12 text-gray">${conectado?`${desdePOS} de ${total} productos vienen del sync automático`:'Solo hay productos cargados manualmente — falta importar el catálogo real'}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:1.5rem;flex-wrap:wrap">
+        <div><div class="fs11 text-gray">Productos</div><div class="fw7 fs16">${total}</div></div>
+        <div><div class="fs11 text-gray">Categorías</div><div class="fw7 fs16">${cats}</div></div>
+        <div><div class="fs11 text-gray">Valor stock</div><div class="fw7 fs16">${clp(valorTotal)}</div></div>
+        <div><div class="fs11 text-gray">Últ. sync catálogo</div><div class="fw7 fs14" style="color:${minsDesdeSync!==null&&minsDesdeSync<180?'var(--gr600)':'var(--r600)'}">${ultimoSync?(minsDesdeSync<60?minsDesdeSync+'m ('+sucSync+')':Math.round(minsDesdeSync/60)+'h ('+sucSync+')'):'nunca'}</div></div>
+      </div>
+      ${!conectado?'<button class="btn btn-p sm" onclick="importarCatalogoPOS()">🖥️ Importar ahora</button>':''}
+    </div>`;
+}
+
+function renderInv(search){
+  if(search!==undefined)_invSearch=search;
+  const cats=['TODOS',...new Set(INVENTARIO.map(i=>i.cat).filter(Boolean))];
+  const tabs=document.getElementById('invCatTabs');
+  if(tabs)tabs.innerHTML=cats.map(cat=>`<button class="marca-tag ${_invCat===cat?'active':''}" onclick="_invCat='${cat}';renderInv()">${cat}${cat!=='TODOS'?` <span style="opacity:.6">(${INVENTARIO.filter(i=>i.cat===cat).length})</span>`:''}</button>`).join('');
+
+  const b=document.getElementById('invBody');if(!b)return;
+  let items=INVENTARIO;
+  if(_invCat!=='TODOS')items=items.filter(i=>i.cat===_invCat);
+  if(_invSearch)items=items.filter(i=>i.nombre.toLowerCase().includes(_invSearch.toLowerCase())||(i.marca||'').toLowerCase().includes(_invSearch.toLowerCase()));
+
+  if(!items.length){
+    b.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--g400)">Sin productos${_invSearch?' que coincidan con la búsqueda':_invCat!=='TODOS'?' en esta categoría':''}.</td></tr>`;
+  }else{
+    b.innerHTML=items.map(i=>{
+      const cc=catColor(i.cat);
+      const bajoMin=i.stock<=i.min&&i.min>0;
+      return`<tr>
+        <td class="fw6">${i.nombre}${i.perecible?'<span title="Producto perecible" style="margin-left:.375rem">📅</span>':''}${!i.origenPOS?'<span title="Cargado manualmente, no viene del POS" style="margin-left:.375rem;opacity:.5;font-size:.7rem">✎</span>':''}</td>
+        <td class="text-gray fs13">${i.marca||'—'}</td>
+        <td><span class="badge" style="background:${cc.bg};color:${cc.fg}">${i.cat}</span></td>
+        <td><span class="badge ${bajoMin?'br':'bg'}">${i.stock}</span></td>
+        <td class="text-gray fs13">${i.min}</td>
+        <td class="mono">${clp(i.precio)}</td>
+        <td><div style="display:flex;gap:.375rem"><button class="btn btn-s sm" onclick="editProd('${i.id}')">✎</button><button class="btn btn-d sm" onclick="delProd('${i.id}')">✕</button></div></td>
+      </tr>`;
+    }).join('');
+  }
+}
 function filterInv(v){renderInv(v);}
 
 /* ============ INV TABS ============ */
@@ -4141,7 +4226,7 @@ function showInvTab(tab,el){
   if(tab==='reposicion') renderReposicion();
   if(tab==='traspasos') initTraspasos();
   if(tab==='historial') initHistorialRep();
-  if(tab==='general'){_invCat='TODOS';renderInv();}
+  if(tab==='general'){_invCat='TODOS';renderInv();renderInvEstado();}
 }
 function togglePerecible(){
   const chk=document.getElementById('pPerecible');
@@ -5153,11 +5238,11 @@ async function subirFotoADrive(item, sucursal, turno, fecha){
       });
       document.body.appendChild(form);form.submit();form.remove();
 
-      // Timeout fallback después de 15s
+      // Timeout fallback — no dejar esperando más de lo que dura el aviso en pantalla
       setTimeout(()=>{
         window.removeEventListener('message',handler);
         resolve(item.photoLocal||'');
-      },15000);
+      },6000);
     };
     reader.readAsDataURL(file);
   });
