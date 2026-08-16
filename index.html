@@ -3149,34 +3149,46 @@ async function renderOportunidadesComerciales(){
     });
   }catch(e){console.warn('oportunidades 3:',e);}
 
-  // ── 4: Mejor día de la semana ──
+  // ── 4: Mejor día de la semana — separado por sucursal ──
   try{
     const diasSemana=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-    const porDia={};
+    const porSucDia={};
     for(const suc of SUCURSALES){
+      porSucDia[suc.id]={nombre:suc.nombre,porDia:{}};
       for(const f of fechas){
         try{
           const snap=await db.collection('ventasPOS').doc(f+'_'+suc.id).get();
           if(!snap.exists)continue;
           const dow=new Date(f+'T12:00').getDay();
-          if(!porDia[dow])porDia[dow]={suma:0,n:0};
-          porDia[dow].suma+=snap.data().totalVenta||0;
-          porDia[dow].n++;
+          if(!porSucDia[suc.id].porDia[dow])porSucDia[suc.id].porDia[dow]={suma:0,n:0};
+          porSucDia[suc.id].porDia[dow].suma+=snap.data().totalVenta||0;
+          porSucDia[suc.id].porDia[dow].n++;
         }catch(e){}
       }
     }
-    const promPorDia=Object.entries(porDia).map(([dow,d])=>({dia:diasSemana[dow],prom:d.n?d.suma/d.n:0})).sort((a,b)=>b.prom-a.prom);
-    const mejor=promPorDia[0],peor=promPorDia[promPorDia.length-1];
+
+    const bloques=Object.values(porSucDia).map(s=>{
+      const dias=[0,1,2,3,4,5,6];
+      const conDatos=dias.filter(d=>s.porDia[d]&&s.porDia[d].n>0);
+      const sinDatos=dias.filter(d=>!s.porDia[d]||s.porDia[d].n===0);
+      if(!conDatos.length)return`<div class="fs12 text-gray" style="margin-bottom:.75rem">${s.nombre}: sin datos suficientes todavía.</div>`;
+      const promedios=conDatos.map(d=>({dia:diasSemana[d],prom:s.porDia[d].suma/s.porDia[d].n})).sort((a,b)=>b.prom-a.prom);
+      const cerrados=sinDatos.length===7-conDatos.length&&sinDatos.length>0&&sinDatos.length<=2
+        ?sinDatos.map(d=>diasSemana[d]) // días consistentemente sin datos = probablemente cerrado ese día
+        :[];
+      return`<div style="margin-bottom:1rem">
+        <div class="fw7 fs13" style="margin-bottom:.25rem">${s.nombre}</div>
+        <div class="fs12" style="color:var(--b600);margin-bottom:.25rem"><strong>${promedios[0].dia}</strong> es el mejor día (${clp(Math.round(promedios[0].prom))})</div>
+        ${cerrados.length?`<div class="fs11 text-gray" style="margin-bottom:.25rem">${cerrados.join(', ')}: sin datos — probablemente no abre ese día</div>`:''}
+        ${promedios.map(d=>`<div style="display:flex;justify-content:space-between;font-size:.7rem;padding:.1rem 0"><span>${d.dia}</span><span class="mono text-gray">${clp(Math.round(d.prom))}</span></div>`).join('')}
+      </div>`;
+    });
 
     tarjetas.push({
       titulo:'📅 Mejor día de la semana',
       color:'var(--b600)',bg:'#EFF6FF',border:'#BFDBFE',
-      explicacion:'Promedio de venta por día de la semana en los últimos 30 días — útil para planificar stock y turnos.',
-      contenido: promPorDia.length
-        ? `<div style="margin-bottom:.5rem"><span class="fw7" style="color:var(--b600)">${mejor?.dia}</span> es el día con más venta en promedio (${clp(mejor?.prom||0)})</div>`
-        + (peor&&peor.dia!==mejor?.dia?`<div class="fs12 text-gray">${peor.dia} es el más bajo (${clp(peor.prom)})</div>`:'')
-        + promPorDia.map(d=>`<div style="display:flex;justify-content:space-between;font-size:.75rem;padding:.2rem 0"><span>${d.dia}</span><span class="mono">${clp(Math.round(d.prom))}</span></div>`).join('')
-        : '<p class="fs13 text-gray">Sin suficientes datos históricos todavía.</p>'
+      explicacion:'Promedio de venta por día de la semana, calculado por separado en cada sucursal — solo con los días que realmente tienen datos.',
+      contenido: bloques.join('')||'<p class="fs13 text-gray">Sin suficientes datos históricos todavía.</p>'
     });
   }catch(e){console.warn('oportunidades 4:',e);}
 
