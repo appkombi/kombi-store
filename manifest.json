@@ -11,7 +11,7 @@
   "categories": ["business", "productivity"],
   "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='80' fill='%23B45309'/><text y='380' font-size='380' x='60'>🛒</text></svg>",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='80' fill='%23B45309'/><text x='256' y='370' font-family='Arial,Helvetica,sans-serif' font-size='300' font-weight='800' fill='white' text-anchor='middle'>K</text></svg>",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any maskable"
