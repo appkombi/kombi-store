@@ -3315,6 +3315,41 @@ function onCambioFiltroCuadratura(){
   renderCuadratura();
 }
 
+// Cuando "Hoy" no tiene datos todavía (ninguna sucursal ha cerrado), muestra
+// el último día con datos reales como referencia — SIEMPRE con la fecha
+// explícita y visualmente distinta, para no repetir el error de mezclar
+// fechas que ya corregimos.
+async function mostrarReferenciaAyer(list,sucFiltro){
+  const ayer=new Date();ayer.setDate(ayer.getDate()-1);
+  const fechaAyer=ayer.toISOString().slice(0,10);
+  const sucsAConsultar=sucFiltro?SUCURSALES.filter(s=>s.id===sucFiltro):SUCURSALES;
+
+  const filas=[];
+  for(const suc of sucsAConsultar){
+    try{
+      const snap=await db.collection('ventasPOS').doc(fechaAyer+'_'+suc.id).get();
+      if(snap.exists)filas.push({nombre:suc.nombre,...snap.data()});
+    }catch(e){}
+  }
+
+  if(!filas.length){
+    list.innerHTML='<div style="text-align:center;padding:1.5rem;color:var(--g400);font-size:.875rem">Sin datos para hoy ni para ayer — aún no hay sync del POS ni cierres registrados.</div>';
+    return;
+  }
+
+  const totalAyer=filas.reduce((a,f)=>a+(f.totalVenta||0),0);
+  list.innerHTML=`
+    <div style="background:var(--g50);border:1px dashed var(--g300);border-radius:10px;padding:.875rem 1rem;margin-bottom:.75rem">
+      <div class="fs13 fw6" style="color:var(--g600);margin-bottom:.5rem">📋 Ninguna sucursal ha cerrado hoy todavía — mostrando el último cierre disponible como referencia (<strong>${fdate(fechaAyer)}</strong>, no es de hoy)</div>
+      <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:.5rem">
+        <div><span class="fs11 text-gray">Total ${fdate(fechaAyer)}</span><div class="fw7" style="color:var(--g600)">${clp(totalAyer)}</div></div>
+      </div>
+      ${filas.map(f=>`<div style="display:flex;justify-content:space-between;font-size:.8125rem;padding:.25rem 0;border-top:1px solid var(--g200)">
+        <span>🏬 ${f.nombre}</span><span class="mono text-gray">${clp(f.totalVenta||0)} · ${f.totalBoletas||0} boletas</span>
+      </div>`).join('')}
+    </div>`;
+}
+
 async function renderCuadratura(){
   const resumen=document.getElementById('cuadraturaResumen');
   const list=document.getElementById('cuadraturaList');
@@ -3406,7 +3441,12 @@ async function renderCuadratura(){
     // 5. Detalle por sucursal
     const entries=Object.entries(bySuc).filter(([,s])=>s.pos>0||s.operador>0);
     if(!entries.length){
-      list.innerHTML='<div style="text-align:center;padding:1.5rem;color:var(--g400);font-size:.875rem">Sin datos para este período — aún no hay sync del POS ni cierres registrados.</div>';
+      if(filtro==='hoy'){
+        // Ninguna sucursal ha cerrado hoy todavía — mostrar ayer como referencia, bien etiquetado
+        await mostrarReferenciaAyer(list,sucFiltro);
+      }else{
+        list.innerHTML='<div style="text-align:center;padding:1.5rem;color:var(--g400);font-size:.875rem">Sin datos para este período — aún no hay sync del POS ni cierres registrados.</div>';
+      }
       return;
     }
 
