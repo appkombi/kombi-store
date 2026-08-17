@@ -5634,12 +5634,21 @@ async function renderPanelOperativo(aperturas){
   const upd=document.getElementById('panelUltActz');
   if(upd)upd.textContent='Actualizado: '+new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
 
-  // Venta real del POS de hoy, por sucursal
+  // Venta de hoy — usamos las boletas XML en vivo (ventasHoraDia, se
+  // actualiza cada 15 min durante el día), NO el Gran Z (ventasPOS), que
+  // solo se genera cuando la sucursal cierra caja al final del día.
   const ventaHoy={};
   for(const suc of SUCURSALES){
     try{
-      const snap=await db.collection('ventasPOS').doc(today()+'_'+suc.id).get();
-      ventaHoy[suc.id]=snap.exists?{total:snap.data().totalVenta||0,boletas:snap.data().totalBoletas||0,syncAt:snap.data().syncAt}:null;
+      const snap=await db.collection('ventasHoraDia').doc(today()+'_'+suc.id).get();
+      if(snap.exists){
+        const porHora=JSON.parse(snap.data().porHora||'{}');
+        const total=Object.values(porHora).reduce((a,h)=>a+(h.monto||0),0);
+        const boletas=Object.values(porHora).reduce((a,h)=>a+(h.boletas||0),0);
+        ventaHoy[suc.id]=total>0?{total,boletas,syncAt:snap.data().syncAt,enVivo:true}:null;
+      }else{
+        ventaHoy[suc.id]=null;
+      }
     }catch(e){ventaHoy[suc.id]=null;}
   }
 
@@ -5676,11 +5685,11 @@ async function renderPanelOperativo(aperturas){
     return`<div class="card" style="border-left:4px solid ${tieneActivo?'var(--gr500)':'var(--g300)'}">
       <div class="fw7 fs14 mb2">🏬 ${suc.nombre}</div>
       <div style="background:var(--a50);border-radius:8px;padding:.625rem .75rem;margin-bottom:.625rem">
-        <div class="fs11 text-gray" style="text-transform:uppercase;letter-spacing:.03em">💰 Venta hoy (POS)</div>
+        <div class="fs11 text-gray" style="text-transform:uppercase;letter-spacing:.03em">💰 Venta hoy <span style="color:var(--gr600)">● en vivo</span></div>
         ${vh?`
           <div class="fw7" style="font-size:1.125rem;color:var(--a600)">${clp(vh.total)}</div>
-          <div class="fs11 text-gray">${vh.boletas} boletas${minsSync!==null?` · sync hace ${minsSync<60?minsSync+'m':Math.round(minsSync/60)+'h'}`:''}</div>
-        `:`<div class="fs13 text-gray" style="font-style:italic">Sin sincronización del POS hoy aún</div>`}
+          <div class="fs11 text-gray">${vh.boletas} boletas${minsSync!==null?` · actualizado hace ${minsSync<60?minsSync+'m':Math.round(minsSync/60)+'h'}`:''}</div>
+        `:`<div class="fs13 text-gray" style="font-style:italic">Sin ventas registradas hoy aún</div>`}
       </div>
       <div style="display:flex;flex-direction:column;gap:.375rem">${estadoTurnos.join('')}</div>
     </div>`;
