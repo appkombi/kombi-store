@@ -5684,17 +5684,20 @@ async function renderPanelOperativo(aperturas){
   // solo se genera cuando la sucursal cierra caja al final del día.
   const ventaHoy={};
   for(const suc of SUCURSALES){
+    const docId=today()+'_'+suc.id;
     try{
-      const snap=await db.collection('ventasHoraDia').doc(today()+'_'+suc.id).get();
+      const snap=await db.collection('ventasHoraDia').doc(docId).get();
       if(snap.exists){
         const porHora=JSON.parse(snap.data().porHora||'{}');
         const total=Object.values(porHora).reduce((a,h)=>a+(h.monto||0),0);
         const boletas=Object.values(porHora).reduce((a,h)=>a+(h.boletas||0),0);
         ventaHoy[suc.id]=total>0?{total,boletas,syncAt:snap.data().syncAt,enVivo:true}:null;
+        console.log('📖 ventasHoraDia leído:',suc.nombre,'docId:'+docId,'existe:true','total:'+total);
       }else{
         ventaHoy[suc.id]=null;
+        console.log('📖 ventasHoraDia leído:',suc.nombre,'docId:'+docId,'existe:false (nunca se escribió)');
       }
-    }catch(e){ventaHoy[suc.id]=null;}
+    }catch(e){ventaHoy[suc.id]=null;console.warn('❌ error leyendo ventasHoraDia',suc.nombre,docId,e.message);}
   }
 
   // Match aperturas with sucursales and check if cierre exists
@@ -5817,12 +5820,14 @@ async function sincronizarVentasHoraDia(ventas,fecha){
       return n===nombreBuscado||n.includes(nombreBuscado)||nombreBuscado.includes(n);
     });
     if(!suc){console.warn('Sin sucursal configurada que coincida con "'+tienda+'" — revisa Ajustes > Sucursales o MAPEO_TIENDA_SUCURSAL');continue;}
+    const totalTienda=Object.values(porTienda[tienda]).reduce((a,h)=>a+h.monto,0);
     try{
       await db.collection('ventasHoraDia').doc(fecha+'_'+suc.id).set({
         porHora:JSON.stringify(porTienda[tienda]),
         syncAt:new Date().toISOString()
       },{merge:true});
-    }catch(e){console.warn('sincronizarVentasHoraDia',tienda,e.message);}
+      console.log('✅ ventasHoraDia guardado:',tienda,'->',suc.nombre,'(id:'+suc.id+')','docId:'+fecha+'_'+suc.id,'total:'+totalTienda);
+    }catch(e){console.warn('❌ sincronizarVentasHoraDia',tienda,'->',suc.nombre,e.message);}
   }
 }
 
