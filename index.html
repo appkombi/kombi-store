@@ -6147,8 +6147,9 @@ async function renderDashVentasHora(){
           const sa=snap.data().syncAt;
           if(sa&&(!ultimoSync||sa>ultimoSync))ultimoSync=sa;
         }
-      }catch(e){}
+      }catch(e){console.warn('❌ renderDashVentasHora — error leyendo',suc.nombre,e.message);}
     }
+    console.log('📊 renderDashVentasHora:',Object.keys(porSuc).length,'sucursales con datos —',Object.keys(porSuc));
     if(syncEl)syncEl.textContent=ultimoSync?'Sync: '+new Date(ultimoSync).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}):'';
 
     const sucs=Object.keys(porSuc);
