@@ -584,7 +584,10 @@ tr:hover td{background:var(--g50)}
       </div>
 
       <div class="section" id="ad-dash">
-        <div class="ph"><h2>Dashboard</h2><p>Análisis operativo</p></div>
+        <div class="ph" style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:.5rem">
+          <div><h2>Dashboard</h2><p>Análisis operativo</p></div>
+          <div id="dashUltimaSyncBadge"></div>
+        </div>
 
         <!-- PANEL OPERATIVO EN VIVO -->
         <div id="panelOperativo" class="hidden" style="margin-bottom:1.25rem">
@@ -3113,6 +3116,7 @@ async function renderDash(){
   renderAlertasCatalogo();
   renderDashTopProductos();
   renderDashVentasHora();
+  renderUltimaSyncBadge();
   checkVencimientos();
 
   // Cuadratura y panel POS — solo si el superadmin los dejó activados
@@ -5696,6 +5700,7 @@ async function pollVentasMinutoDashboard(){
     await renderAlertasCatalogo();
     await renderDashTopProductos();
     await renderDashVentasHora();
+    await renderUltimaSyncBadge();
     // Forzar re-render del panel ahora mismo, sin esperar al próximo cambio de "aperturas"
     if(document.getElementById('panelOperativo')){
       const snap=await db.collection('aperturas').where('fecha','==',today()).get();
@@ -6065,6 +6070,29 @@ async function descontarStockPorVentas(ventas,fecha){
       }catch(e){console.warn('alertasCatalogo write',suc.nombre,e.message);}
     }
   }
+}
+
+// Indicador de "última sincronización" — de un vistazo, sin tener que
+// adivinar si los datos que se están viendo son de hace 1 minuto o de horas.
+async function renderUltimaSyncBadge(){
+  const c=document.getElementById('dashUltimaSyncBadge');if(!c)return;
+  try{
+    let ultimoSync=null;
+    for(const suc of SUCURSALES){
+      try{
+        const snap=await db.collection('ventasPOS').doc(today()+'_'+suc.id).get();
+        const sa=snap.exists?snap.data().syncAt:null;
+        if(sa&&(!ultimoSync||sa>ultimoSync))ultimoSync=sa;
+      }catch(e){}
+    }
+    if(!ultimoSync){c.innerHTML='<span class="fs11 text-gray">🔌 Sin sincronizar hoy</span>';return;}
+    const minsAgo=Math.round((Date.now()-new Date(ultimoSync).getTime())/60000);
+    let color='var(--gr600)',emoji='🟢';
+    if(minsAgo>=30){color='var(--r600)';emoji='🔴';}
+    else if(minsAgo>=5){color='#B45309';emoji='🟡';}
+    const texto=minsAgo<1?'hace instantes':minsAgo<60?`hace ${minsAgo}m`:`hace ${Math.round(minsAgo/60)}h`;
+    c.innerHTML=`<span class="fs12 fw6" style="color:${color}">${emoji} Datos POS actualizados ${texto}</span>`;
+  }catch(e){console.warn('renderUltimaSyncBadge',e.message);}
 }
 
 // Mini-gráfico "ventas de hoy por hora" directo en el Dashboard — versión
