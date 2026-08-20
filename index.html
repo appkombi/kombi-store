@@ -659,6 +659,11 @@ tr:hover td{background:var(--g50)}
           <div class="card"><div class="ct">📦 Stock crítico</div><div id="dashStock"></div></div>
           <div class="card"><div class="ct">🕐 Actividad</div><div class="tl" id="dashTL"></div></div>
         </div>
+        <!-- TOP PRODUCTOS VENDIDOS HOY (datos reales del POS) -->
+        <div class="card mt4" id="wgtTopProductosHoy">
+          <div class="ct">🏆 Top productos vendidos hoy</div>
+          <div id="dashTopProductos"></div>
+        </div>
         <!-- RETIROS POR CATEGORÍA -->
         <div class="g2 mt4" id="wgtRetirosVentas">
           <div class="card"><div class="ct">💸 Retiros por categoría</div><div id="dashRetirosCat"></div></div>
@@ -3098,6 +3103,7 @@ async function renderDash(){
   renderDashChart(v);renderDashCompo(v);renderDashCigs();renderDashStock();renderDashTL();
   renderMetaVentas();renderDashRetirosCat();renderDashVentasSuc();renderOportunidadesComerciales();
   renderAlertasCatalogo();
+  renderDashTopProductos();
   checkVencimientos();
 
   // Cuadratura y panel POS — solo si el superadmin los dejó activados
@@ -5679,6 +5685,7 @@ async function pollVentasMinutoDashboard(){
     await sincronizarVentasHoraDia(data.ventas,today());
     await descontarStockPorVentas(data.ventas,today());
     await renderAlertasCatalogo();
+    await renderDashTopProductos();
     // Forzar re-render del panel ahora mismo, sin esperar al próximo cambio de "aperturas"
     if(document.getElementById('panelOperativo')){
       const snap=await db.collection('aperturas').where('fecha','==',today()).get();
@@ -5907,12 +5914,21 @@ const MAPEO_TIENDA_SUCURSAL={'Mi PC':'7 Norte','Libertad':'Libertad'};
 async function sincronizarVentasDia(ventas,fecha){
   if(!ventas||!ventas.length)return {ok:false,motivo:'sin ventas'};
   const porTienda={};
+  const porTiendaProducto={};
   ventas.forEach(v=>{
     porTienda[v.tienda]=porTienda[v.tienda]||{};
     const h=String(Number((v.hora||'').slice(11,13))||0);
     if(!porTienda[v.tienda][h])porTienda[v.tienda][h]={monto:0,boletas:0};
     porTienda[v.tienda][h].monto+=v.monto;
     porTienda[v.tienda][h].boletas++;
+
+    porTiendaProducto[v.tienda]=porTiendaProducto[v.tienda]||{};
+    (v.items||[]).forEach(item=>{
+      const key=normalizaCodigoProducto(item.codigo);
+      if(!porTiendaProducto[v.tienda][key])porTiendaProducto[v.tienda][key]={codigo:item.codigo,nombre:item.nombre||'',cantidad:0,monto:0};
+      porTiendaProducto[v.tienda][key].cantidad+=item.cantidad||1;
+      porTiendaProducto[v.tienda][key].monto+=(item.precio||0)*(item.cantidad||1);
+    });
   });
   let sucursalesSincronizadas=0;
   for(const tienda of Object.keys(porTienda)){
@@ -5938,6 +5954,12 @@ async function sincronizarVentasDia(ventas,fecha){
         fuente:'ventasMinuto (boletas SII)',
         syncAt:new Date().toISOString()
       },{merge:true});
+      // Ranking de productos vendidos hoy (para el widget "Top productos" del Dashboard)
+      await db.collection('topProductosDia').doc(fecha+'_'+suc.id).set({
+        sucursal:suc.nombre,
+        productos:porTiendaProducto[tienda]||{},
+        syncAt:new Date().toISOString()
+      });
       console.log('✅ sincronizado:',tienda,'->',suc.nombre,fecha,'total:'+totalTienda,'boletas:'+boletasTienda);
       sucursalesSincronizadas++;
     }catch(e){console.warn('❌ sincronizarVentasDia',tienda,'->',suc.nombre,e.message);}
@@ -6026,6 +6048,39 @@ async function descontarStockPorVentas(ventas,fecha){
       }catch(e){console.warn('alertasCatalogo write',suc.nombre,e.message);}
     }
   }
+}
+
+// "Top productos vendidos hoy" — ranking en vivo por cantidad, combinando
+// ambas sucursales, usando el detalle real de cada boleta (topProductosDia).
+async function renderDashTopProductos(){
+  const c=document.getElementById('dashTopProductos');if(!c)return;
+  try{
+    const snap=await db.collection('topProductosDia').where(firebase.firestore.FieldPath.documentId(),'>=',today()+'_').where(firebase.firestore.FieldPath.documentId(),'<',today()+'_').get();
+    const acumulado={};
+    snap.docs.forEach(d=>{
+      const productos=d.data().productos||{};
+      Object.values(productos).forEach(p=>{
+        const key=normalizaCodigoProducto(p.codigo);
+        if(!acumulado[key])acumulado[key]={codigo:p.codigo,nombre:p.nombre,cantidad:0,monto:0};
+        acumulado[key].cantidad+=p.cantidad||0;
+        acumulado[key].monto+=p.monto||0;
+      });
+    });
+    const top=Object.values(acumulado).sort((a,b)=>b.cantidad-a.cantidad).slice(0,8);
+    if(!top.length){c.innerHTML='<p class="fs13 text-gray">Sin ventas registradas hoy aún</p>';return;}
+    const max=Math.max(...top.map(p=>p.cantidad));
+    c.innerHTML=top.map((p,i)=>`<div style="display:flex;align-items:center;gap:.625rem;padding:.375rem 0;${i<top.length-1?'border-bottom:1px solid var(--g100)':''}">
+      <span class="fs11 text-gray" style="width:1.25rem">${i+1}</span>
+      <div style="flex:1;min-width:0">
+        <div class="fs13 fw6" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.nombre||p.codigo}</div>
+        <div style="background:var(--g100);border-radius:4px;height:5px;margin-top:.25rem;overflow:hidden"><div style="background:var(--a400);height:100%;width:${Math.round(p.cantidad/max*100)}%"></div></div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div class="fw7 fs13">${p.cantidad}u</div>
+        <div class="fs11 text-gray">${clp(p.monto)}</div>
+      </div>
+    </div>`).join('');
+  }catch(e){console.warn('renderDashTopProductos',e.message);c.innerHTML='<p class="fs13 text-gray">Sin datos aún</p>';}
 }
 
 // Muestra en el Dashboard los productos que se vendieron hoy pero no tienen
