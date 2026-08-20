@@ -3597,10 +3597,25 @@ async function renderCuadratura(){
   }
 }
 
-function renderDashChart(ventas){
-  const c=document.getElementById('dashChart');if(!c)return;if(!ventas.length){c.innerHTML='<p class="fs14 text-gray" style="padding:1rem">Sin datos</p>';return;}
-  const s=[...ventas].sort((a,b)=>a.fecha.localeCompare(b.fecha)).slice(-14),max=Math.max(...s.map(v=>v.total),1);
-  c.innerHTML=`<div class="cbars" style="margin-top:.5rem">${s.map(v=>{const h=Math.max(Math.round(v.total/max*140),4);return`<div class="cbw"><div class="cvl">${v.total>=1000?Math.round(v.total/1000)+'k':v.total}</div><div class="cbar ${v.fecha===today()?'today':''}" style="height:${h}px"></div><div class="cbl">${v.fecha.slice(5)}</div></div>`;}).join('')}</div>`;
+async function renderDashChart(ventas){
+  const c=document.getElementById('dashChart');if(!c)return;
+  if(ventas.length){
+    const s=[...ventas].sort((a,b)=>a.fecha.localeCompare(b.fecha)).slice(-14),max=Math.max(...s.map(v=>v.total),1);
+    c.innerHTML=`<div class="cbars" style="margin-top:.5rem">${s.map(v=>{const h=Math.max(Math.round(v.total/max*140),4);return`<div class="cbw"><div class="cvl">${v.total>=1000?Math.round(v.total/1000)+'k':v.total}</div><div class="cbar ${v.fecha===today()?'today':''}" style="height:${h}px"></div><div class="cbl">${v.fecha.slice(5)}</div></div>`;}).join('')}</div>`;
+    return;
+  }
+  // Sin registro manual — usar la tendencia real del POS (ventasPOS) de los últimos 14 días
+  const fechas=[];for(let i=13;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);fechas.push(d.toISOString().slice(0,10));}
+  const porDia={};fechas.forEach(f=>porDia[f]=0);
+  for(const suc of SUCURSALES){
+    for(const f of fechas){
+      try{const snap=await db.collection('ventasPOS').doc(f+'_'+suc.id).get();if(snap.exists)porDia[f]+=snap.data().totalVenta||0;}catch(e){}
+    }
+  }
+  const total=Object.values(porDia).reduce((a,v)=>a+v,0);
+  if(!total){c.innerHTML='<p class="fs14 text-gray" style="padding:1rem">Sin datos</p>';return;}
+  const max=Math.max(...Object.values(porDia),1);
+  c.innerHTML=`<div class="cbars" style="margin-top:.5rem">${fechas.map(f=>{const val=porDia[f];const h=Math.max(Math.round(val/max*140),val>0?4:0);return`<div class="cbw"><div class="cvl">${val>=1000?Math.round(val/1000)+'k':val}</div><div class="cbar ${f===today()?'today':''}" style="height:${h}px"></div><div class="cbl">${f.slice(5)}</div></div>`;}).join('')}</div>`;
 }
 function renderDashCompo(ventas){
   const c=document.getElementById('dashCompo');if(!c)return;c.innerHTML='';
@@ -3610,7 +3625,30 @@ function renderDashCompo(ventas){
 }
 function renderDashCigs(){const c=document.getElementById('dashCigs');if(!c)return;const t=TURNOS[0];if(!t){c.innerHTML='<p class="fs13 text-gray">Sin datos</p>';return;}const all=[...new Map([...(t.cigarrosAp||[]),...(t.cigarrosCi||[])].map(x=>[x.id,x])).values()];if(!all.length){c.innerHTML='<p class="fs13 text-gray">Sin datos</p>';return;}c.innerHTML=`<table class="cig-table"><thead><tr><th>Prod.</th><th style="text-align:center">Ap</th><th style="text-align:center">Ci</th><th style="text-align:center">Dif</th></tr></thead><tbody>${all.map(cg=>{const ap=(t.cigarrosAp||[]).find(x=>x.id===cg.id),ci=(t.cigarrosCi||[]).find(x=>x.id===cg.id),diff=ap?.stock!=null&&ci?.stock!=null?ci.stock-ap.stock:null;return`<tr><td class="fs13">${cg.nombre}</td><td style="text-align:center">${ap?.stock??'—'}</td><td style="text-align:center">${ci?.stock??'—'}</td><td style="text-align:center">${diff!==null?`<span class="badge ${diff<0?'br':diff>0?'bg':'ba'}">${diff>0?'+':''}${diff}</span>`:'—'}</td></tr>`;}).join('')}</tbody></table>`;}
 function renderDashStock(){const c=document.getElementById('dashStock');if(!c)return;const bajo=INVENTARIO.filter(i=>i.stock<=i.min&&i.min>0);if(!bajo.length){c.innerHTML='<p class="fs13 text-green">✓ Todo OK</p>';return;}c.innerHTML=`<table class="cig-table"><thead><tr><th>Producto</th><th style="text-align:center">Stock</th><th style="text-align:center">Mín</th></tr></thead><tbody>${bajo.map(i=>`<tr><td class="fs13">${i.nombre}</td><td style="text-align:center"><span class="badge br">${i.stock}</span></td><td style="text-align:center;color:var(--g400)">${i.min}</td></tr>`).join('')}</tbody></table>`;}
-function renderDashTL(){const tl=document.getElementById('dashTL');if(!tl)return;const ev=[];if(AP.saved)ev.push({t:'Apertura',h:AP.hora,c:'g'});RETIROS.filter(r=>r.fecha===today()).forEach(r=>ev.push({t:`${r.tipo==='retiro'?'Retiro':'Abono'}: ${clp(r.monto)}`,h:r.hora,c:r.tipo==='retiro'?'r':'g'}));if(CI.saved)ev.push({t:'Cierre enviado',h:CI.hora,c:'g'});tl.innerHTML=ev.length?ev.map(e=>`<div class="tli"><div class="tld ${e.c}"></div><div><div class="tlt">${e.t}</div><div class="tltime">${e.h}</div></div></div>`).join(''):'<p class="fs13 text-gray">Sin actividad</p>';}
+async function renderDashTL(){
+  const tl=document.getElementById('dashTL');if(!tl)return;
+  const ev=[];
+  if(AP.saved)ev.push({t:'Apertura',h:AP.hora,c:'g'});
+  RETIROS.filter(r=>r.fecha===today()).forEach(r=>ev.push({t:`${r.tipo==='retiro'?'Retiro':'Abono'}: ${clp(r.monto)}`,h:r.hora,c:r.tipo==='retiro'?'r':'g'}));
+  if(CI.saved)ev.push({t:'Cierre enviado',h:CI.hora,c:'g'});
+
+  // Hitos reales de venta (primera, pico y última boleta del día), combinando ambas sucursales
+  try{
+    let pico=null;
+    for(const suc of SUCURSALES){
+      const snap=await db.collection('ventasHoraDia').doc(today()+'_'+suc.id).get();
+      if(!snap.exists)continue;
+      const porHora=JSON.parse(snap.data().porHora||'{}');
+      Object.entries(porHora).forEach(([h,d])=>{
+        if(!pico||d.monto>pico.monto)pico={h:Number(h),monto:d.monto,suc:suc.nombre};
+      });
+    }
+    if(pico&&pico.monto>0)ev.push({t:`📈 Hora pico: ${pico.h}h — ${clp(pico.monto)} (${pico.suc})`,h:String(pico.h).padStart(2,'0')+':00',c:'g'});
+  }catch(e){console.warn('renderDashTL hitos',e.message);}
+
+  ev.sort((a,b)=>(a.h||'').localeCompare(b.h||''));
+  tl.innerHTML=ev.length?ev.map(e=>`<div class="tli"><div class="tld ${e.c}"></div><div><div class="tlt">${e.t}</div><div class="tltime">${e.h}</div></div></div>`).join(''):'<p class="fs13 text-gray">Sin actividad</p>';
+}
 
 /* ============ 9. PWA ============ */
 function registerSW(){
