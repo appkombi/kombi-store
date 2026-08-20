@@ -770,6 +770,9 @@ tr:hover td{background:var(--g50)}
       <div class="section" id="ad-inv">
         <div class="ph"><h2>Inventario</h2><p>Gestión de stock y productos</p></div>
 
+        <!-- Estado del catálogo POS — siempre visible, en cualquier sub-pestaña -->
+        <div id="invCatalogoEstadoBanner" style="margin-bottom:1rem"></div>
+
         <!-- Buscador global -->
         <div style="position:relative;margin-bottom:1rem">
           <input class="inp" id="invBuscadorGlobal" placeholder="🔍 Buscar cualquier producto — precio, stock por tienda, acciones rápidas…" style="font-size:.9375rem;padding:.75rem 1rem" oninput="renderBuscadorGlobal()" onfocus="renderBuscadorGlobal()"/>
@@ -4468,7 +4471,22 @@ async function renderInvEstado(){
     </div>`;
 }
 
+function renderCatalogoEstadoBanner(){
+  const c=document.getElementById('invCatalogoEstadoBanner');if(!c)return;
+  const desdePOS=INVENTARIO.filter(i=>i.origenPOS).length;
+  const conectado=desdePOS>0;
+  c.innerHTML=`<div style="display:flex;align-items:center;gap:.75rem;background:${conectado?'#F0FDF4':'#FEF2F2'};border:1px solid ${conectado?'#BBF7D0':'#FECACA'};border-radius:10px;padding:.75rem 1rem">
+    <span style="font-size:1.25rem">${conectado?'✅':'🔌'}</span>
+    <div style="flex:1">
+      <div class="fw7 fs13" style="color:${conectado?'var(--gr600)':'var(--r600)'}">${conectado?'Catálogo conectado al POS':'Catálogo no conectado al POS'}</div>
+      <div class="fs11 text-gray">${conectado?`${desdePOS} de ${INVENTARIO.length} productos sincronizados`:'Importa el catálogo real desde POS para tener precios y códigos actualizados'}</div>
+    </div>
+    <button class="btn btn-s sm" onclick="importarCatalogoPOS()">🖥️ Desde POS</button>
+  </div>`;
+}
+
 async function renderInv(search){
+  renderCatalogoEstadoBanner();
   if(search!==undefined)_invSearch=search;
   const cats=['TODOS',...new Set(INVENTARIO.map(i=>i.cat).filter(Boolean))];
   const tabs=document.getElementById('invCatTabs');
