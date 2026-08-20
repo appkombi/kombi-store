@@ -5796,6 +5796,10 @@ async function cargarVentasVivo(){
 // agrega las boletas por hora y las guarda en ventasHoraDia, matcheando
 // el nombre de la tienda (Libertad / Mi PC) contra las sucursales configuradas.
 function normalizaTexto(s){return (s||'').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();}
+// Mapeo manual: nombre de carpeta en Drive (POS-Xpress) -> nombre real de la sucursal en la app.
+// El emparejamiento automático por texto no sirve porque los nombres no se parecen
+// (ej: "Mi PC" es la carpeta del local que en la app se llama "7 Norte").
+const MAPEO_TIENDA_SUCURSAL={'Mi PC':'7 Norte','Libertad':'Libertad'};
 async function sincronizarVentasHoraDia(ventas,fecha){
   if(fecha!==today()||!ventas||!ventas.length)return; // el panel es "en vivo", solo tiene sentido para hoy
   const porTienda={};
@@ -5807,11 +5811,12 @@ async function sincronizarVentasHoraDia(ventas,fecha){
     porTienda[v.tienda][h].boletas++;
   });
   for(const tienda of Object.keys(porTienda)){
+    const nombreBuscado=normalizaTexto(MAPEO_TIENDA_SUCURSAL[tienda]||tienda);
     const suc=SUCURSALES.find(s=>{
-      const n=normalizaTexto(s.nombre),t=normalizaTexto(tienda);
-      return n.includes(t)||t.includes(n);
+      const n=normalizaTexto(s.nombre);
+      return n===nombreBuscado||n.includes(nombreBuscado)||nombreBuscado.includes(n);
     });
-    if(!suc){console.warn('Sin sucursal configurada que coincida con "'+tienda+'" — revisa Ajustes > Sucursales');continue;}
+    if(!suc){console.warn('Sin sucursal configurada que coincida con "'+tienda+'" — revisa Ajustes > Sucursales o MAPEO_TIENDA_SUCURSAL');continue;}
     try{
       await db.collection('ventasHoraDia').doc(fecha+'_'+suc.id).set({
         porHora:JSON.stringify(porTienda[tienda]),
