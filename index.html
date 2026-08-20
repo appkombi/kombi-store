@@ -598,6 +598,9 @@ tr:hover td{background:var(--g50)}
         <!-- NOTIFICACIONES -->
         <div id="notifBanner" style="margin-bottom:1rem"></div>
 
+        <!-- ALERTAS DE CATÁLOGO DESINCRONIZADO -->
+        <div id="alertasCatalogoBanner" style="margin-bottom:1rem"></div>
+
         <!-- CUADRATURA POS vs OPERADOR — pieza central -->
         <div class="card" id="cuadraturaCard" style="margin-bottom:1.25rem;border:1.5px solid var(--g200)">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">
@@ -3094,6 +3097,7 @@ async function renderDash(){
   s.innerHTML=[{l:'Ventas período',v:clp(total),sub:usaPOS?`${pos.boletas} boletas · datos reales POS`:`${v.length} registros`,col:'var(--a500)'},{l:'Promedio diario',v:clp(avg),sub:'del período',col:'var(--b500)'},{l:'Stock crítico',v:stk,sub:'bajo mínimo',col:stk?'var(--r500)':'var(--gr500)'},{l:'Retiros hoy',v:clp(retH),sub:`${RETIROS.filter(r=>r.fecha===today()).length} mov.`,col:'var(--g500)'}].map(x=>`<div class="sc"><div class="lbl">${x.l}</div><div class="val" style="color:${x.col}">${x.v}</div><div class="sub">${x.sub}</div></div>`).join('');
   renderDashChart(v);renderDashCompo(v);renderDashCigs();renderDashStock();renderDashTL();
   renderMetaVentas();renderDashRetirosCat();renderDashVentasSuc();renderOportunidadesComerciales();
+  renderAlertasCatalogo();
   checkVencimientos();
 
   // Cuadratura y panel POS — solo si el superadmin los dejó activados
@@ -5674,6 +5678,7 @@ async function pollVentasMinutoDashboard(){
     if(!data.ok||!data.ventas){console.warn('pollVentasMinutoDashboard: respuesta inesperada',data);return;}
     await sincronizarVentasHoraDia(data.ventas,today());
     await descontarStockPorVentas(data.ventas,today());
+    await renderAlertasCatalogo();
     // Forzar re-render del panel ahora mismo, sin esperar al próximo cambio de "aperturas"
     if(document.getElementById('panelOperativo')){
       const snap=await db.collection('aperturas').where('fecha','==',today()).get();
@@ -5986,11 +5991,15 @@ async function descontarStockPorVentas(ventas,fecha){
     const nuevasBoletas=boletasOrdenadas.filter(v=>v.hora>ultimaHoraProcesada);
     if(!nuevasBoletas.length)continue;
 
-    let itemsDescontados=0,sinMatch=new Set();
+    let itemsDescontados=0;const sinMatch={};
     for(const boleta of nuevasBoletas){
       for(const item of (boleta.items||[])){
         const prod=porSku[normalizaCodigoProducto(item.codigo)];
-        if(!prod){sinMatch.add(item.codigo+' — '+(item.nombre||''));continue;}
+        if(!prod){
+          const key=normalizaCodigoProducto(item.codigo);
+          sinMatch[key]={codigo:item.codigo,nombre:item.nombre||'',vecesVisto:(sinMatch[key]?.vecesVisto||0)+1};
+          continue;
+        }
         try{
           await descontarStockSucursal(suc.id,prod.id,'exhibicion',item.cantidad||1);
           itemsDescontados++;
@@ -6000,8 +6009,59 @@ async function descontarStockPorVentas(ventas,fecha){
 
     await cursorRef.set({ultimaHora:nuevasBoletas[nuevasBoletas.length-1].hora,fijadoEn:new Date().toISOString()},{merge:true});
     console.log('📉 Stock descontado:',suc.nombre,'-',nuevasBoletas.length,'boletas nuevas,',itemsDescontados,'líneas descontadas');
-    if(sinMatch.size)console.warn('⚠ Códigos de producto sin match en inventario ('+suc.nombre+'):',[...sinMatch].slice(0,20));
+
+    // Guarda (acumulando) los códigos vendidos que no tienen match en el
+    // inventario, para mostrarlos como alerta accionable en el Dashboard —
+    // en vez de perderse en la consola del navegador.
+    if(Object.keys(sinMatch).length){
+      console.warn('⚠ Códigos de producto sin match en inventario ('+suc.nombre+'):',Object.values(sinMatch));
+      try{
+        const alertaRef=db.collection('alertasCatalogo').doc(fecha+'_'+suc.id);
+        const alertaSnap=await alertaRef.get();
+        const existentes=alertaSnap.exists?(alertaSnap.data().codigos||{}):{};
+        Object.keys(sinMatch).forEach(k=>{
+          existentes[k]={...sinMatch[k],vecesVisto:(existentes[k]?.vecesVisto||0)+sinMatch[k].vecesVisto};
+        });
+        await alertaRef.set({sucursal:suc.nombre,fecha,codigos:existentes,actualizadoEn:new Date().toISOString()},{merge:true});
+      }catch(e){console.warn('alertasCatalogo write',suc.nombre,e.message);}
+    }
   }
+}
+
+// Muestra en el Dashboard los productos que se vendieron hoy pero no tienen
+// match en el inventario (SKU no encontrado) — sin esto, esas ventas nunca
+// descuentan stock y el inventario se desincroniza en silencio.
+async function renderAlertasCatalogo(){
+  const c=document.getElementById('alertasCatalogoBanner');if(!c)return;
+  try{
+    const snap=await db.collection('alertasCatalogo').where('fecha','==',today()).get();
+    const docs=snap.docs.map(d=>d.data()).filter(d=>d.codigos&&Object.keys(d.codigos).length);
+    if(!docs.length){c.innerHTML='';return;}
+
+    const filas=[];
+    docs.forEach(d=>{
+      Object.values(d.codigos).forEach(item=>{
+        filas.push({sucursal:d.sucursal,...item});
+      });
+    });
+    filas.sort((a,b)=>b.vecesVisto-a.vecesVisto);
+
+    c.innerHTML=`<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:.875rem 1rem">
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
+        <span style="font-size:1.125rem">⚠️</span>
+        <div class="fw7 fs14" style="color:#92400E">${filas.length} producto${filas.length!==1?'s':''} vendido${filas.length!==1?'s':''} hoy sin match en tu catálogo</div>
+      </div>
+      <div class="fs12" style="color:#92400E;margin-bottom:.625rem">Estas ventas NO descontaron stock automáticamente — agrega el SKU al inventario para que empiecen a matchear.</div>
+      <div style="display:flex;flex-direction:column;gap:.25rem">
+        ${filas.slice(0,10).map(f=>`<div style="display:flex;justify-content:space-between;font-size:.8125rem;padding:.25rem 0;border-top:1px solid #FDE68A">
+          <span>🏬 ${f.sucursal} · <span class="mono">${f.codigo}</span> — ${f.nombre}</span>
+          <span class="text-gray">${f.vecesVisto}×</span>
+        </div>`).join('')}
+        ${filas.length>10?`<div class="fs11 text-gray" style="padding-top:.25rem">…y ${filas.length-10} más</div>`:''}
+      </div>
+      <button class="btn btn-s sm" style="margin-top:.625rem" onclick="showSec('ad-inv',document.querySelector('.ni[data-sec=ad-inv]'))">📋 Ir a Inventario a agregarlos</button>
+    </div>`;
+  }catch(e){console.warn('renderAlertasCatalogo',e.message);}
 }
 
 function renderVentasVivo(ventas,fecha){
