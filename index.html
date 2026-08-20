@@ -5964,6 +5964,13 @@ async function sincronizarVentasDia(ventas,fecha){
         fuente:'ventasMinuto (boletas SII)',
         syncAt:new Date().toISOString()
       },{merge:true});
+      // Alimenta ventasProductoDia (usado por "Compras Sugeridas" para calcular
+      // velocidad de venta real de 30 días y proyectar quiebre de stock).
+      await db.collection('ventasProductoDia').doc(fecha+'_'+suc.id).set({
+        productos:JSON.stringify(Object.values(porTiendaProducto[tienda]||{})),
+        fuente:'ventasMinuto (boletas SII)',
+        syncAt:new Date().toISOString()
+      });
       // Ranking de productos vendidos hoy (para el widget "Top productos" del Dashboard)
       await db.collection('topProductosDia').doc(fecha+'_'+suc.id).set({
         sucursal:suc.nombre,
