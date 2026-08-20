@@ -3056,11 +3056,42 @@ function showDiffAlert(msg,isNeg){const d=document.createElement('div');d.style.
 let _dashPeriod='dia';
 function setDashPeriod(p,el){_dashPeriod=p;document.querySelectorAll('.marca-tag').forEach(b=>b.classList.remove('active'));el.classList.add('active');renderDash();}
 function getVentasPeriod(){const t=today(),d=new Date();let v=VENTAS;if(_dashPeriod==='dia')v=v.filter(x=>x.fecha===t);else if(_dashPeriod==='semana'){const f=new Date(d);f.setDate(f.getDate()-6);v=v.filter(x=>x.fecha>=f.toISOString().slice(0,10)&&x.fecha<=t);}else if(_dashPeriod==='mes')v=v.filter(x=>x.fecha.slice(0,7)===t.slice(0,7));else v=v.filter(x=>x.fecha.slice(0,4)===t.slice(0,4));return v;}
-function renderDash(){
+// Rango de fechas del período elegido en el Dashboard (Día/Semana/Mes/Año)
+function rangoFechasDash(){
+  const t=today();let desde=t,hasta=t;const d=new Date();
+  if(_dashPeriod==='semana'){const f=new Date(d);f.setDate(f.getDate()-6);desde=f.toISOString().slice(0,10);}
+  else if(_dashPeriod==='mes')desde=t.slice(0,7)+'-01';
+  else if(_dashPeriod==='ano')desde=t.slice(0,4)+'-01-01';
+  return [desde,hasta];
+}
+// Totales reales del POS (ventasPOS) para el período — reemplaza el registro
+// manual del operador cuando hay datos reales sincronizados, así el Dashboard
+// no depende de que alguien declare "Ventas del Día" a mano.
+async function getVentasPOSPeriodo(){
+  const [desde,hasta]=rangoFechasDash();
+  const fechas=[];let cur=new Date(desde+'T00:00');const fin=new Date(hasta+'T00:00');
+  while(cur<=fin){fechas.push(cur.toISOString().slice(0,10));cur.setDate(cur.getDate()+1);}
+  let total=0,boletas=0;const diasConDatos=new Set();
+  for(const suc of SUCURSALES){
+    for(const f of fechas){
+      try{
+        const snap=await db.collection('ventasPOS').doc(f+'_'+suc.id).get();
+        if(snap.exists){const dd=snap.data();total+=dd.totalVenta||0;boletas+=dd.totalBoletas||0;diasConDatos.add(f);}
+      }catch(e){}
+    }
+  }
+  return {total,boletas,dias:diasConDatos.size};
+}
+
+async function renderDash(){
   const s=document.getElementById('dashStats');if(!s)return;
-  const v=getVentasPeriod(),total=v.reduce((a,x)=>a+x.total,0),avg=v.length?Math.round(total/v.length):0;
+  const v=getVentasPeriod();
+  const pos=await getVentasPOSPeriodo();
+  const usaPOS=pos.total>0;
+  const total=usaPOS?pos.total:v.reduce((a,x)=>a+x.total,0);
+  const avg=usaPOS?(pos.dias?Math.round(pos.total/pos.dias):pos.total):(v.length?Math.round(total/v.length):0);
   const stk=INVENTARIO.filter(i=>i.stock<=i.min&&i.min>0).length,retH=RETIROS.filter(r=>r.fecha===today()&&r.tipo==='retiro').reduce((a,r)=>a+r.monto,0);
-  s.innerHTML=[{l:'Ventas período',v:clp(total),sub:`${v.length} registros`,col:'var(--a500)'},{l:'Promedio diario',v:clp(avg),sub:'del período',col:'var(--b500)'},{l:'Stock crítico',v:stk,sub:'bajo mínimo',col:stk?'var(--r500)':'var(--gr500)'},{l:'Retiros hoy',v:clp(retH),sub:`${RETIROS.filter(r=>r.fecha===today()).length} mov.`,col:'var(--g500)'}].map(x=>`<div class="sc"><div class="lbl">${x.l}</div><div class="val" style="color:${x.col}">${x.v}</div><div class="sub">${x.sub}</div></div>`).join('');
+  s.innerHTML=[{l:'Ventas período',v:clp(total),sub:usaPOS?`${pos.boletas} boletas · datos reales POS`:`${v.length} registros`,col:'var(--a500)'},{l:'Promedio diario',v:clp(avg),sub:'del período',col:'var(--b500)'},{l:'Stock crítico',v:stk,sub:'bajo mínimo',col:stk?'var(--r500)':'var(--gr500)'},{l:'Retiros hoy',v:clp(retH),sub:`${RETIROS.filter(r=>r.fecha===today()).length} mov.`,col:'var(--g500)'}].map(x=>`<div class="sc"><div class="lbl">${x.l}</div><div class="val" style="color:${x.col}">${x.v}</div><div class="sub">${x.sub}</div></div>`).join('');
   renderDashChart(v);renderDashCompo(v);renderDashCigs();renderDashStock();renderDashTL();
   renderMetaVentas();renderDashRetirosCat();renderDashVentasSuc();renderOportunidadesComerciales();
   checkVencimientos();
