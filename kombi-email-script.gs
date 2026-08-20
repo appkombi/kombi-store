@@ -34,6 +34,10 @@ function doGet(e) {
     return handleVentasMinuto(e);
   }
 
+  if (accion === "arqueoDia") {
+    return handleArqueoDia(e);
+  }
+
   return ContentService
     .createTextOutput(JSON.stringify({ ok: true, status: "Kombi API activa ✓" }))
     .setMimeType(ContentService.MimeType.JSON);
@@ -135,6 +139,91 @@ function extraerItemsXML(xml) {
     const precio = Number(extraerTagXML(bloque, "PrcItem")) || 0;
     if (codigo) items.push({ codigo: codigo, nombre: nombre, cantidad: cantidad, precio: precio });
   }
+  return items;
+}
+
+// ─────────────────────────────────────────
+// ARQUEO / CIERRE DE CAJA (composición por medio de pago)
+// Lee "filePrinD.doc" (texto plano pese a la extensión) que el
+// POS-Xpress genera al hacer un cierre de caja / arqueo — trae
+// el desglose real Efectivo/Débito/etc. Solo se actualiza cuando
+// alguien hace el cierre en el POS, no es continuo como las boletas.
+// ─────────────────────────────────────────
+function handleArqueoDia(e) {
+  try {
+    const resultado = [];
+    TIENDAS_POS.forEach(nombreTienda => {
+      const tiendaIt = DriveApp.getFoldersByName(nombreTienda);
+      if (!tiendaIt.hasNext()) return;
+      const tiendaFolder = tiendaIt.next();
+
+      const archivo = buscarArchivoArqueo(tiendaFolder);
+      if (!archivo) return;
+
+      const texto = archivo.getBlob().getDataAsString("UTF-8");
+      const fechaArqueo = extraerFechaArqueo(texto);
+      const medios = extraerMediosPago(texto);
+
+      resultado.push({
+        tienda: nombreTienda,
+        fecha: fechaArqueo,
+        modificado: Utilities.formatDate(archivo.getLastUpdated(), "America/Santiago", "yyyy-MM-dd HH:mm:ss"),
+        medios: medios
+      });
+    });
+
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true, arqueos: resultado }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: false, error: err.message }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function buscarArchivoArqueo(tiendaFolder) {
+  // Patrón 1 (ej. "Mi PC"): [Tienda]/report/filePrinD.doc
+  let it = tiendaFolder.getFoldersByName("report");
+  if (it.hasNext()) {
+    const rf = it.next();
+    const fIt = rf.getFilesByName("filePrinD.doc");
+    if (fIt.hasNext()) return fIt.next();
+  }
+  // Patrón 2 (ej. "Libertad"): [Tienda]/locales/[N]/filePrinD.doc
+  it = tiendaFolder.getFoldersByName("locales");
+  if (it.hasNext()) {
+    const localesFolder = it.next();
+    const subFolders = localesFolder.getFolders();
+    while (subFolders.hasNext()) {
+      const sub = subFolders.next();
+      const fIt = sub.getFilesByName("filePrinD.doc");
+      if (fIt.hasNext()) return fIt.next();
+    }
+  }
+  return null;
+}
+
+function extraerFechaArqueo(texto) {
+  const m = texto.match(/Hasta fecha\s*:\s*(\d{1,2})\/\s*(\d{1,2})\/(\d{2,4})/);
+  if (!m) return "";
+  let dia = m[1], mes = m[2], anio = m[3];
+  if (anio.length === 2) anio = "20" + anio;
+  return anio + "-" + mes.padStart(2, "0") + "-" + dia.padStart(2, "0");
+}
+
+function extraerMediosPago(texto) {
+  const m = texto.match(/vtas\.formas de pagos[\s\S]*?_{5,}\r?\n([\s\S]*?)_{5,}/);
+  if (!m) return [];
+  const lineas = m[1].split(/\r?\n/).filter(l => l.trim());
+  const items = [];
+  lineas.forEach(l => {
+    const mm = l.match(/^(.+?)\s*\(\s*\)\s*\$\s*([\d.,]+)/);
+    if (mm) {
+      const monto = Number(mm[2].replace(/\./g, "").replace(",", ".")) || 0;
+      items.push({ descripcion: mm[1].trim(), monto: monto });
+    }
+  });
   return items;
 }
 

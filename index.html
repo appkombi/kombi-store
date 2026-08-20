@@ -3630,11 +3630,32 @@ async function renderDashChart(ventas){
   }).join('')}</div>
   <div class="fs11 text-gray" style="margin-top:.5rem">${sucs.map(s=>`<span style="color:${colores[s]}">■</span> ${s}`).join('  ')}</div>`;
 }
-function renderDashCompo(ventas){
+async function renderDashCompo(ventas){
   const c=document.getElementById('dashCompo');if(!c)return;c.innerHTML='';
-  const ef=ventas.reduce((a,v)=>a+(v.ef||0),0),pos=ventas.reduce((a,v)=>a+(v.pos||0),0),tr=ventas.reduce((a,v)=>a+(v.tr||0),0),total=ef+pos+tr||1;
-  if(!total){c.innerHTML='<p class="fs14 text-gray" style="padding:1rem">Sin datos</p>';return;}
-  [['Efectivo',ef,'var(--a500)'],['POS',pos,'var(--b500)'],['Transfer.',tr,'var(--gr500)']].forEach(([l,v,col])=>{const pct=Math.round(v/total*100);c.innerHTML+=`<div style="margin-bottom:.875rem"><div style="display:flex;justify-content:space-between;font-size:.8125rem;margin-bottom:.3rem"><span class="fw6">${l}</span><span class="mono text-gray">${clp(v)} (${pct}%)</span></div><div style="height:8px;background:var(--g100);border-radius:4px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${col};border-radius:4px"></div></div></div>`;});
+  let ef=ventas.reduce((a,v)=>a+(v.ef||0),0),pos=ventas.reduce((a,v)=>a+(v.pos||0),0),tr=ventas.reduce((a,v)=>a+(v.tr||0),0);
+  let total=ef+pos+tr;
+  let fuenteReal=false;
+
+  if(!total){
+    // Sin registro manual — usar el desglose real del arqueo/cierre de caja (si ya se sincronizó hoy)
+    let debito=0,credito=0,otros=0;ef=0;
+    for(const suc of SUCURSALES){
+      try{
+        const snap=await db.collection('ventasPOS').doc(today()+'_'+suc.id).get();
+        if(snap.exists){
+          const d=snap.data();
+          ef+=d.efectivo||0;debito+=d.debito||0;credito+=d.credito||0;otros+=d.otros||0;
+        }
+      }catch(e){}
+    }
+    pos=debito+credito;tr=otros;
+    total=ef+pos+tr;
+    fuenteReal=total>0;
+  }
+
+  if(!total){c.innerHTML='<p class="fs14 text-gray" style="padding:1rem">Sin datos — se completa cuando se hace el cierre de caja en el POS</p>';return;}
+  if(fuenteReal){c.innerHTML='<div class="fs11 text-gray" style="margin-bottom:.5rem">💳 Desde el cierre de caja de hoy</div>';}
+  [['Efectivo',ef,'var(--a500)'],['POS (débito+crédito)',pos,'var(--b500)'],['Otros',tr,'var(--gr500)']].forEach(([l,v,col])=>{const pct=Math.round(v/total*100);c.innerHTML+=`<div style="margin-bottom:.875rem"><div style="display:flex;justify-content:space-between;font-size:.8125rem;margin-bottom:.3rem"><span class="fw6">${l}</span><span class="mono text-gray">${clp(v)} (${pct}%)</span></div><div style="height:8px;background:var(--g100);border-radius:4px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${col};border-radius:4px"></div></div></div>`;});
 }
 function renderDashCigs(){const c=document.getElementById('dashCigs');if(!c)return;const t=TURNOS[0];if(!t){c.innerHTML='<p class="fs13 text-gray">Sin datos</p>';return;}const all=[...new Map([...(t.cigarrosAp||[]),...(t.cigarrosCi||[])].map(x=>[x.id,x])).values()];if(!all.length){c.innerHTML='<p class="fs13 text-gray">Sin datos</p>';return;}c.innerHTML=`<table class="cig-table"><thead><tr><th>Prod.</th><th style="text-align:center">Ap</th><th style="text-align:center">Ci</th><th style="text-align:center">Dif</th></tr></thead><tbody>${all.map(cg=>{const ap=(t.cigarrosAp||[]).find(x=>x.id===cg.id),ci=(t.cigarrosCi||[]).find(x=>x.id===cg.id),diff=ap?.stock!=null&&ci?.stock!=null?ci.stock-ap.stock:null;return`<tr><td class="fs13">${cg.nombre}</td><td style="text-align:center">${ap?.stock??'—'}</td><td style="text-align:center">${ci?.stock??'—'}</td><td style="text-align:center">${diff!==null?`<span class="badge ${diff<0?'br':diff>0?'bg':'ba'}">${diff>0?'+':''}${diff}</span>`:'—'}</td></tr>`;}).join('')}</tbody></table>`;}
 function renderDashStock(){const c=document.getElementById('dashStock');if(!c)return;const bajo=INVENTARIO.filter(i=>i.stock<=i.min&&i.min>0);if(!bajo.length){c.innerHTML='<p class="fs13 text-green">✓ Todo OK</p>';return;}c.innerHTML=`<table class="cig-table"><thead><tr><th>Producto</th><th style="text-align:center">Stock</th><th style="text-align:center">Mín</th></tr></thead><tbody>${bajo.map(i=>`<tr><td class="fs13">${i.nombre}</td><td style="text-align:center"><span class="badge br">${i.stock}</span></td><td style="text-align:center;color:var(--g400)">${i.min}</td></tr>`).join('')}</tbody></table>`;}
@@ -5767,6 +5788,8 @@ async function pollVentasMinutoDashboard(){
     await renderDashTopProductos();
     await renderDashVentasHora();
     await renderUltimaSyncBadge();
+    await sincronizarComposicionPago();
+    await renderDashCompo(getVentasPeriod());
     // Forzar re-render del panel ahora mismo, sin esperar al próximo cambio de "aperturas"
     if(document.getElementById('panelOperativo')){
       const snap=await db.collection('aperturas').where('fecha','==',today()).get();
@@ -5929,6 +5952,45 @@ function iniciarAutoRefreshVivo(){
 }
 function pausarAutoRefreshVivo(){
   if(_vivoInterval){clearInterval(_vivoInterval);_vivoInterval=null;}
+}
+
+/* ============ COMPOSICIÓN POR MEDIO DE PAGO (arqueo/cierre de caja) ============ */
+// Lee el reporte de arqueo (filePrinD.doc) que el POS genera SOLO cuando
+// alguien cierra caja en la tienda — no es continuo como las boletas.
+// Si la fecha del arqueo no es la de hoy, no se aplica (evita mostrar
+// datos de un cierre viejo como si fueran del día actual).
+async function sincronizarComposicionPago(){
+  const url=getGasUrl();if(!url)return;
+  try{
+    const r=await fetch(url+'?accion=arqueoDia');
+    const data=await r.json();
+    if(!data.ok||!data.arqueos)return;
+    for(const arq of data.arqueos){
+      if(arq.fecha!==today()||!arq.medios||!arq.medios.length)continue;
+      const nombreBuscado=normalizaTexto(MAPEO_TIENDA_SUCURSAL[arq.tienda]||arq.tienda);
+      const suc=SUCURSALES.find(s=>{
+        const n=normalizaTexto(s.nombre);
+        return n===nombreBuscado||n.includes(nombreBuscado)||nombreBuscado.includes(n);
+      });
+      if(!suc)continue;
+      let efectivo=0,debito=0,credito=0,otros=0;
+      arq.medios.forEach(m=>{
+        const d=normalizaTexto(m.descripcion);
+        if(d.includes('efectivo'))efectivo+=m.monto;
+        else if(d.includes('debito'))debito+=m.monto;
+        else if(d.includes('credito'))credito+=m.monto;
+        else otros+=m.monto;
+      });
+      try{
+        await db.collection('ventasPOS').doc(arq.fecha+'_'+suc.id).set({
+          efectivo,debito,credito,otros,
+          fuenteMedioPago:'arqueoDia (cierre de caja)',
+          medioPagoSyncAt:new Date().toISOString()
+        },{merge:true});
+        console.log('💳 Composición sincronizada:',arq.tienda,'->',suc.nombre,{efectivo,debito,credito,otros});
+      }catch(e){console.warn('sincronizarComposicionPago write',suc.nombre,e.message);}
+    }
+  }catch(e){console.warn('sincronizarComposicionPago',e.message);}
 }
 
 /* ============ RESCATE HISTÓRICO — trae varios días de boletas reales desde Drive ============ */
