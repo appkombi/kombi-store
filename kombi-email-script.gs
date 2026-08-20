@@ -389,7 +389,7 @@ function buildEmail(asunto, contenidoHtml, tipo) {
     + '<table width="100%" cellpadding="0" cellspacing="0"><tr>'
     + '<td><div style="color:rgba(255,255,255,.8);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">' + c.label + '</div>'
     + '<div style="color:#fff;font-size:20px;font-weight:800">' + asunto + '</div></td>'
-    + '<td align="right"><div style="background:rgba(255,255,255,.15);border-radius:8px;padding:8px 14px;color:#fff;font-weight:800;font-size:15px">🛒 Kombi</div></td>'
+    + '<td align="right"><div style="background:rgba(255,255,255,.15);border-radius:8px;padding:8px 14px;color:#fff;font-weight:800;font-size:15px">Kombi</div></td>'
     + '</tr></table></td></tr>'
     + '<tr><td style="padding:28px 32px;color:#374151;font-size:14px;line-height:1.6">' + contenidoHtml + '</td></tr>'
     + '<tr><td style="background:#F9FAFB;padding:16px 32px;border-top:1px solid #E5E7EB">'
