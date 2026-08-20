@@ -3604,18 +3604,31 @@ async function renderDashChart(ventas){
     c.innerHTML=`<div class="cbars" style="margin-top:.5rem">${s.map(v=>{const h=Math.max(Math.round(v.total/max*140),4);return`<div class="cbw"><div class="cvl">${v.total>=1000?Math.round(v.total/1000)+'k':v.total}</div><div class="cbar ${v.fecha===today()?'today':''}" style="height:${h}px"></div><div class="cbl">${v.fecha.slice(5)}</div></div>`;}).join('')}</div>`;
     return;
   }
-  // Sin registro manual — usar la tendencia real del POS (ventasPOS) de los últimos 14 días
+  // Sin registro manual — usar la tendencia real del POS (ventasPOS) de los últimos 14 días,
+  // diferenciada por sucursal (una barra por local, lado a lado, cada día).
   const fechas=[];for(let i=13;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);fechas.push(d.toISOString().slice(0,10));}
-  const porDia={};fechas.forEach(f=>porDia[f]=0);
+  const porDiaSuc={};fechas.forEach(f=>porDiaSuc[f]={});
   for(const suc of SUCURSALES){
     for(const f of fechas){
-      try{const snap=await db.collection('ventasPOS').doc(f+'_'+suc.id).get();if(snap.exists)porDia[f]+=snap.data().totalVenta||0;}catch(e){}
+      try{const snap=await db.collection('ventasPOS').doc(f+'_'+suc.id).get();porDiaSuc[f][suc.nombre]=snap.exists?(snap.data().totalVenta||0):0;}catch(e){porDiaSuc[f][suc.nombre]=0;}
     }
   }
-  const total=Object.values(porDia).reduce((a,v)=>a+v,0);
+  const sucs=SUCURSALES.map(s=>s.nombre);
+  const total=fechas.reduce((a,f)=>a+sucs.reduce((b,s)=>b+(porDiaSuc[f][s]||0),0),0);
   if(!total){c.innerHTML='<p class="fs14 text-gray" style="padding:1rem">Sin datos</p>';return;}
-  const max=Math.max(...Object.values(porDia),1);
-  c.innerHTML=`<div class="cbars" style="margin-top:.5rem">${fechas.map(f=>{const val=porDia[f];const h=Math.max(Math.round(val/max*140),val>0?4:0);return`<div class="cbw"><div class="cvl">${val>=1000?Math.round(val/1000)+'k':val}</div><div class="cbar ${f===today()?'today':''}" style="height:${h}px"></div><div class="cbl">${f.slice(5)}</div></div>`;}).join('')}</div>`;
+  const paleta=['var(--b500)','var(--gr500)','var(--a500)','#8B5CF6'];
+  const colores={};sucs.forEach((s,i)=>colores[s]=paleta[i%paleta.length]);
+  let max=1;fechas.forEach(f=>sucs.forEach(s=>{max=Math.max(max,porDiaSuc[f][s]||0);}));
+
+  c.innerHTML=`<div class="cbars" style="margin-top:.5rem;height:160px">${fechas.map(f=>{
+    const bars=sucs.map(s=>{
+      const v=porDiaSuc[f][s]||0;
+      const h=Math.max(Math.round(v/max*140),v>0?4:0);
+      return `<div title="${s} ${f}: ${clp(v)}" style="height:${h}px;background:${colores[s]};width:${Math.floor(70/sucs.length)}%;display:inline-block;margin-right:1px;border-radius:3px 3px 0 0"></div>`;
+    }).join('');
+    return `<div class="cbw"><div style="display:flex;align-items:flex-end;height:140px;width:100%;justify-content:center">${bars}</div><div class="cbl">${f.slice(5)}</div></div>`;
+  }).join('')}</div>
+  <div class="fs11 text-gray" style="margin-top:.5rem">${sucs.map(s=>`<span style="color:${colores[s]}">■</span> ${s}`).join('  ')}</div>`;
 }
 function renderDashCompo(ventas){
   const c=document.getElementById('dashCompo');if(!c)return;c.innerHTML='';
