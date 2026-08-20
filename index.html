@@ -1075,6 +1075,7 @@ tr:hover td{background:var(--g50)}
           <button class="rep-tab" onclick="showRepTab('metricas',this)">📐 Métricas Comerciales</button>
           <button class="rep-tab" onclick="showRepTab('compras',this)">📦 Compras Sugeridas</button>
           <button class="rep-tab" onclick="showRepTab('envio',this)">📧 Enviar Reportes</button>
+          <button class="rep-tab" onclick="showRepTab('vivo',this)">⏱ En vivo</button>
         </div>
 
         <!-- TAB: ANÁLISIS -->
@@ -1230,6 +1231,27 @@ tr:hover td{background:var(--g50)}
             <div class="ct">📊 Análisis ABC (prioridad de compra)</div>
             <p class="fs11 text-gray mb2">Clasificación clásica de inventario: <strong>A</strong> = productos que generan el 80% de la venta (nunca deben quebrarse), <strong>B</strong> = 15% siguiente, <strong>C</strong> = el 5% restante (baja prioridad).</p>
             <div id="csABC"></div>
+          </div>
+        </div>
+
+        <!-- TAB: EN VIVO (minuto a minuto, Libertad vs Mi PC) -->
+        <div id="repTabVivo" style="display:none">
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
+            <input class="inp" type="date" id="vivoFecha" style="max-width:180px"/>
+            <button class="btn btn-p sm" onclick="cargarVentasVivo()">🔄 Actualizar</button>
+            <span id="vivoStatus" class="fs11 text-gray"></span>
+          </div>
+
+          <div class="g4" id="vivoKPIs" style="margin-bottom:1rem"></div>
+
+          <div class="card" style="margin-bottom:1rem">
+            <div class="ct">📈 Ventas por hora — Libertad vs Mi PC</div>
+            <div id="vivoChart"></div>
+          </div>
+
+          <div class="card">
+            <div class="ct">🧾 Boletas del día (orden cronológico)</div>
+            <div id="vivoLista" style="max-height:480px;overflow-y:auto"></div>
           </div>
         </div>
 
@@ -5698,7 +5720,7 @@ async function renderPanelOperativo(aperturas){
 
 /* ============ BOOT (updated) ============ */
 function showRepTab(tab,el){
-  ['analisis','comparativa','topprod','metricas','compras','envio'].forEach(t=>{
+  ['analisis','comparativa','topprod','metricas','compras','envio','vivo'].forEach(t=>{
     const el2=document.getElementById('repTab'+t.charAt(0).toUpperCase()+t.slice(1));
     if(el2)el2.style.display=t===tab?'block':'none';
   });
@@ -5710,6 +5732,108 @@ function showRepTab(tab,el){
   if(tab==='metricas')initMetricasComerciales();
   if(tab==='compras')initComprasSugeridas();
   if(tab==='envio'){document.getElementById('repFecha').value=today();if(CFG.gasUrl){const gi=document.getElementById('gasUrlInput');if(gi)gi.value=CFG.gasUrl;}}
+  if(tab==='vivo'){const fi=document.getElementById('vivoFecha');if(fi&&!fi.value)fi.value=today();cargarVentasVivo();iniciarAutoRefreshVivo();}
+  else pausarAutoRefreshVivo();
+}
+
+let _vivoInterval=null;
+function iniciarAutoRefreshVivo(){
+  pausarAutoRefreshVivo();
+  _vivoInterval=setInterval(()=>{
+    // Solo auto-refrescar si se está viendo el día de hoy (no tiene sentido para fechas pasadas)
+    const fi=document.getElementById('vivoFecha');
+    if(fi&&fi.value===today())cargarVentasVivo();
+  },30000);
+}
+function pausarAutoRefreshVivo(){
+  if(_vivoInterval){clearInterval(_vivoInterval);_vivoInterval=null;}
+}
+
+/* ============ VENTAS EN VIVO — minuto a minuto (Libertad vs Mi PC) ============ */
+async function cargarVentasVivo(){
+  const url=getGasUrl();
+  const st=document.getElementById('vivoStatus');
+  const fecha=document.getElementById('vivoFecha')?.value||today();
+  if(!url){if(st)st.textContent='⚠ Configura la URL del script en "Enviar Reportes"';return;}
+  if(st)st.textContent='🔄 Cargando boletas…';
+  try{
+    const r=await fetch(url+'?accion=ventasMinuto&fecha='+fecha);
+    const data=await r.json();
+    if(!data.ok){if(st)st.textContent='❌ '+(data.error||'Error');return;}
+    if(st)st.textContent=data.ventas.length+' boletas · actualizado '+new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+    renderVentasVivo(data.ventas,fecha);
+  }catch(e){
+    if(st)st.textContent='❌ '+e.message;
+  }
+}
+
+function renderVentasVivo(ventas,fecha){
+  // KPIs
+  const porTienda={};
+  ventas.forEach(v=>{
+    porTienda[v.tienda]=porTienda[v.tienda]||{total:0,cant:0};
+    porTienda[v.tienda].total+=v.monto;
+    porTienda[v.tienda].cant++;
+  });
+  const totalGeneral=ventas.reduce((a,v)=>a+v.monto,0);
+  const kpis=document.getElementById('vivoKPIs');
+  if(kpis){
+    const cards=[{l:'Total del día',v:clp(totalGeneral),sub:ventas.length+' boletas',col:'var(--a500)'}];
+    Object.keys(porTienda).forEach(t=>{
+      cards.push({l:t,v:clp(porTienda[t].total),sub:porTienda[t].cant+' boletas',col:t==='Libertad'?'var(--b500)':'var(--gr500)'});
+    });
+    kpis.innerHTML=cards.map(x=>`<div class="sc"><div class="lbl">${x.l}</div><div class="val" style="color:${x.col}">${x.v}</div><div class="sub">${x.sub}</div></div>`).join('');
+  }
+
+  // Chart por hora, comparando tiendas
+  const chart=document.getElementById('vivoChart');
+  if(chart){
+    const horas=Array.from({length:24},(_, h)=>h);
+    const tiendas=Object.keys(porTienda);
+    const porHora={};
+    tiendas.forEach(t=>porHora[t]=Array(24).fill(0));
+    ventas.forEach(v=>{
+      const h=Number((v.hora||'').slice(11,13))||0;
+      if(!porHora[v.tienda])porHora[v.tienda]=Array(24).fill(0);
+      porHora[v.tienda][h]+=v.monto;
+    });
+    const max=Math.max(1,...tiendas.map(t=>Math.max(...porHora[t])));
+    const colores={'Libertad':'var(--b400)','Mi PC':'var(--gr400)'};
+    if(!ventas.length){
+      chart.innerHTML='<p class="fs13 text-gray">Sin boletas registradas para esta fecha aún</p>';
+    }else{
+      chart.innerHTML=`<div class="cbars" style="height:140px">${horas.map(h=>{
+        const label=h%3===0?h+'h':'';
+        const bars=tiendas.map(t=>{
+          const v=porHora[t][h];
+          const hgt=Math.max(Math.round(v/max*120),v>0?4:0);
+          return `<div class="cbar" title="${t} ${h}h: ${clp(v)}" style="height:${hgt}px;background:${colores[t]||'var(--a400)'};width:${Math.floor(48/tiendas.length)}%;display:inline-block;margin-right:1px"></div>`;
+        }).join('');
+        return `<div class="cbw"><div style="display:flex;align-items:flex-end;height:120px">${bars}</div><div class="cbl" style="font-size:.55rem">${label}</div></div>`;
+      }).join('')}</div>
+      <div class="fs11 text-gray" style="margin-top:.5rem">${tiendas.map(t=>`<span style="color:${colores[t]||'var(--a400)'}">■</span> ${t}`).join('  ')}</div>`;
+    }
+  }
+
+  // Lista cronológica
+  const lista=document.getElementById('vivoLista');
+  if(lista){
+    if(!ventas.length){
+      lista.innerHTML='<p class="fs13 text-gray">Sin boletas registradas para esta fecha aún</p>';
+    }else{
+      const acumulado={};
+      lista.innerHTML=ventas.map(v=>{
+        acumulado[v.tienda]=(acumulado[v.tienda]||0)+v.monto;
+        const horaCorta=(v.hora||'').slice(11,19);
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem .5rem;border-bottom:1px solid var(--g100);font-size:.8125rem">
+          <span class="fs11 text-gray" style="width:70px">${horaCorta}</span>
+          <span class="fw6" style="flex:1;padding:0 .5rem">${v.tienda}</span>
+          <span class="fs11 text-gray" style="width:80px">Folio ${v.folio}</span>
+          <span class="fw7">${clp(v.monto)}</span>
+        </div>`;
+      }).join('');
+    }
+  }
 }
 
 /* ============ TOP PRODUCTOS VENDIDOS ============ */

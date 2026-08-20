@@ -28,9 +28,96 @@ function doPost(e) {
 }
 
 function doGet(e) {
+  const accion = (e && e.parameter && e.parameter.accion) || "status";
+
+  if (accion === "ventasMinuto") {
+    return handleVentasMinuto(e);
+  }
+
   return ContentService
     .createTextOutput(JSON.stringify({ ok: true, status: "Kombi API activa ✓" }))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ─────────────────────────────────────────
+// VENTAS MINUTO A MINUTO (boletas SII desde Drive)
+// Lee las carpetas de exportación POS-Xpress:
+//   [Tienda]/datos/[RUT]/xml/[AAMMDD]/*.xml
+// Cada XML es un DTE (boleta) con timestamp real de emisión.
+// ─────────────────────────────────────────
+const TIENDAS_POS = ["Libertad", "Mi PC"];
+
+function handleVentasMinuto(e) {
+  try {
+    const fecha = (e.parameter.fecha) || today(); // yyyy-MM-dd
+    const carpetaFecha = fecha.slice(2, 4) + fecha.slice(5, 7) + fecha.slice(8, 10); // AAMMDD
+
+    const ventas = [];
+
+    TIENDAS_POS.forEach(nombreTienda => {
+      const tiendaIt = DriveApp.getFoldersByName(nombreTienda);
+      if (!tiendaIt.hasNext()) return;
+      const tiendaFolder = tiendaIt.next();
+
+      const datosIt = tiendaFolder.getFoldersByName("datos");
+      if (!datosIt.hasNext()) return;
+      const datosFolder = datosIt.next();
+
+      const rutFolders = datosFolder.getFolders();
+      while (rutFolders.hasNext()) {
+        const rutFolder = rutFolders.next(); // ej: 77276679, 00000001
+        const xmlIt = rutFolder.getFoldersByName("xml");
+        if (!xmlIt.hasNext()) continue;
+        const xmlFolder = xmlIt.next();
+
+        const fechaIt = xmlFolder.getFoldersByName(carpetaFecha);
+        if (!fechaIt.hasNext()) continue;
+        const fechaFolder = fechaIt.next();
+
+        const iter = fechaFolder.getFiles();
+        while (iter.hasNext()) {
+          const f = iter.next();
+          if (!/\.xml$/i.test(f.getName())) continue;
+          try {
+            const xml = f.getBlob().getDataAsString("UTF-8");
+            const monto = Number(extraerTagXML(xml, "MntTotal")) || 0;
+            const folio = extraerTagXML(xml, "Folio") || "";
+            const tipoDoc = extraerTagXML(xml, "TipoDTE") || "";
+            const tsFirma = extraerTagXML(xml, "TmstFirma"); // yyyy-MM-ddTHH:mm:ss
+            const hora = tsFirma
+              ? tsFirma.replace("T", " ").slice(0, 19)
+              : Utilities.formatDate(f.getDateCreated(), "America/Santiago", "yyyy-MM-dd HH:mm:ss");
+
+            ventas.push({
+              tienda: nombreTienda,
+              archivo: f.getName(),
+              folio: folio,
+              tipoDoc: tipoDoc,
+              monto: monto,
+              hora: hora
+            });
+          } catch (errFile) {
+            Logger.log("Error leyendo " + f.getName() + ": " + errFile.message);
+          }
+        }
+      }
+    });
+
+    ventas.sort((a, b) => (a.hora < b.hora ? -1 : a.hora > b.hora ? 1 : 0));
+
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true, fecha: fecha, total: ventas.length, ventas: ventas }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: false, error: err.message }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function extraerTagXML(xml, tag) {
+  const m = xml.match(new RegExp("<" + tag + ">([^<]+)</" + tag + ">"));
+  return m ? m[1] : "";
 }
 
 // ─────────────────────────────────────────
