@@ -5762,8 +5762,38 @@ async function cargarVentasVivo(){
     if(!data.ok){if(st)st.textContent='❌ '+(data.error||'Error');return;}
     if(st)st.textContent=data.ventas.length+' boletas · actualizado '+new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
     renderVentasVivo(data.ventas,fecha);
+    sincronizarVentasHoraDia(data.ventas,fecha);
   }catch(e){
     if(st)st.textContent='❌ '+e.message;
+  }
+}
+
+// Alimenta el panel "🟢 Estado en vivo de sucursales" del Dashboard —
+// agrega las boletas por hora y las guarda en ventasHoraDia, matcheando
+// el nombre de la tienda (Libertad / Mi PC) contra las sucursales configuradas.
+function normalizaTexto(s){return (s||'').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();}
+async function sincronizarVentasHoraDia(ventas,fecha){
+  if(fecha!==today()||!ventas.length)return; // el panel es "en vivo", solo tiene sentido para hoy
+  const porTienda={};
+  ventas.forEach(v=>{
+    porTienda[v.tienda]=porTienda[v.tienda]||{};
+    const h=String(Number((v.hora||'').slice(11,13))||0);
+    if(!porTienda[v.tienda][h])porTienda[v.tienda][h]={monto:0,boletas:0};
+    porTienda[v.tienda][h].monto+=v.monto;
+    porTienda[v.tienda][h].boletas++;
+  });
+  for(const tienda of Object.keys(porTienda)){
+    const suc=SUCURSALES.find(s=>{
+      const n=normalizaTexto(s.nombre),t=normalizaTexto(tienda);
+      return n.includes(t)||t.includes(n);
+    });
+    if(!suc){console.warn('Sin sucursal configurada que coincida con "'+tienda+'" — revisa Ajustes > Sucursales');continue;}
+    try{
+      await db.collection('ventasHoraDia').doc(fecha+'_'+suc.id).set({
+        porHora:JSON.stringify(porTienda[tienda]),
+        syncAt:new Date().toISOString()
+      },{merge:true});
+    }catch(e){console.warn('sincronizarVentasHoraDia',tienda,e.message);}
   }
 }
 
