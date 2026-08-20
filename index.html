@@ -5642,6 +5642,7 @@ async function pollVentasMinutoDashboard(){
     const data=await r.json();
     if(!data.ok||!data.ventas){console.warn('pollVentasMinutoDashboard: respuesta inesperada',data);return;}
     await sincronizarVentasHoraDia(data.ventas,today());
+    await descontarStockPorVentas(data.ventas,today());
     // Forzar re-render del panel ahora mismo, sin esperar al próximo cambio de "aperturas"
     if(document.getElementById('panelOperativo')){
       const snap=await db.collection('aperturas').where('fecha','==',today()).get();
@@ -5852,6 +5853,7 @@ async function cargarVentasVivo(){
     if(st)st.textContent=ventas.length+' boletas · actualizado '+new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
     renderVentasVivo(ventas,fecha);
     sincronizarVentasHoraDia(ventas,fecha);
+    if(fecha===today())descontarStockPorVentas(ventas,fecha); // solo descuenta stock viendo "hoy", nunca fechas pasadas
   }catch(e){
     if(st)st.textContent='❌ '+e.message;
   }
@@ -5908,6 +5910,68 @@ async function sincronizarVentasDia(ventas,fecha){
 }
 // Alias por compatibilidad con el nombre anterior
 const sincronizarVentasHoraDia=sincronizarVentasDia;
+
+/* ============ DESCUENTO AUTOMÁTICO DE STOCK POR VENTAS REALES ============ */
+// Resta del stock (ubicación "exhibición") la cantidad vendida en cada línea
+// de cada boleta nueva, matcheando el código de producto del POS contra el
+// SKU del inventario. Solo procesa boletas MÁS NUEVAS que el último punto
+// sincronizado por sucursal (guardado en stockSyncCursor) — nunca retrocede
+// ni descuenta histórico, para no restar dos veces sobre un conteo físico ya
+// hecho. La primera vez que corre para una sucursal, solo fija el punto de
+// partida (no descuenta nada todavía).
+function normalizaCodigoProducto(c){return String(c||'').replace(/^0+/,'')||'0';}
+async function descontarStockPorVentas(ventas,fecha){
+  if(!ventas||!ventas.length)return;
+  const porTienda={};
+  ventas.forEach(v=>{(porTienda[v.tienda]=porTienda[v.tienda]||[]).push(v);});
+
+  // Índice SKU normalizado -> producto de inventario (una vez por corrida)
+  const porSku={};
+  INVENTARIO.forEach(p=>{if(p.sku)porSku[normalizaCodigoProducto(p.sku)]=p;});
+
+  for(const tienda of Object.keys(porTienda)){
+    const nombreBuscado=normalizaTexto(MAPEO_TIENDA_SUCURSAL[tienda]||tienda);
+    const suc=SUCURSALES.find(s=>{
+      const n=normalizaTexto(s.nombre);
+      return n===nombreBuscado||n.includes(nombreBuscado)||nombreBuscado.includes(n);
+    });
+    if(!suc)continue; // ya se avisó en sincronizarVentasDia
+
+    const cursorRef=db.collection('stockSyncCursor').doc(suc.id);
+    let cursorSnap;
+    try{cursorSnap=await cursorRef.get();}catch(e){console.warn('stockSyncCursor read',suc.nombre,e.message);continue;}
+
+    const boletasOrdenadas=porTienda[tienda].slice().sort((a,b)=>a.hora<b.hora?-1:a.hora>b.hora?1:0);
+
+    if(!cursorSnap.exists){
+      // Primera vez para esta sucursal: solo fija el punto de partida, no descuenta nada.
+      const ultimaHora=boletasOrdenadas[boletasOrdenadas.length-1]?.hora||fecha;
+      await cursorRef.set({ultimaHora,fijadoEn:new Date().toISOString()});
+      console.log('📍 stockSyncCursor inicializado para',suc.nombre,'en',ultimaHora,'— desde aquí se empieza a descontar stock');
+      continue;
+    }
+
+    const ultimaHoraProcesada=cursorSnap.data().ultimaHora||'';
+    const nuevasBoletas=boletasOrdenadas.filter(v=>v.hora>ultimaHoraProcesada);
+    if(!nuevasBoletas.length)continue;
+
+    let itemsDescontados=0,sinMatch=new Set();
+    for(const boleta of nuevasBoletas){
+      for(const item of (boleta.items||[])){
+        const prod=porSku[normalizaCodigoProducto(item.codigo)];
+        if(!prod){sinMatch.add(item.codigo+' — '+(item.nombre||''));continue;}
+        try{
+          await descontarStockSucursal(suc.id,prod.id,'exhibicion',item.cantidad||1);
+          itemsDescontados++;
+        }catch(e){console.warn('descontarStockPorVentas',suc.nombre,item.codigo,e.message);}
+      }
+    }
+
+    await cursorRef.set({ultimaHora:nuevasBoletas[nuevasBoletas.length-1].hora,fijadoEn:new Date().toISOString()},{merge:true});
+    console.log('📉 Stock descontado:',suc.nombre,'-',nuevasBoletas.length,'boletas nuevas,',itemsDescontados,'líneas descontadas');
+    if(sinMatch.size)console.warn('⚠ Códigos de producto sin match en inventario ('+suc.nombre+'):',[...sinMatch].slice(0,20));
+  }
+}
 
 function renderVentasVivo(ventas,fecha){
   // KPIs

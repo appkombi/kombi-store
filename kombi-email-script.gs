@@ -94,7 +94,8 @@ function handleVentasMinuto(e) {
               folio: folio,
               tipoDoc: tipoDoc,
               monto: monto,
-              hora: hora
+              hora: hora,
+              items: extraerItemsXML(xml)
             });
           } catch (errFile) {
             Logger.log("Error leyendo " + f.getName() + ": " + errFile.message);
@@ -118,6 +119,23 @@ function handleVentasMinuto(e) {
 function extraerTagXML(xml, tag) {
   const m = xml.match(new RegExp("<" + tag + ">([^<]+)</" + tag + ">"));
   return m ? m[1] : "";
+}
+
+// Extrae el detalle de productos de una boleta (puede traer varias líneas
+// <Detalle> — una por producto vendido en esa transacción).
+function extraerItemsXML(xml) {
+  const items = [];
+  const detalleRegex = /<Detalle>([\s\S]*?)<\/Detalle>/g;
+  let m;
+  while ((m = detalleRegex.exec(xml))) {
+    const bloque = m[1];
+    const codigo = extraerTagXML(bloque, "VlrCodigo");
+    const nombre = extraerTagXML(bloque, "NmbItem");
+    const cantidad = Number(extraerTagXML(bloque, "QtyItem")) || 1;
+    const precio = Number(extraerTagXML(bloque, "PrcItem")) || 0;
+    if (codigo) items.push({ codigo: codigo, nombre: nombre, cantidad: cantidad, precio: precio });
+  }
+  return items;
 }
 
 // ─────────────────────────────────────────
