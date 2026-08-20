@@ -6168,7 +6168,7 @@ async function renderDashVentasHora(){
         const hgt=Math.max(Math.round(v/max*90),v>0?3:0);
         return `<div title="${s} ${h}h: ${clp(v)}" style="height:${hgt}px;background:${colores[s]};width:${Math.floor(40/sucs.length)}%;display:inline-block;margin-right:1px"></div>`;
       }).join('');
-      return `<div class="cbw"><div style="display:flex;align-items:flex-end;height:90px">${bars}</div><div class="cbl" style="font-size:.55rem">${label}</div></div>`;
+      return `<div class="cbw"><div style="display:flex;align-items:flex-end;height:90px;width:100%">${bars}</div><div class="cbl" style="font-size:.55rem">${label}</div></div>`;
     }).join('')}</div>
     <div class="fs11 text-gray" style="margin-top:.375rem">${sucs.map(s=>`<span style="color:${colores[s]}">■</span> ${s}`).join('  ')}</div>`;
   }catch(e){console.warn('renderDashVentasHora',e.message);}
@@ -6285,7 +6285,7 @@ function renderVentasVivo(ventas,fecha){
           const hgt=Math.max(Math.round(v/max*120),v>0?4:0);
           return `<div class="cbar" title="${t} ${h}h: ${clp(v)}" style="height:${hgt}px;background:${colores[t]||'var(--a400)'};width:${Math.floor(48/tiendas.length)}%;display:inline-block;margin-right:1px"></div>`;
         }).join('');
-        return `<div class="cbw"><div style="display:flex;align-items:flex-end;height:120px">${bars}</div><div class="cbl" style="font-size:.55rem">${label}</div></div>`;
+        return `<div class="cbw"><div style="display:flex;align-items:flex-end;height:120px;width:100%">${bars}</div><div class="cbl" style="font-size:.55rem">${label}</div></div>`;
       }).join('')}</div>
       <div class="fs11 text-gray" style="margin-top:.5rem">${tiendas.map(t=>`<span style="color:${colores[t]||'var(--a400)'}">■</span> ${t}`).join('  ')}</div>`;
     }
