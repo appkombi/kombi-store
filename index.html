@@ -4296,7 +4296,7 @@ async function renderCajaEstado(){
         :diff!==null?{txt:'⚠ Diferencia',cls:'br'}
         :{txt:'Cerrado',cls:'bg'};
 
-      return`<div class="card" style="border-left:4px solid ${cj.sinApertura?'var(--g300)':!cj.cierre?'var(--b400)':diff===0?'var(--gr500)':diff!==null?'var(--r500)':'var(--g300)'}">
+      return`<div class="card" style="border-left:4px solid ${cj.sinApertura?'var(--g300)':!cj.cierre?'var(--b500)':diff===0?'var(--gr500)':diff!==null?'var(--r500)':'var(--g300)'}">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.875rem">
           <div class="fw7 fs15">🏬 ${cj.sucNombre}</div>
           <div style="display:flex;gap:.375rem;align-items:center">
@@ -6156,7 +6156,7 @@ async function renderDashVentasHora(){
     if(!sucs.length){c.innerHTML='<p class="fs13 text-gray">Sin ventas registradas hoy aún</p>';return;}
 
     const horas=Array.from({length:24},(_, h)=>h);
-    const colores={};const paleta=['var(--b400)','var(--gr400)','var(--a400)','#F59E0B'];
+    const colores={};const paleta=['var(--b500)','var(--gr500)','var(--a400)','#F59E0B'];
     sucs.forEach((s,i)=>colores[s]=paleta[i%paleta.length]);
     let max=1;
     sucs.forEach(s=>horas.forEach(h=>{max=Math.max(max,(porSuc[s][h]?.monto)||0);}));
@@ -6274,7 +6274,7 @@ function renderVentasVivo(ventas,fecha){
       porHora[v.tienda][h]+=v.monto;
     });
     const max=Math.max(1,...tiendas.map(t=>Math.max(...porHora[t])));
-    const colores={'Libertad':'var(--b400)','Mi PC':'var(--gr400)'};
+    const colores={'Libertad':'var(--b500)','Mi PC':'var(--gr500)'};
     if(!ventas.length){
       chart.innerHTML='<p class="fs13 text-gray">Sin boletas registradas para esta fecha aún</p>';
     }else{
@@ -6777,7 +6777,7 @@ async function renderHoraPico(fechas,sucs){
   c.innerHTML=`
     <div style="margin-bottom:.75rem"><span class="fw7" style="color:var(--b600)">${pico[0]}:00 hrs</span> es la hora con más venta (${clp(pico[1].monto)})</div>
     <div class="cbars" style="height:70px">
-      ${horas.map(([hr,d])=>`<div class="cbw" title="${hr}:00 — ${clp(d.monto)}"><div class="cbar" style="height:${Math.max(Math.round(d.monto/max*55),d.monto>0?3:0)}px;background:var(--b400)"></div><div class="cbl">${hr}</div></div>`).join('')}
+      ${horas.map(([hr,d])=>`<div class="cbw" title="${hr}:00 — ${clp(d.monto)}"><div class="cbar" style="height:${Math.max(Math.round(d.monto/max*55),d.monto>0?3:0)}px;background:var(--b500)"></div><div class="cbl">${hr}</div></div>`).join('')}
     </div>`;
 }
 
@@ -6862,7 +6862,7 @@ function renderAnDiaSemana(ventas){
   ventas.forEach(v=>{const d=new Date(v.fecha+'T12:00').getDay();tots[d]+=v.total;cnts[d]++;});
   const avgs=tots.map((t,i)=>cnts[i]?Math.round(t/cnts[i]):0);
   const max=Math.max(...avgs,1);
-  c.innerHTML=avgs.map((avg,i)=>`<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.375rem"><div style="width:28px;font-size:.75rem;font-weight:600;color:var(--g500)">${ds[i]}</div><div style="flex:1;height:20px;background:var(--g100);border-radius:4px;overflow:hidden"><div style="height:100%;width:${Math.round(avg/max*100)}%;background:${i===0||i===6?'var(--b400)':'var(--a400)'};border-radius:4px"></div></div><div style="width:64px;font-size:.75rem;font-family:var(--mono);text-align:right;color:var(--g600)">${avg?clp(avg):'—'}</div></div>`).join('');
+  c.innerHTML=avgs.map((avg,i)=>`<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.375rem"><div style="width:28px;font-size:.75rem;font-weight:600;color:var(--g500)">${ds[i]}</div><div style="flex:1;height:20px;background:var(--g100);border-radius:4px;overflow:hidden"><div style="height:100%;width:${Math.round(avg/max*100)}%;background:${i===0||i===6?'var(--b500)':'var(--a400)'};border-radius:4px"></div></div><div style="width:64px;font-size:.75rem;font-family:var(--mono);text-align:right;color:var(--g600)">${avg?clp(avg):'—'}</div></div>`).join('');
 }
 function renderAnPorMes(ventas){
   const c=document.getElementById('anPorMes');if(!c)return;
