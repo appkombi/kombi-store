@@ -1244,6 +1244,20 @@ tr:hover td{background:var(--g50)}
 
           <div class="g4" id="vivoKPIs" style="margin-bottom:1rem"></div>
 
+          <div class="card" style="margin-bottom:1rem;border:1px dashed var(--g300)">
+            <div class="ct">📥 Rescatar histórico</div>
+            <p class="fs13 text-gray mb4">Trae las boletas reales de los últimos días desde Drive y alimenta Cuadratura, Análisis de Ventas y Comparativa Sucursales con datos reales (no solo el Gran Z manual).</p>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+              <select class="sel sm" id="backfillDias" style="max-width:160px">
+                <option value="7">Últimos 7 días</option>
+                <option value="14" selected>Últimos 14 días</option>
+                <option value="30">Últimos 30 días</option>
+              </select>
+              <button class="btn btn-s sm" onclick="rescatarHistoricoVentas()">📥 Rescatar ahora</button>
+            </div>
+            <div id="backfillStatus" class="fs11 text-gray" style="margin-top:.5rem"></div>
+          </div>
+
           <div class="card" style="margin-bottom:1rem">
             <div class="ct">📈 Ventas por hora — Libertad vs Mi PC</div>
             <div id="vivoChart"></div>
@@ -5774,6 +5788,37 @@ function pausarAutoRefreshVivo(){
   if(_vivoInterval){clearInterval(_vivoInterval);_vivoInterval=null;}
 }
 
+/* ============ RESCATE HISTÓRICO — trae varios días de boletas reales desde Drive ============ */
+async function rescatarHistoricoVentas(){
+  const url=getGasUrl();
+  const st=document.getElementById('backfillStatus');
+  const dias=Number(document.getElementById('backfillDias')?.value||14);
+  if(!url){if(st)st.textContent='⚠ Configura la URL del script en "Enviar Reportes"';return;}
+
+  let diasConDatos=0,diasVacios=0,totalBoletas=0;
+  for(let i=0;i<dias;i++){
+    const d=new Date();d.setDate(d.getDate()-i);
+    const fecha=d.toISOString().slice(0,10);
+    if(st)st.textContent=`🔄 Procesando ${fecha}… (${i+1}/${dias})`;
+    try{
+      const r=await fetch(url+'?accion=ventasMinuto&fecha='+fecha);
+      const data=await r.json();
+      if(data.ok&&data.ventas&&data.ventas.length){
+        await sincronizarVentasDia(data.ventas,fecha);
+        diasConDatos++;
+        totalBoletas+=data.ventas.length;
+      }else{
+        diasVacios++;
+      }
+    }catch(e){
+      console.warn('rescatarHistoricoVentas',fecha,e.message);
+      diasVacios++;
+    }
+  }
+  if(st)st.textContent=`✅ Listo — ${diasConDatos} días con datos (${totalBoletas} boletas), ${diasVacios} sin datos.`;
+  toast('✅ Rescate histórico completo');
+}
+
 /* ============ VENTAS EN VIVO — minuto a minuto (Libertad vs Mi PC) ============ */
 async function cargarVentasVivo(){
   const url=getGasUrl();
@@ -5794,16 +5839,17 @@ async function cargarVentasVivo(){
   }
 }
 
-// Alimenta el panel "🟢 Estado en vivo de sucursales" del Dashboard —
-// agrega las boletas por hora y las guarda en ventasHoraDia, matcheando
-// el nombre de la tienda (Libertad / Mi PC) contra las sucursales configuradas.
+// Alimenta el panel "🟢 Estado en vivo de sucursales" (ventasHoraDia) Y las
+// colecciones que usan Cuadratura/Análisis/Comparativa (ventasPOS), a partir
+// de las boletas reales del POS-Xpress leídas desde Drive. Sirve tanto para
+// "hoy" (panel en vivo) como para backfill histórico (rescatarHistoricoVentas).
 function normalizaTexto(s){return (s||'').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();}
 // Mapeo manual: nombre de carpeta en Drive (POS-Xpress) -> nombre real de la sucursal en la app.
 // El emparejamiento automático por texto no sirve porque los nombres no se parecen
 // (ej: "Mi PC" es la carpeta del local que en la app se llama "7 Norte").
 const MAPEO_TIENDA_SUCURSAL={'Mi PC':'7 Norte','Libertad':'Libertad'};
-async function sincronizarVentasHoraDia(ventas,fecha){
-  if(fecha!==today()||!ventas||!ventas.length)return; // el panel es "en vivo", solo tiene sentido para hoy
+async function sincronizarVentasDia(ventas,fecha){
+  if(!ventas||!ventas.length)return {ok:false,motivo:'sin ventas'};
   const porTienda={};
   ventas.forEach(v=>{
     porTienda[v.tienda]=porTienda[v.tienda]||{};
@@ -5812,6 +5858,7 @@ async function sincronizarVentasHoraDia(ventas,fecha){
     porTienda[v.tienda][h].monto+=v.monto;
     porTienda[v.tienda][h].boletas++;
   });
+  let sucursalesSincronizadas=0;
   for(const tienda of Object.keys(porTienda)){
     const nombreBuscado=normalizaTexto(MAPEO_TIENDA_SUCURSAL[tienda]||tienda);
     const suc=SUCURSALES.find(s=>{
@@ -5820,15 +5867,29 @@ async function sincronizarVentasHoraDia(ventas,fecha){
     });
     if(!suc){console.warn('Sin sucursal configurada que coincida con "'+tienda+'" — revisa Ajustes > Sucursales o MAPEO_TIENDA_SUCURSAL');continue;}
     const totalTienda=Object.values(porTienda[tienda]).reduce((a,h)=>a+h.monto,0);
+    const boletasTienda=Object.values(porTienda[tienda]).reduce((a,h)=>a+h.boletas,0);
     try{
       await db.collection('ventasHoraDia').doc(fecha+'_'+suc.id).set({
         porHora:JSON.stringify(porTienda[tienda]),
         syncAt:new Date().toISOString()
       },{merge:true});
-      console.log('✅ ventasHoraDia guardado:',tienda,'->',suc.nombre,'(id:'+suc.id+')','docId:'+fecha+'_'+suc.id,'total:'+totalTienda);
-    }catch(e){console.warn('❌ sincronizarVentasHoraDia',tienda,'->',suc.nombre,e.message);}
+      // También alimenta ventasPOS (lo que leen Cuadratura, Análisis de Ventas
+      // y Comparativa Sucursales) — sin desglose de medio de pago porque el
+      // XML de boleta no lo trae, pero sí total y cantidad de boletas reales.
+      await db.collection('ventasPOS').doc(fecha+'_'+suc.id).set({
+        totalVenta:totalTienda,
+        totalBoletas:boletasTienda,
+        fuente:'ventasMinuto (boletas SII)',
+        syncAt:new Date().toISOString()
+      },{merge:true});
+      console.log('✅ sincronizado:',tienda,'->',suc.nombre,fecha,'total:'+totalTienda,'boletas:'+boletasTienda);
+      sucursalesSincronizadas++;
+    }catch(e){console.warn('❌ sincronizarVentasDia',tienda,'->',suc.nombre,e.message);}
   }
+  return {ok:sucursalesSincronizadas>0,sucursalesSincronizadas};
 }
+// Alias por compatibilidad con el nombre anterior
+const sincronizarVentasHoraDia=sincronizarVentasDia;
 
 function renderVentasVivo(ventas,fecha){
   // KPIs
