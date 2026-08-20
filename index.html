@@ -5588,12 +5588,35 @@ function startRealTimeListeners(){
         const aperturas=snap.docs.map(d=>({id:d.id,...d.data()}));
         renderPanelOperativo(aperturas);
       }, e=>console.warn('Panel listener:',e));
+
+    // 3. Ventas minuto a minuto (Libertad / Mi PC) — alimenta directo el
+    // panel del Dashboard, sin necesidad de pasar por Reportes > En vivo
+    pollVentasMinutoDashboard();
+    _pollVentasMinutoInterval=setInterval(pollVentasMinutoDashboard,30000);
   }
 }
 
 function stopRealTimeListeners(){
   if(_unsubNotif){_unsubNotif();_unsubNotif=null;}
   if(_unsubPanel){_unsubPanel();_unsubPanel=null;}
+  if(_pollVentasMinutoInterval){clearInterval(_pollVentasMinutoInterval);_pollVentasMinutoInterval=null;}
+}
+
+let _pollVentasMinutoInterval=null;
+async function pollVentasMinutoDashboard(){
+  const url=getGasUrl();
+  if(!url)return; // sin URL configurada aún (Reportes > Enviar Reportes)
+  try{
+    const r=await fetch(url+'?accion=ventasMinuto&fecha='+today());
+    const data=await r.json();
+    if(!data.ok)return;
+    await sincronizarVentasHoraDia(data.ventas,today());
+    // Forzar re-render del panel ahora mismo, sin esperar al próximo cambio de "aperturas"
+    if(document.getElementById('panelOperativo')){
+      const snap=await db.collection('aperturas').where('fecha','==',today()).get();
+      renderPanelOperativo(snap.docs.map(d=>({id:d.id,...d.data()})));
+    }
+  }catch(e){console.warn('pollVentasMinutoDashboard:',e.message);}
 }
 
 function renderNotifBanner(notifs){
