@@ -610,6 +610,7 @@ tr:hover td{background:var(--g50)}
             <div>
               <div class="fw7 fs15">⚖️ Cuadratura — Sistema vs Operador</div>
               <div class="fs12 text-gray" id="cuadraturaSub">Comparando lo que dice el POS contra lo declarado en el cierre de turno</div>
+              <div class="fs13 fw6" id="cuadraturaResumenCompacto" style="margin-top:.25rem"></div>
             </div>
             <div style="display:flex;gap:.375rem;align-items:center;flex-wrap:wrap">
               <select class="sel sm" id="cuadFechaFiltro" onchange="onCambioFiltroCuadratura()" style="font-size:.8125rem">
@@ -624,10 +625,13 @@ tr:hover td{background:var(--g50)}
                 <option value="">Todas las sucursales</option>
               </select>
               <button class="btn btn-s sm" onclick="syncPOS('sync_all');setTimeout(renderCuadratura,2500)">🔄 Actualizar</button>
+              <button class="btn btn-g sm" id="cuadraturaToggleBtn" onclick="toggleCuadraturaDetalle()">▸ Detalle</button>
             </div>
           </div>
-          <div id="cuadraturaResumen" class="g3" style="margin-bottom:1rem"></div>
-          <div id="cuadraturaList"></div>
+          <div id="cuadraturaDetalle" class="hidden">
+            <div id="cuadraturaResumen" class="g3" style="margin-bottom:1rem"></div>
+            <div id="cuadraturaList"></div>
+          </div>
         </div>
 
         <!-- META DE VENTAS -->
@@ -698,8 +702,10 @@ tr:hover td{background:var(--g50)}
             <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
               <span class="fs12 text-gray" id="posSyncTime"></span>
               <button class="btn btn-s sm" onclick="syncPOS('sync_all')">🔄 Sync ahora</button>
+              <button class="btn btn-g sm" id="posSyncToggleBtn" onclick="togglePOSDetalle()">▸ Detalle</button>
             </div>
           </div>
+          <div id="posSyncDetalle" class="hidden">
           <!-- Filtros temporales -->
           <div style="display:flex;gap:.375rem;flex-wrap:wrap;margin-bottom:1rem;border-bottom:2px solid var(--g200);padding-bottom:.5rem">
             <button class="rep-tab active" onclick="setPOSPeriod('dia',this)">Hoy</button>
@@ -735,6 +741,7 @@ tr:hover td{background:var(--g50)}
               <div class="ct" style="padding:0;margin-bottom:.75rem">🏬 Comparativa sucursales</div>
               <div id="posSucursales"></div>
             </div>
+          </div>
           </div>
         </div>
       </div>
@@ -3528,6 +3535,14 @@ async function renderCuadratura(){
     else if(sucursalesConAmbos)diffSub='todo cuadra';
     else diffSub='sin cierres registrados aún para comparar';
 
+    // Resumen de una línea, visible aunque el detalle esté colapsado
+    const compactoEl=document.getElementById('cuadraturaResumenCompacto');
+    if(compactoEl){
+      if(sucursalesConDiff)compactoEl.innerHTML=`<span style="color:var(--r600)">⚠ ${diffSub} · ${clp(Math.abs(diffTotal))}</span>`;
+      else if(sucursalesConAmbos)compactoEl.innerHTML=`<span style="color:var(--gr600)">✓ Todo cuadra · ${clp(totalPOS)}</span>`;
+      else compactoEl.innerHTML=`<span class="text-gray">— ${diffSub}</span>`;
+    }
+
     resumen.innerHTML=[
       {l:'💻 Total Sistema (POS)',v:clp(totalPOS),sub:'suma de todas las sucursales',col:'var(--b600)'},
       {l:'👤 Total Operador',v:clp(totalOp),sub:'declarado en cierres',col:'var(--a600)'},
@@ -6070,6 +6085,27 @@ async function descontarStockPorVentas(ventas,fecha){
       }catch(e){console.warn('alertasCatalogo write',suc.nombre,e.message);}
     }
   }
+}
+
+// Colapsa/expande el detalle de Cuadratura y POS-XPRESS por defecto — el
+// panel "🟢 Estado en vivo de sucursales" ya da el vistazo rápido, estos
+// paneles quedan disponibles para quien quiera profundizar sin saturar
+// el Dashboard de entrada.
+function toggleCuadraturaDetalle(){
+  const d=document.getElementById('cuadraturaDetalle');
+  const btn=document.getElementById('cuadraturaToggleBtn');
+  if(!d)return;
+  const abierto=!d.classList.contains('hidden');
+  d.classList.toggle('hidden');
+  if(btn)btn.textContent=abierto?'▸ Detalle':'▾ Detalle';
+}
+function togglePOSDetalle(){
+  const d=document.getElementById('posSyncDetalle');
+  const btn=document.getElementById('posSyncToggleBtn');
+  if(!d)return;
+  const abierto=!d.classList.contains('hidden');
+  d.classList.toggle('hidden');
+  if(btn)btn.textContent=abierto?'▸ Detalle':'▾ Detalle';
 }
 
 // Indicador de "última sincronización" — de un vistazo, sin tener que
