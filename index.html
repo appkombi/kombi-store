@@ -650,6 +650,14 @@ tr:hover td{background:var(--g50)}
           <button class="marca-tag" onclick="setDashPeriod('ano',this)">Año</button>
         </div>
         <div class="g4" id="dashStats"></div>
+        <!-- VENTAS DE HOY POR HORA — Libertad vs 7 Norte, datos reales en vivo -->
+        <div class="card mt4" id="wgtVentasHoyHora">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div class="ct" style="margin-bottom:0">⏱ Ventas de hoy por hora</div>
+            <span class="fs11 text-gray" id="dashHoraSync"></span>
+          </div>
+          <div id="dashVentasHora"></div>
+        </div>
         <div class="g2 mt4" id="wgtVentasChart">
           <div class="card"><div class="ct">📈 Ventas</div><div id="dashChart"></div></div>
           <div class="card"><div class="ct">💰 Composición</div><div id="dashCompo"></div></div>
@@ -3104,6 +3112,7 @@ async function renderDash(){
   renderMetaVentas();renderDashRetirosCat();renderDashVentasSuc();renderOportunidadesComerciales();
   renderAlertasCatalogo();
   renderDashTopProductos();
+  renderDashVentasHora();
   checkVencimientos();
 
   // Cuadratura y panel POS — solo si el superadmin los dejó activados
@@ -5686,6 +5695,7 @@ async function pollVentasMinutoDashboard(){
     await descontarStockPorVentas(data.ventas,today());
     await renderAlertasCatalogo();
     await renderDashTopProductos();
+    await renderDashVentasHora();
     // Forzar re-render del panel ahora mismo, sin esperar al próximo cambio de "aperturas"
     if(document.getElementById('panelOperativo')){
       const snap=await db.collection('aperturas').where('fecha','==',today()).get();
@@ -6048,6 +6058,48 @@ async function descontarStockPorVentas(ventas,fecha){
       }catch(e){console.warn('alertasCatalogo write',suc.nombre,e.message);}
     }
   }
+}
+
+// Mini-gráfico "ventas de hoy por hora" directo en el Dashboard — versión
+// compacta de lo que ya existe en Reportes > En vivo, comparando sucursales
+// sin tener que cambiar de pantalla.
+async function renderDashVentasHora(){
+  const c=document.getElementById('dashVentasHora');if(!c)return;
+  const syncEl=document.getElementById('dashHoraSync');
+  try{
+    const porSuc={};let ultimoSync=null;
+    for(const suc of SUCURSALES){
+      try{
+        const snap=await db.collection('ventasHoraDia').doc(today()+'_'+suc.id).get();
+        if(snap.exists){
+          porSuc[suc.nombre]=JSON.parse(snap.data().porHora||'{}');
+          const sa=snap.data().syncAt;
+          if(sa&&(!ultimoSync||sa>ultimoSync))ultimoSync=sa;
+        }
+      }catch(e){}
+    }
+    if(syncEl)syncEl.textContent=ultimoSync?'Sync: '+new Date(ultimoSync).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}):'';
+
+    const sucs=Object.keys(porSuc);
+    if(!sucs.length){c.innerHTML='<p class="fs13 text-gray">Sin ventas registradas hoy aún</p>';return;}
+
+    const horas=Array.from({length:24},(_, h)=>h);
+    const colores={};const paleta=['var(--b400)','var(--gr400)','var(--a400)','#F59E0B'];
+    sucs.forEach((s,i)=>colores[s]=paleta[i%paleta.length]);
+    let max=1;
+    sucs.forEach(s=>horas.forEach(h=>{max=Math.max(max,(porSuc[s][h]?.monto)||0);}));
+
+    c.innerHTML=`<div class="cbars" style="height:110px">${horas.map(h=>{
+      const label=h%3===0?h+'h':'';
+      const bars=sucs.map(s=>{
+        const v=(porSuc[s][h]?.monto)||0;
+        const hgt=Math.max(Math.round(v/max*90),v>0?3:0);
+        return `<div title="${s} ${h}h: ${clp(v)}" style="height:${hgt}px;background:${colores[s]};width:${Math.floor(40/sucs.length)}%;display:inline-block;margin-right:1px"></div>`;
+      }).join('');
+      return `<div class="cbw"><div style="display:flex;align-items:flex-end;height:90px">${bars}</div><div class="cbl" style="font-size:.55rem">${label}</div></div>`;
+    }).join('')}</div>
+    <div class="fs11 text-gray" style="margin-top:.375rem">${sucs.map(s=>`<span style="color:${colores[s]}">■</span> ${s}`).join('  ')}</div>`;
+  }catch(e){console.warn('renderDashVentasHora',e.message);}
 }
 
 // "Top productos vendidos hoy" — ranking en vivo por cantidad, combinando
