@@ -5609,7 +5609,7 @@ async function pollVentasMinutoDashboard(){
   try{
     const r=await fetch(url+'?accion=ventasMinuto&fecha='+today());
     const data=await r.json();
-    if(!data.ok)return;
+    if(!data.ok||!data.ventas){console.warn('pollVentasMinutoDashboard: respuesta inesperada',data);return;}
     await sincronizarVentasHoraDia(data.ventas,today());
     // Forzar re-render del panel ahora mismo, sin esperar al próximo cambio de "aperturas"
     if(document.getElementById('panelOperativo')){
@@ -5783,9 +5783,10 @@ async function cargarVentasVivo(){
     const r=await fetch(url+'?accion=ventasMinuto&fecha='+fecha);
     const data=await r.json();
     if(!data.ok){if(st)st.textContent='❌ '+(data.error||'Error');return;}
-    if(st)st.textContent=data.ventas.length+' boletas · actualizado '+new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
-    renderVentasVivo(data.ventas,fecha);
-    sincronizarVentasHoraDia(data.ventas,fecha);
+    const ventas=data.ventas||[];
+    if(st)st.textContent=ventas.length+' boletas · actualizado '+new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+    renderVentasVivo(ventas,fecha);
+    sincronizarVentasHoraDia(ventas,fecha);
   }catch(e){
     if(st)st.textContent='❌ '+e.message;
   }
@@ -5796,7 +5797,7 @@ async function cargarVentasVivo(){
 // el nombre de la tienda (Libertad / Mi PC) contra las sucursales configuradas.
 function normalizaTexto(s){return (s||'').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();}
 async function sincronizarVentasHoraDia(ventas,fecha){
-  if(fecha!==today()||!ventas.length)return; // el panel es "en vivo", solo tiene sentido para hoy
+  if(fecha!==today()||!ventas||!ventas.length)return; // el panel es "en vivo", solo tiene sentido para hoy
   const porTienda={};
   ventas.forEach(v=>{
     porTienda[v.tienda]=porTienda[v.tienda]||{};
