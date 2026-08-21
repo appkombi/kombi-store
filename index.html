@@ -3090,6 +3090,31 @@ function rangoFechasDash(){
   else if(_dashPeriod==='ano')desde=t.slice(0,4)+'-01-01';
   return [desde,hasta];
 }
+// ============ CACHÉ LOCAL DE DOCUMENTOS HISTÓRICOS ============
+// Los documentos de días PASADOS (no hoy) ya no cambian una vez que
+// kombi-sync los escribió — no tiene sentido volver a pedirlos a Firestore
+// cada vez que se abre una pantalla. Se guardan en localStorage y solo se
+// refrescan si son de HOY (que sí sigue actualizándose durante el día).
+function _cacheDocKey(col,docId){return 'kombiCache_'+col+'_'+docId;}
+async function getDocCached(col,docId){
+  const esHoy=docId.startsWith(today());
+  if(!esHoy){
+    try{
+      const cached=localStorage.getItem(_cacheDocKey(col,docId));
+      if(cached)return JSON.parse(cached);
+    }catch(e){}
+  }
+  let resultado={exists:false,data:null};
+  try{
+    const snap=await db.collection(col).doc(docId).get();
+    resultado=snap.exists?{exists:true,data:snap.data()}:{exists:false,data:null};
+  }catch(e){}
+  if(!esHoy){
+    try{localStorage.setItem(_cacheDocKey(col,docId),JSON.stringify(resultado));}catch(e){} // storage lleno u otro error: no es crítico
+  }
+  return resultado;
+}
+
 // Totales reales del POS (ventasPOS) para el período — reemplaza el registro
 // manual del operador cuando hay datos reales sincronizados, así el Dashboard
 // no depende de que alguien declare "Ventas del Día" a mano.
@@ -3101,8 +3126,8 @@ async function getVentasPOSPeriodo(){
   for(const suc of SUCURSALES){
     for(const f of fechas){
       try{
-        const snap=await db.collection('ventasPOS').doc(f+'_'+suc.id).get();
-        if(snap.exists){const dd=snap.data();total+=dd.totalVenta||0;boletas+=dd.totalBoletas||0;diasConDatos.add(f);}
+        const cached=await getDocCached('ventasPOS',f+'_'+suc.id);
+        if(cached.exists){const dd=cached.data;total+=dd.totalVenta||0;boletas+=dd.totalBoletas||0;diasConDatos.add(f);}
       }catch(e){}
     }
   }
@@ -3257,11 +3282,11 @@ async function renderOportunidadesComerciales(){
       porSucDia[suc.id]={nombre:suc.nombre,porDia:{}};
       for(const f of fechas){
         try{
-          const snap=await db.collection('ventasPOS').doc(f+'_'+suc.id).get();
-          if(!snap.exists)continue;
+          const cached=await getDocCached('ventasPOS',f+'_'+suc.id);
+          if(!cached.exists)continue;
           const dow=new Date(f+'T12:00').getDay();
           if(!porSucDia[suc.id].porDia[dow])porSucDia[suc.id].porDia[dow]={suma:0,n:0};
-          porSucDia[suc.id].porDia[dow].suma+=snap.data().totalVenta||0;
+          porSucDia[suc.id].porDia[dow].suma+=cached.data.totalVenta||0;
           porSucDia[suc.id].porDia[dow].n++;
         }catch(e){}
       }
@@ -3488,8 +3513,8 @@ async function renderCuadratura(){
     for(const suc of sucsAConsultar){
       for(const f of fechas){
         try{
-          const snap=await db.collection('ventasPOS').doc(f+'_'+suc.id).get();
-          if(snap.exists)posDocs.push({fecha:f,sucId:suc.id,sucNombre:suc.nombre,...snap.data()});
+          const cached=await getDocCached('ventasPOS',f+'_'+suc.id);
+          if(cached.exists)posDocs.push({fecha:f,sucId:suc.id,sucNombre:suc.nombre,...cached.data});
         }catch(e){}
       }
     }
@@ -3610,7 +3635,7 @@ async function renderDashChart(ventas){
   const porDiaSuc={};fechas.forEach(f=>porDiaSuc[f]={});
   for(const suc of SUCURSALES){
     for(const f of fechas){
-      try{const snap=await db.collection('ventasPOS').doc(f+'_'+suc.id).get();porDiaSuc[f][suc.nombre]=snap.exists?(snap.data().totalVenta||0):0;}catch(e){porDiaSuc[f][suc.nombre]=0;}
+      try{const cached=await getDocCached('ventasPOS',f+'_'+suc.id);porDiaSuc[f][suc.nombre]=cached.exists?(cached.data.totalVenta||0):0;}catch(e){porDiaSuc[f][suc.nombre]=0;}
     }
   }
   const sucs=SUCURSALES.map(s=>s.nombre);
@@ -3821,8 +3846,8 @@ async function _datosInformeSemanal(){
   for(const suc of SUCURSALES){
     for(const f of fechas){
       try{
-        const snap=await db.collection('ventasPOS').doc(f+'_'+suc.id).get();
-        if(snap.exists){bySuc[suc.id].pos+=snap.data().totalVenta||0;bySuc[suc.id].boletas+=snap.data().totalBoletas||0;}
+        const cached=await getDocCached('ventasPOS',f+'_'+suc.id);
+        if(cached.exists){bySuc[suc.id].pos+=cached.data.totalVenta||0;bySuc[suc.id].boletas+=cached.data.totalBoletas||0;}
       }catch(e){}
     }
   }
@@ -6515,9 +6540,9 @@ async function _csVentasPorProducto(sucs){
   for(const sucId of sucs){
     for(const f of fechas){
       try{
-        const snap=await db.collection('ventasProductoDia').doc(f+'_'+sucId).get();
-        if(!snap.exists)continue;
-        JSON.parse(snap.data().productos||'[]').forEach(p=>{
+        const cached=await getDocCached('ventasProductoDia',f+'_'+sucId);
+        if(!cached.exists)continue;
+        JSON.parse(cached.data.productos||'[]').forEach(p=>{
           const key=p.nombre.toLowerCase().trim();
           if(!porProducto[key])porProducto[key]={nombre:p.nombre,cantidad:0,monto:0};
           porProducto[key].cantidad+=p.cantidad||0;
@@ -6752,9 +6777,9 @@ async function renderRotacionInventario(fechas,sucs,dias){
   for(const sucId of sucs){
     for(const f of fechas){
       try{
-        const snap=await db.collection('ventasProductoDia').doc(f+'_'+sucId).get();
-        if(!snap.exists)continue;
-        JSON.parse(snap.data().productos||'[]').forEach(p=>{
+        const cached=await getDocCached('ventasProductoDia',f+'_'+sucId);
+        if(!cached.exists)continue;
+        JSON.parse(cached.data.productos||'[]').forEach(p=>{
           const key=p.nombre.toLowerCase().trim();
           if(!porProducto[key])porProducto[key]={nombre:p.nombre,cantidad:0};
           porProducto[key].cantidad+=p.cantidad||0;
@@ -7214,8 +7239,8 @@ async function loadPOSData(){
       for(const fecha of fechas){
         const docId=fecha+'_'+sucId;
         try{
-          const snap=await db.collection('ventasPOS').doc(docId).get();
-          if(snap.exists) allDocs.push({fecha,sucId,...snap.data()});
+          const cached=await getDocCached('ventasPOS',docId);
+          if(cached.exists) allDocs.push({fecha,sucId,...cached.data});
         }catch(e){}
       }
     }
@@ -7232,8 +7257,8 @@ async function loadPOSData(){
     for(const sucId of sucs){
       for(const fecha of fechas){
         try{
-          const snap=await db.collection('ventasCategorias').doc(fecha+'_'+sucId).get();
-          if(snap.exists) catDocs.push({fecha,sucId,...snap.data()});
+          const cached=await getDocCached('ventasCategorias',fecha+'_'+sucId);
+          if(cached.exists) catDocs.push({fecha,sucId,...cached.data});
         }catch(e){}
       }
     }
