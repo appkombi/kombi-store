@@ -1111,12 +1111,14 @@ tr:hover td{background:var(--g50)}
         <div id="repTabAnalisis">
           <!-- Filtros -->
           <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
-            <select class="sel" id="anPeriodo" onchange="renderAnalisis()">
+            <select class="sel" id="anPeriodo" onchange="onCambioPeriodoAnalisis()">
               <option value="7">Últimos 7 días</option>
               <option value="14">Últimos 14 días</option>
               <option value="30" selected>Últimos 30 días</option>
               <option value="90">Últimos 90 días</option>
+              <option value="custom">📅 Elegir fecha…</option>
             </select>
+            <input type="date" id="anFechaCustom" class="inp sm hidden" style="max-width:150px" onchange="renderAnalisis()"/>
             <select class="sel" id="anSucursal" onchange="renderAnalisis()">
               <option value="">Todas las sucursales</option>
             </select>
@@ -6950,13 +6952,59 @@ function getVentasFiltradas(dias,sucId){
   if(sucId)v=v.filter(x=>x.sucursalId===sucId);
   return v;
 }
-function renderAnalisis(){
-  const dias=document.getElementById('anPeriodo')?.value||30;
+function onCambioPeriodoAnalisis(){
+  const sel=document.getElementById('anPeriodo');
+  const inp=document.getElementById('anFechaCustom');
+  if(sel?.value==='custom'){
+    inp.classList.remove('hidden');
+    if(!inp.value)inp.value=today();
+  }else{
+    inp?.classList.add('hidden');
+  }
+  renderAnalisis();
+}
+// Combina el registro manual (VENTAS) con los datos reales del POS
+// (ventasPOS, sincronizado por kombi-sync) como respaldo cuando no hay
+// registro manual para un día — misma idea que ya se usa en el Dashboard.
+async function obtenerVentasAnalisis(periodoVal,sucId,fechaCustom){
+  let fechas=[];
+  if(periodoVal==='custom'){
+    fechas=[fechaCustom||today()];
+  }else{
+    const dias=parseInt(periodoVal)||30;
+    for(let i=dias-1;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);fechas.push(d.toISOString().slice(0,10));}
+  }
+  const sucsAConsultar=sucId?SUCURSALES.filter(s=>s.id===sucId):SUCURSALES;
+  const resultado=[];
+  for(const fecha of fechas){
+    const manual=VENTAS.find(x=>x.fecha===fecha&&(!sucId||x.sucursalId===sucId));
+    if(manual&&manual.total>0){resultado.push(manual);continue;}
+    let total=0,ef=0,pos=0,tr=0;
+    for(const suc of sucsAConsultar){
+      try{
+        const cached=await getDocCached('ventasPOS',fecha+'_'+suc.id);
+        if(cached.exists){
+          const d=cached.data;
+          total+=d.totalVenta||0;
+          ef+=d.efectivo||0;
+          pos+=(d.debito||0)+(d.credito||0);
+          tr+=d.otros||0;
+        }
+      }catch(e){}
+    }
+    if(total>0)resultado.push({fecha,total,ef,pos,tr,sucursalId:sucId||''});
+  }
+  return resultado;
+}
+async function renderAnalisis(){
+  const periodoVal=document.getElementById('anPeriodo')?.value||'30';
   const sucId=document.getElementById('anSucursal')?.value||'';
+  const fechaCustom=document.getElementById('anFechaCustom')?.value||today();
   const sel=document.getElementById('anSucursal');
   if(sel&&sel.children.length<=1)SUCURSALES.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.nombre;sel.appendChild(o);});
-  const ventas=getVentasFiltradas(dias,sucId);
-  renderAnKPIs(ventas,dias);renderAnTendencia(ventas);renderAnComposicion(ventas);renderAnDiaSemana(ventas);renderAnPorMes(ventas);renderAnMetricas(ventas);
+  const ventas=await obtenerVentasAnalisis(periodoVal,sucId,fechaCustom);
+  const diasLabel=periodoVal==='custom'?1:periodoVal;
+  renderAnKPIs(ventas,diasLabel);renderAnTendencia(ventas);renderAnComposicion(ventas);renderAnDiaSemana(ventas);renderAnPorMes(ventas);renderAnMetricas(ventas);
 }
 function renderAnKPIs(ventas,dias){
   const c=document.getElementById('anKPIs');if(!c)return;
