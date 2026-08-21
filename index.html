@@ -5788,7 +5788,9 @@ async function pollVentasMinutoDashboard(){
     await renderDashTopProductos();
     await renderDashVentasHora();
     await renderUltimaSyncBadge();
-    await sincronizarComposicionPago();
+    // sincronizarComposicionPago() desactivada: "kombi-sync" ya llena
+    // efectivo/debito/credito/otros en ventasPOS leyendo el Gran Z real
+    // (mas confiable que filePrinD.doc, que es solo "lo ultimo impreso").
     await renderDashCompo(getVentasPeriod());
     // Forzar re-render del panel ahora mismo, sin esperar al próximo cambio de "aperturas"
     if(document.getElementById('panelOperativo')){
@@ -6057,21 +6059,12 @@ const MAPEO_TIENDA_SUCURSAL={'Mi PC':'7 Norte','Libertad':'Libertad'};
 async function sincronizarVentasDia(ventas,fecha){
   if(!ventas||!ventas.length)return {ok:false,motivo:'sin ventas'};
   const porTienda={};
-  const porTiendaProducto={};
   ventas.forEach(v=>{
     porTienda[v.tienda]=porTienda[v.tienda]||{};
     const h=String(Number((v.hora||'').slice(11,13))||0);
     if(!porTienda[v.tienda][h])porTienda[v.tienda][h]={monto:0,boletas:0};
     porTienda[v.tienda][h].monto+=v.monto;
     porTienda[v.tienda][h].boletas++;
-
-    porTiendaProducto[v.tienda]=porTiendaProducto[v.tienda]||{};
-    (v.items||[]).forEach(item=>{
-      const key=normalizaCodigoProducto(item.codigo);
-      if(!porTiendaProducto[v.tienda][key])porTiendaProducto[v.tienda][key]={codigo:item.codigo,nombre:item.nombre||'',cantidad:0,monto:0};
-      porTiendaProducto[v.tienda][key].cantidad+=item.cantidad||1;
-      porTiendaProducto[v.tienda][key].monto+=(item.precio||0)*(item.cantidad||1);
-    });
   });
   let sucursalesSincronizadas=0;
   for(const tienda of Object.keys(porTienda)){
@@ -6084,33 +6077,15 @@ async function sincronizarVentasDia(ventas,fecha){
     const totalTienda=Object.values(porTienda[tienda]).reduce((a,h)=>a+h.monto,0);
     const boletasTienda=Object.values(porTienda[tienda]).reduce((a,h)=>a+h.boletas,0);
     try{
+      // Solo alimenta ventasHoraDia (panel "en vivo" minuto a minuto) — el
+      // resto (ventasPOS, ventasProductoDia, topProductosDia) ya lo escribe
+      // "kombi-sync" cada 15 min con lectura más completa (Gran Z + detalle
+      // de transacciones), evitando que dos sistemas se pisen entre sí.
       await db.collection('ventasHoraDia').doc(fecha+'_'+suc.id).set({
         porHora:JSON.stringify(porTienda[tienda]),
         syncAt:new Date().toISOString()
       },{merge:true});
-      // También alimenta ventasPOS (lo que leen Cuadratura, Análisis de Ventas
-      // y Comparativa Sucursales) — sin desglose de medio de pago porque el
-      // XML de boleta no lo trae, pero sí total y cantidad de boletas reales.
-      await db.collection('ventasPOS').doc(fecha+'_'+suc.id).set({
-        totalVenta:totalTienda,
-        totalBoletas:boletasTienda,
-        fuente:'ventasMinuto (boletas SII)',
-        syncAt:new Date().toISOString()
-      },{merge:true});
-      // Alimenta ventasProductoDia (usado por "Compras Sugeridas" para calcular
-      // velocidad de venta real de 30 días y proyectar quiebre de stock).
-      await db.collection('ventasProductoDia').doc(fecha+'_'+suc.id).set({
-        productos:JSON.stringify(Object.values(porTiendaProducto[tienda]||{})),
-        fuente:'ventasMinuto (boletas SII)',
-        syncAt:new Date().toISOString()
-      });
-      // Ranking de productos vendidos hoy (para el widget "Top productos" del Dashboard)
-      await db.collection('topProductosDia').doc(fecha+'_'+suc.id).set({
-        sucursal:suc.nombre,
-        productos:porTiendaProducto[tienda]||{},
-        syncAt:new Date().toISOString()
-      });
-      console.log('✅ sincronizado:',tienda,'->',suc.nombre,fecha,'total:'+totalTienda,'boletas:'+boletasTienda);
+      console.log('✅ sincronizado (en vivo):',tienda,'->',suc.nombre,fecha,'total:'+totalTienda,'boletas:'+boletasTienda);
       sucursalesSincronizadas++;
     }catch(e){console.warn('❌ sincronizarVentasDia',tienda,'->',suc.nombre,e.message);}
   }
