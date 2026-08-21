@@ -3682,7 +3682,29 @@ async function renderDashCompo(ventas){
   if(fuenteReal){c.innerHTML='<div class="fs11 text-gray" style="margin-bottom:.5rem">💳 Desde el cierre de caja de hoy</div>';}
   [['Efectivo',ef,'var(--a500)'],['POS (débito+crédito)',pos,'var(--b500)'],['Otros',tr,'var(--gr500)']].forEach(([l,v,col])=>{const pct=Math.round(v/total*100);c.innerHTML+=`<div style="margin-bottom:.875rem"><div style="display:flex;justify-content:space-between;font-size:.8125rem;margin-bottom:.3rem"><span class="fw6">${l}</span><span class="mono text-gray">${clp(v)} (${pct}%)</span></div><div style="height:8px;background:var(--g100);border-radius:4px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${col};border-radius:4px"></div></div></div>`;});
 }
-function renderDashCigs(){const c=document.getElementById('dashCigs');if(!c)return;const t=TURNOS[0];if(!t){c.innerHTML='<p class="fs13 text-gray">Sin datos</p>';return;}const all=[...new Map([...(t.cigarrosAp||[]),...(t.cigarrosCi||[])].map(x=>[x.id,x])).values()];if(!all.length){c.innerHTML='<p class="fs13 text-gray">Sin datos</p>';return;}c.innerHTML=`<table class="cig-table"><thead><tr><th>Prod.</th><th style="text-align:center">Ap</th><th style="text-align:center">Ci</th><th style="text-align:center">Dif</th></tr></thead><tbody>${all.map(cg=>{const ap=(t.cigarrosAp||[]).find(x=>x.id===cg.id),ci=(t.cigarrosCi||[]).find(x=>x.id===cg.id),diff=ap?.stock!=null&&ci?.stock!=null?ci.stock-ap.stock:null;return`<tr><td class="fs13">${cg.nombre}</td><td style="text-align:center">${ap?.stock??'—'}</td><td style="text-align:center">${ci?.stock??'—'}</td><td style="text-align:center">${diff!==null?`<span class="badge ${diff<0?'br':diff>0?'bg':'ba'}">${diff>0?'+':''}${diff}</span>`:'—'}</td></tr>`;}).join('')}</tbody></table>`;}
+async function renderDashCigs(){
+  const c=document.getElementById('dashCigs');if(!c)return;
+
+  // Venta real de cigarros hoy — el arqueo/Gran Z registra la venta de
+  // cigarros como "Exento" (IVA exento), sincronizado por kombi-sync.
+  let ventaCigarrosHoy=0;
+  for(const suc of SUCURSALES){
+    try{
+      const cached=await getDocCached('ventasPOS',today()+'_'+suc.id);
+      if(cached.exists)ventaCigarrosHoy+=cached.data.ventaCigarros||0;
+    }catch(e){}
+  }
+  const htmlVenta=ventaCigarrosHoy>0?`<div style="background:var(--a50);border-radius:8px;padding:.625rem .75rem;margin-bottom:.625rem">
+    <div class="fs11 text-gray" style="text-transform:uppercase;letter-spacing:.03em">🚬 Venta real hoy</div>
+    <div class="fw7" style="font-size:1.125rem;color:var(--a600)">${clp(ventaCigarrosHoy)}</div>
+  </div>`:'';
+
+  const t=TURNOS[0];
+  if(!t){c.innerHTML=htmlVenta||'<p class="fs13 text-gray">Sin datos</p>';return;}
+  const all=[...new Map([...(t.cigarrosAp||[]),...(t.cigarrosCi||[])].map(x=>[x.id,x])).values()];
+  if(!all.length){c.innerHTML=htmlVenta||'<p class="fs13 text-gray">Sin datos</p>';return;}
+  c.innerHTML=htmlVenta+`<table class="cig-table"><thead><tr><th>Prod.</th><th style="text-align:center">Ap</th><th style="text-align:center">Ci</th><th style="text-align:center">Dif</th></tr></thead><tbody>${all.map(cg=>{const ap=(t.cigarrosAp||[]).find(x=>x.id===cg.id),ci=(t.cigarrosCi||[]).find(x=>x.id===cg.id),diff=ap?.stock!=null&&ci?.stock!=null?ci.stock-ap.stock:null;return`<tr><td class="fs13">${cg.nombre}</td><td style="text-align:center">${ap?.stock??'—'}</td><td style="text-align:center">${ci?.stock??'—'}</td><td style="text-align:center">${diff!==null?`<span class="badge ${diff<0?'br':diff>0?'bg':'ba'}">${diff>0?'+':''}${diff}</span>`:'—'}</td></tr>`;}).join('')}</tbody></table>`;
+}
 function renderDashStock(){const c=document.getElementById('dashStock');if(!c)return;const bajo=INVENTARIO.filter(i=>i.stock<=i.min&&i.min>0);if(!bajo.length){c.innerHTML='<p class="fs13 text-green">✓ Todo OK</p>';return;}c.innerHTML=`<table class="cig-table"><thead><tr><th>Producto</th><th style="text-align:center">Stock</th><th style="text-align:center">Mín</th></tr></thead><tbody>${bajo.map(i=>`<tr><td class="fs13">${i.nombre}</td><td style="text-align:center"><span class="badge br">${i.stock}</span></td><td style="text-align:center;color:var(--g400)">${i.min}</td></tr>`).join('')}</tbody></table>`;}
 async function renderDashTL(){
   const tl=document.getElementById('dashTL');if(!tl)return;
