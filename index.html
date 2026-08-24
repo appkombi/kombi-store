@@ -6811,9 +6811,24 @@ async function renderRotacionInventario(fechas,sucs,dias){
       }catch(e){}
     }
   }
+  // El stock real vive por sucursal en 'stockSucursal' (exhibicion+bodega);
+  // el campo inv.stock del catálogo global casi siempre queda en 0/desactualizado,
+  // por eso NO se usa como única fuente — se suma el stock real de las sucursales
+  // seleccionadas y solo se cae a inv.stock si no hay nada en stockSucursal.
+  const stockPorSucMap={};
+  for(const sucId of sucs){
+    try{const snap=await db.collection('stockSucursal').doc(sucId).get();stockPorSucMap[sucId]=snap.exists?snap.data():{};}catch(e){stockPorSucMap[sucId]={};}
+  }
   const conRotacion=Object.values(porProducto).map(p=>{
     const inv=INVENTARIO.find(i=>i.nombre.toLowerCase().trim()===p.nombre.toLowerCase().trim());
-    const stock=inv?.stock||0;
+    let stock=0;
+    if(inv){
+      sucs.forEach(sucId=>{
+        const d=stockPorSucMap[sucId]?.[inv.id];
+        if(d)stock+=(d.exhibicion||0)+(d.bodega||0);
+      });
+      if(!stock)stock=inv.stock||0;
+    }
     return{...p,stock,rotacion:stock>0?Math.round(p.cantidad/stock*10)/10:null};
   }).filter(p=>p.rotacion!==null).sort((a,b)=>b.rotacion-a.rotacion);
 
