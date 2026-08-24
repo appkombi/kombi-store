@@ -829,6 +829,7 @@ tr:hover td{background:var(--g50)}
               <button class="rep-tab" onclick="showInvTab('vencimientos',this)">Vencimientos</button>
               <button class="rep-tab" onclick="showInvTab('movimientos',this)">Movimientos</button>
               <button class="rep-tab" onclick="showInvTab('historial',this)">Historial Repos.</button>
+              <button class="rep-tab" onclick="showInvTab('ventas',this)">Ventas por Producto</button>
             </div>
           </div>
         </div>
@@ -1035,6 +1036,27 @@ tr:hover td{background:var(--g50)}
             </div>
           </div>
           <div id="invReposicionList"></div>
+        </div>
+
+        <!-- TAB VENTAS POR PRODUCTO -->
+        <div id="invTabVentas" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">
+            <p class="fs13 text-gray" style="margin:0">Qué artículos se han vendido y cuántos, en el período elegido — y cuáles no se han vendido nada.</p>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+              <select class="sel sm" id="vpSucFiltro" onchange="renderVentasPorProducto()" style="font-size:.8125rem">
+                <option value="">Todas las sucursales</option>
+              </select>
+              <select class="sel sm" id="vpPeriodo" onchange="renderVentasPorProducto()" style="font-size:.8125rem">
+                <option value="7">Últimos 7 días</option>
+                <option value="30" selected>Últimos 30 días</option>
+                <option value="90">Últimos 90 días</option>
+              </select>
+              <input class="inp sm" type="search" id="vpBuscar" placeholder="Buscar producto…" style="max-width:180px" oninput="renderVentasPorProducto()"/>
+              <button class="btn btn-s sm" onclick="exportVentasPorProductoExcel()">⬇ Excel</button>
+            </div>
+          </div>
+          <div id="vpResumen" class="fs12 text-gray" style="margin-bottom:.5rem"></div>
+          <div id="vpTabla"></div>
         </div>
 
         <!-- TAB TRASPASOS ENTRE SUCURSALES -->
@@ -4737,7 +4759,7 @@ function filterInv(v){renderInv(v);}
 
 /* ============ INV TABS ============ */
 function showInvTab(tab,el){
-  ['inicio','general','sucursal','conteo','vencimientos','movimientos','reposicion','traspasos','historial'].forEach(t=>{
+  ['inicio','general','sucursal','conteo','vencimientos','movimientos','reposicion','traspasos','historial','ventas'].forEach(t=>{
     const d=document.getElementById('invTab'+t.charAt(0).toUpperCase()+t.slice(1));
     if(d)d.style.display=t===tab?'block':'none';
   });
@@ -4751,6 +4773,7 @@ function showInvTab(tab,el){
   if(tab==='reposicion') renderReposicion();
   if(tab==='traspasos') initTraspasos();
   if(tab==='historial') initHistorialRep();
+  if(tab==='ventas') initVentasPorProducto();
   if(tab==='general'){_invCat='TODOS';renderInv();renderInvEstado();}
 }
 function togglePerecible(){
@@ -6791,6 +6814,97 @@ async function renderTicketPromedio(fechas,sucs,dias){
     ${porDia.length>1?`<div class="cbars" style="height:70px">
       ${porDia.slice(-14).map(p=>`<div class="cbw" title="${p.fecha}: ${clp(p.ticket)}"><div class="cbar" style="height:${Math.max(Math.round(p.ticket/max*55),3)}px"></div><div class="cbl">${p.fecha.slice(8)}</div></div>`).join('')}
     </div>`:''}`;
+}
+
+/* ============ VENTAS POR PRODUCTO (tab Inventario) ============ */
+async function initVentasPorProducto(){
+  const sel=document.getElementById('vpSucFiltro');
+  if(sel&&sel.children.length<=1){
+    SUCURSALES.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.nombre;sel.appendChild(o);});
+  }
+  renderVentasPorProducto();
+}
+
+let _vpCache=[];
+async function renderVentasPorProducto(){
+  const cTabla=document.getElementById('vpTabla');
+  const cResumen=document.getElementById('vpResumen');
+  if(!cTabla)return;
+  cTabla.innerHTML='<p class="fs13 text-gray">Calculando…</p>';
+
+  const sucFiltro=document.getElementById('vpSucFiltro')?.value;
+  const sucs=sucFiltro?[sucFiltro]:SUCURSALES.map(s=>s.id);
+  const dias=parseInt(document.getElementById('vpPeriodo')?.value||30);
+  const busq=(document.getElementById('vpBuscar')?.value||'').toLowerCase().trim();
+
+  const fechas=[];const hoy=new Date();
+  for(let i=0;i<dias;i++){const d=new Date(hoy);d.setDate(d.getDate()-i);fechas.push(d.toISOString().slice(0,10));}
+
+  // 1. Sumar unidades vendidas por producto en el período (fuente: kombi-sync → ventasProductoDia)
+  const vendidos={};
+  for(const sucId of sucs){
+    for(const f of fechas){
+      try{
+        const cached=await getDocCached('ventasProductoDia',f+'_'+sucId);
+        if(!cached.exists)continue;
+        JSON.parse(cached.data.productos||'[]').forEach(p=>{
+          const key=p.nombre.toLowerCase().trim();
+          if(!vendidos[key])vendidos[key]={nombre:p.nombre,cantidad:0,monto:0};
+          vendidos[key].cantidad+=p.cantidad||0;
+          vendidos[key].monto+=p.monto||0;
+        });
+      }catch(e){}
+    }
+  }
+
+  // 2. Cruzar contra el catálogo completo — así se ve también lo que NO se vendió
+  const filas=INVENTARIO.map(inv=>{
+    const v=vendidos[inv.nombre.toLowerCase().trim()];
+    return{id:inv.id,nombre:inv.nombre,cat:inv.cat||'',cantidad:v?.cantidad||0,monto:v?.monto||0};
+  });
+  // Productos vendidos que no calzaron con ningún ítem del catálogo (nombre distinto) — igual se muestran
+  const nombresCatalogo=new Set(INVENTARIO.map(i=>i.nombre.toLowerCase().trim()));
+  Object.values(vendidos).forEach(v=>{
+    if(!nombresCatalogo.has(v.nombre.toLowerCase().trim()))filas.push({id:null,nombre:v.nombre,cat:'(sin catálogo)',cantidad:v.cantidad,monto:v.monto});
+  });
+
+  const filtradas=busq?filas.filter(f=>f.nombre.toLowerCase().includes(busq)):filas;
+  filtradas.sort((a,b)=>b.cantidad-a.cantidad);
+
+  _vpCache=filtradas;
+
+  const conVenta=filtradas.filter(f=>f.cantidad>0);
+  const sinVenta=filtradas.filter(f=>f.cantidad===0);
+
+  cResumen.innerHTML=`${conVenta.length} producto${conVenta.length===1?'':'s'} con ventas · ${sinVenta.length} sin ventas en los últimos ${dias} días`;
+
+  if(!filtradas.length){cTabla.innerHTML='<p class="fs13 text-gray">Sin datos para este filtro.</p>';return;}
+
+  cTabla.innerHTML=`
+    <div style="overflow-x:auto">
+    <table class="tbl" style="width:100%">
+      <thead><tr><th>Producto</th><th>Categoría</th><th style="text-align:right">Cantidad vendida</th><th style="text-align:right">Monto vendido</th></tr></thead>
+      <tbody>
+        ${filtradas.slice(0,300).map(f=>`<tr${f.cantidad===0?' style="color:var(--gr500)"':''}>
+          <td>${f.nombre}</td>
+          <td class="fs12 text-gray">${f.cat}</td>
+          <td style="text-align:right" class="mono fw7">${f.cantidad}</td>
+          <td style="text-align:right" class="mono">${f.monto?clp(f.monto):'—'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    </div>
+    ${filtradas.length>300?`<p class="fs11 text-gray mt2">Mostrando los primeros 300 de ${filtradas.length}. Usa el buscador o exporta a Excel para ver todo.</p>`:''}`;
+}
+
+function exportVentasPorProductoExcel(){
+  if(!_vpCache.length){toast('Nada que exportar');return;}
+  const rows=[['Producto','Categoría','Cantidad vendida','Monto vendido']];
+  _vpCache.forEach(f=>rows.push([f.nombre,f.cat,f.cantidad,f.monto]));
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Ventas por Producto');
+  XLSX.writeFile(wb,`ventas_por_producto_${today()}.xlsx`);
+  toast('✅ Excel descargado');
 }
 
 // ── 2. Rotación de inventario ──
