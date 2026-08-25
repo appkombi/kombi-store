@@ -2149,7 +2149,8 @@ function showSec(id,el){
   document.getElementById(id)?.classList.add('active');
   document.querySelectorAll('.ni').forEach(b=>b.classList.remove('active'));
   el?.classList.add('active');
-  if(id==='ad-dash')renderDash();if(id==='ad-hist'){renderHistorial();actualizarBotonesTurnoManual();}if(id==='ad-v'){renderVChart();renderVH();renderVContraste();}
+  if(id==='ad-dash'){renderDash();iniciarAutoRefreshDash();}else pausarAutoRefreshDash();
+  if(id==='ad-hist'){renderHistorial();actualizarBotonesTurnoManual();}if(id==='ad-v'){renderVChart();renderVH();renderVContraste();}
   if(id==='ad-caja')renderCajaEstado();if(id==='ad-inv')renderInv();if(id==='ad-aj')renderAjustes();
   if(id==='ad-rep')renderAnalisis();
   if(id==='op-rep')initReponer();
@@ -6013,6 +6014,20 @@ function showRepTab(tab,el){
   if(tab==='envio'){document.getElementById('repFecha').value=today();if(CFG.gasUrl){const gi=document.getElementById('gasUrlInput');if(gi)gi.value=CFG.gasUrl;}}
   if(tab==='vivo'){const fi=document.getElementById('vivoFecha');if(fi&&!fi.value)fi.value=today();cargarVentasVivo();iniciarAutoRefreshVivo();}
   else pausarAutoRefreshVivo();
+}
+
+// Dashboard: refresca solo mientras esa sección esté abierta, así "en vivo"
+// no depende de que el usuario recargue la página o vuelva a entrar a la app.
+let _dashInterval=null;
+function iniciarAutoRefreshDash(){
+  pausarAutoRefreshDash();
+  _dashInterval=setInterval(()=>{
+    if(document.getElementById('ad-dash')?.classList.contains('active'))renderDash();
+    else pausarAutoRefreshDash();
+  },60000);
+}
+function pausarAutoRefreshDash(){
+  if(_dashInterval){clearInterval(_dashInterval);_dashInterval=null;}
 }
 
 let _vivoInterval=null;
