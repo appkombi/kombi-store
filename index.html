@@ -657,6 +657,22 @@ tr:hover td{background:var(--g50)}
           <button class="marca-tag" onclick="setDashPeriod('ano',this)">Año</button>
         </div>
         <div class="g4" id="dashStats"></div>
+
+        <!-- COMPARAR DÍA CON DÍA -->
+        <div class="card mt4">
+          <div class="ct">🔀 Comparar un día con otro</div>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.75rem">
+            <input type="date" class="inp sm" id="cmpDiaA" style="max-width:150px" onchange="renderCmpDia()"/>
+            <span class="fs12 text-gray">vs.</span>
+            <input type="date" class="inp sm" id="cmpDiaB" style="max-width:150px" onchange="renderCmpDia()"/>
+            <select class="sel sm" id="cmpDiaModo" onchange="onCambioCmpDiaModo()">
+              <option value="manual">Fechas elegidas</option>
+              <option value="mismodia">Mismo día de la semana (últimas 8 veces)</option>
+            </select>
+          </div>
+          <div id="cmpDiaResultado"></div>
+        </div>
+
         <!-- VENTAS DE HOY POR HORA — Libertad vs 7 Norte, datos reales en vivo -->
         <div class="card mt4" id="wgtVentasHoyHora">
           <div style="display:flex;justify-content:space-between;align-items:center">
@@ -1138,14 +1154,22 @@ tr:hover td{background:var(--g50)}
               <option value="14">Últimos 14 días</option>
               <option value="30" selected>Últimos 30 días</option>
               <option value="90">Últimos 90 días</option>
-              <option value="custom">📅 Elegir fecha…</option>
+              <option value="mes">📆 Mes en curso</option>
+              <option value="custom">📅 Elegir un día…</option>
+              <option value="rango">↔️ Elegir rango de fechas…</option>
             </select>
             <input type="date" id="anFechaCustom" class="inp sm hidden" style="max-width:150px" onchange="renderAnalisis()"/>
+            <input type="date" id="anFechaDesde" class="inp sm hidden" style="max-width:150px" onchange="renderAnalisis()"/>
+            <span id="anRangoGuion" class="hidden fs12 text-gray">a</span>
+            <input type="date" id="anFechaHasta" class="inp sm hidden" style="max-width:150px" onchange="renderAnalisis()"/>
             <select class="sel" id="anSucursal" onchange="renderAnalisis()">
               <option value="">Todas las sucursales</option>
             </select>
             <button class="btn btn-s sm" onclick="renderAnalisis()">🔄 Actualizar</button>
           </div>
+
+          <!-- Comparación vs. semana anterior -->
+          <div class="card" id="anVsSemana" style="margin-bottom:1rem"></div>
 
           <!-- KPIs -->
           <div class="g4" id="anKPIs" style="margin-bottom:1rem"></div>
@@ -1423,6 +1447,12 @@ tr:hover td{background:var(--g50)}
             <div id="diagnosticoSyncList"></div>
           </div>
           <div class="card"><div class="ct">🏪 Tienda</div><div class="fld"><label class="lbl">Nombre</label><input class="inp" type="text" id="ajNombre"/></div><div class="fld"><label class="lbl">Dirección</label><input class="inp" type="text" id="ajDir"/></div><button class="btn btn-p" onclick="saveTienda()">Guardar</button></div>
+          <div class="card" id="ajDatosDesdeCard" style="display:none">
+            <div class="ct">📅 Datos desde</div>
+            <p class="fs12 text-gray mb4">Fecha a partir de la cual los reportes y análisis consideran los datos de ventas. Los datos anteriores a esta fecha NO se borran — solo se dejan de mostrar, útil cuando hubo distorsión por bugs ya corregidos.</p>
+            <div class="fld"><label class="lbl">Mostrar datos desde</label><input class="inp" type="date" id="ajDatosDesde"/></div>
+            <button class="btn btn-p" onclick="saveDatosDesde()">Guardar</button>
+          </div>
           <div class="card"><div class="ct">🏬 Sucursales</div><div class="ml" id="ajSucList" style="margin-bottom:1rem"></div><button class="btn btn-s w100" style="margin-bottom:.75rem" onclick="saveSucursales()">💾 Guardar cambios</button><div class="g2"><div class="fld"><label class="lbl">Nombre</label><input class="inp" type="text" id="ajSucNombre" placeholder="Ej: Centro"/></div><div class="fld"><label class="lbl">Dirección</label><input class="inp" type="text" id="ajSucDir" placeholder="Opcional"/></div></div><button class="btn btn-p w100" onclick="addSucursal()">+ Agregar</button></div>
           <div class="card"><div class="ct">💳 Terminales POS</div><div class="ml" id="posTermList" style="margin-bottom:1rem"></div><div style="display:flex;gap:.5rem"><input class="inp" type="text" id="newTerm" placeholder="Nombre terminal"/><button class="btn btn-p" onclick="addTerminal()">+</button></div></div>
           <div class="card"><div class="ct">🖥️ Etiquetas Sistema</div><div class="fld"><label class="lbl">Efectivo</label><input class="inp" type="text" id="ajSisLblEf"/></div><div class="fld"><label class="lbl">Tarjetas/POS</label><input class="inp" type="text" id="ajSisLblTarj"/></div><div class="fld"><label class="lbl">Otros</label><input class="inp" type="text" id="ajSisLblOtros"/></div><button class="btn btn-p" onclick="saveSisLabels()">Guardar</button></div>
@@ -2805,6 +2835,19 @@ async function checkVencimientos(){
 }
 
 /* ============ IMPORTAR CATÁLOGO DESDE POS ============ */
+// Sincroniza el catálogo (precios + productos nuevos) desde catalogoPOS hacia
+// la colección 'inventario' que alimenta el listado. silent=true no muestra
+// diálogos ni toasts (usado para que esto pase solo, sin que nadie tenga que
+// apretar un botón) — se llama automáticamente al entrar a Inventario.
+let _catalogoAutoSyncEnCurso=false;
+async function sincronizarCatalogoPOSAuto(){
+  if(_catalogoAutoSyncEnCurso)return;
+  _catalogoAutoSyncEnCurso=true;
+  try{ await importarCatalogoPOSCore(SUCURSALES,/*silent=*/true); }
+  catch(e){ console.warn('Auto-sync catálogo POS:',e); }
+  finally{ _catalogoAutoSyncEnCurso=false; }
+}
+
 async function importarCatalogoPOS(){
   if(!confirm('Vas a importar el catálogo de productos del POS al inventario.\n\nSe actualizarán precios y se agregarán productos nuevos. El stock actual no se modifica.\n\n¿Continuar?'))return;
 
@@ -2815,8 +2858,11 @@ async function importarCatalogoPOS(){
   const idx=parseInt(resp);
   const sucSeleccionadas = idx===0 ? SUCURSALES : (SUCURSALES[idx-1]?[SUCURSALES[idx-1]]:null);
   if(!sucSeleccionadas){toast('Opción inválida');return;}
+  await importarCatalogoPOSCore(sucSeleccionadas,false,idx===0?'todas las sucursales':sucSeleccionadas[0].nombre);
+}
 
-  toast('🔄 Leyendo catálogo del POS…',8000);
+async function importarCatalogoPOSCore(sucSeleccionadas,silent,origenTxt){
+  if(!silent)toast('🔄 Leyendo catálogo del POS…',8000);
   try{
     // Cargar y combinar productos de las sucursales seleccionadas (dedupe por SKU)
     let productosPorSku={};
@@ -2835,9 +2881,9 @@ async function importarCatalogoPOS(){
       }
     }
     const productos=Object.values(productosPorSku);
-    if(!productos.length){toast('❌ Sin catálogo sincronizado para la selección. Ejecuta el sync primero.');return;}
+    if(!productos.length){if(!silent)toast('❌ Sin catálogo sincronizado para la selección. Ejecuta el sync primero.');return;}
 
-    toast(`⏳ Importando ${productos.length} productos…`,10000);
+    if(!silent)toast(`⏳ Importando ${productos.length} productos…`,10000);
 
     const existing={};
     INVENTARIO.forEach(i=>{if(i.sku)existing[i.sku]=i.id;});
@@ -2866,11 +2912,14 @@ async function importarCatalogoPOS(){
     }
 
     await loadInventario();
-    renderInv();
-    const origenTxt=idx===0?'todas las sucursales':sucSeleccionadas[0].nombre;
-    await auditLog('inventario',{accion:'importar_pos',origen:origenTxt,agregados:added,actualizados:updated});
-    toast(`✅ ${added} agregados, ${updated} actualizados (${origenTxt})`,6000);
-  }catch(e){toast('❌ Error: '+e.message,5000);}
+    if(!silent||added||updated)renderInv(); // en modo silencioso solo re-renderiza si de verdad cambió algo
+    if(added||updated){ // solo dejar rastro en el log/toast si de verdad hubo cambios
+      await auditLog('inventario',{accion:silent?'importar_pos_auto':'importar_pos',origen:origenTxt||'todas las sucursales',agregados:added,actualizados:updated});
+      if(!silent)toast(`✅ ${added} agregados, ${updated} actualizados (${origenTxt})`,6000);
+    }else if(!silent){
+      toast('✅ El catálogo ya estaba al día',4000);
+    }
+  }catch(e){if(!silent)toast('❌ Error: '+e.message,5000); else throw e;}
 }
 
 /* ============ TRAER DATOS DEL POS ============ */
@@ -3145,8 +3194,9 @@ async function getDocCached(col,docId){
 // no depende de que alguien declare "Ventas del Día" a mano.
 async function getVentasPOSPeriodo(){
   const [desde,hasta]=rangoFechasDash();
-  const fechas=[];let cur=new Date(desde+'T00:00');const fin=new Date(hasta+'T00:00');
+  let fechas=[];let cur=new Date(desde+'T00:00');const fin=new Date(hasta+'T00:00');
   while(cur<=fin){fechas.push(cur.toISOString().slice(0,10));cur.setDate(cur.getDate()+1);}
+  fechas=aplicarDatosDesde(fechas);
   let total=0,boletas=0;const diasConDatos=new Set();
   for(const suc of SUCURSALES){
     for(const f of fechas){
@@ -3170,6 +3220,7 @@ async function renderDash(){
   s.innerHTML=[{l:'Ventas período',v:clp(total),sub:usaPOS?`${pos.boletas} boletas · datos reales POS`:`${v.length} registros`,col:'var(--a500)'},{l:'Promedio diario',v:clp(avg),sub:'del período',col:'var(--b500)'},{l:'Stock crítico',v:stk,sub:'bajo mínimo',col:stk?'var(--r500)':'var(--gr500)'},{l:'Retiros hoy',v:clp(retH),sub:`${RETIROS.filter(r=>r.fecha===today()).length} mov.`,col:'var(--g500)'}].map(x=>`<div class="sc"><div class="lbl">${x.l}</div><div class="val" style="color:${x.col}">${x.v}</div><div class="sub">${x.sub}</div></div>`).join('');
   renderDashChart(v);renderDashCompo(v);renderDashCigs();renderDashStock();renderDashTL();
   renderMetaVentas();renderDashRetirosCat();renderDashVentasSuc();renderOportunidadesComerciales();
+  renderCmpDia();
   renderAlertasCatalogo();
   renderDashTopProductos();
   renderDashVentasHora();
@@ -3194,6 +3245,62 @@ async function renderDash(){
     if(window._posRefreshTimer){clearInterval(window._posRefreshTimer);window._posRefreshTimer=null;}
   }
   aplicarDashWidgets();
+}
+
+/* ============ COMPARAR DÍA CON DÍA (Dashboard) ============ */
+async function totalVentaDia(fecha){
+  let total=0,boletas=0;
+  for(const suc of SUCURSALES){
+    try{
+      const cached=await getDocCached('ventasPOS',fecha+'_'+suc.id);
+      if(cached.exists){total+=cached.data.totalVenta||0;boletas+=cached.data.totalBoletas||0;}
+    }catch(e){}
+  }
+  return {fecha,total,boletas};
+}
+function onCambioCmpDiaModo(){renderCmpDia();}
+async function renderCmpDia(){
+  const c=document.getElementById('cmpDiaResultado');if(!c)return;
+  const modo=document.getElementById('cmpDiaModo')?.value||'manual';
+  const inpA=document.getElementById('cmpDiaA'),inpB=document.getElementById('cmpDiaB');
+  if(!inpA.value)inpA.value=today();
+  if(!inpB.value){const d=new Date();d.setDate(d.getDate()-7);inpB.value=d.toISOString().slice(0,10);}
+
+  if(modo==='mismodia'){
+    inpB.parentElement.querySelectorAll('input')[1]?.classList.add('hidden'); // no aplica en este modo
+    c.innerHTML='<p class="fs13 text-gray">Calculando…</p>';
+    const diasES=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+    const base=new Date(inpA.value+'T12:00:00');
+    const dow=base.getDay();
+    const fechas=[];
+    for(let i=0;i<8;i++){const d=new Date(base);d.setDate(d.getDate()-7*i);fechas.push(d.toISOString().slice(0,10));}
+    const datos=(await Promise.all(fechas.map(totalVentaDia))).filter(d=>d.total>0);
+    if(!datos.length){c.innerHTML=`<p class="fs13 text-gray">Sin datos para los ${diasES[dow]} anteriores.</p>`;return;}
+    const max=Math.max(...datos.map(d=>d.total),1);
+    c.innerHTML=`<div class="fs12 text-gray mb2">Todos los <strong>${diasES[dow]}</strong> con datos, más reciente primero</div>
+      ${datos.map(d=>`<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.375rem">
+        <div style="width:80px;font-size:.75rem;color:var(--g500)">${fdate(d.fecha)}</div>
+        <div style="flex:1;height:20px;background:var(--g100);border-radius:4px;overflow:hidden"><div style="height:100%;width:${Math.round(d.total/max*100)}%;background:var(--a500);border-radius:4px"></div></div>
+        <div style="width:110px;font-size:.75rem;font-family:var(--mono);text-align:right">${clp(d.total)}</div>
+      </div>`).join('')}`;
+    return;
+  }
+
+  inpB.parentElement.querySelectorAll('input')[1]?.classList.remove('hidden');
+  c.innerHTML='<p class="fs13 text-gray">Calculando…</p>';
+  const [a,b]=await Promise.all([totalVentaDia(inpA.value),totalVentaDia(inpB.value)]);
+  const variacion=b.total>0?Math.round((a.total-b.total)/b.total*1000)/10:null;
+  const max=Math.max(a.total,b.total,1);
+  c.innerHTML=`
+    <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:.75rem">
+      <div><div class="fs11 text-gray">${fdate(a.fecha)}</div><div class="fw7" style="font-size:1.25rem">${clp(a.total)}</div><div class="fs11 text-gray">${a.boletas||0} boletas</div></div>
+      <div><div class="fs11 text-gray">${fdate(b.fecha)}</div><div class="fw7" style="font-size:1.25rem;color:var(--g500)">${clp(b.total)}</div><div class="fs11 text-gray">${b.boletas||0} boletas</div></div>
+      ${variacion!==null?`<div><div class="fs11 text-gray">Variación</div><div class="fw7" style="font-size:1.25rem;color:${variacion>=0?'var(--gr600)':'var(--r600)'}">${variacion>=0?'+':''}${variacion}%</div></div>`:''}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:.375rem">
+      <div style="display:flex;align-items:center;gap:.5rem"><div style="width:90px;font-size:.7rem;color:var(--g500)">${fdate(a.fecha)}</div><div style="flex:1;height:18px;background:var(--g100);border-radius:4px;overflow:hidden"><div style="height:100%;width:${Math.round(a.total/max*100)}%;background:var(--a500);border-radius:4px"></div></div></div>
+      <div style="display:flex;align-items:center;gap:.5rem"><div style="width:90px;font-size:.7rem;color:var(--g500)">${fdate(b.fecha)}</div><div style="flex:1;height:18px;background:var(--g100);border-radius:4px;overflow:hidden"><div style="height:100%;width:${Math.round(b.total/max*100)}%;background:var(--b500);border-radius:4px"></div></div></div>
+    </div>`;
 }
 
 /* ============ OPORTUNIDADES COMERCIALES ============ */
@@ -4775,7 +4882,7 @@ function showInvTab(tab,el){
   if(tab==='traspasos') initTraspasos();
   if(tab==='historial') initHistorialRep();
   if(tab==='ventas') initVentasPorProducto();
-  if(tab==='general'){_invCat='TODOS';renderInv();renderInvEstado();}
+  if(tab==='general'){_invCat='TODOS';renderInv();renderInvEstado();sincronizarCatalogoPOSAuto().then(()=>{renderInv();renderInvEstado();});}
 }
 function togglePerecible(){
   const chk=document.getElementById('pPerecible');
@@ -7099,25 +7206,48 @@ function getVentasFiltradas(dias,sucId){
 function onCambioPeriodoAnalisis(){
   const sel=document.getElementById('anPeriodo');
   const inp=document.getElementById('anFechaCustom');
+  const desde=document.getElementById('anFechaDesde');
+  const hasta=document.getElementById('anFechaHasta');
+  const guion=document.getElementById('anRangoGuion');
+  inp?.classList.add('hidden');
+  desde?.classList.add('hidden');
+  hasta?.classList.add('hidden');
+  guion?.classList.add('hidden');
   if(sel?.value==='custom'){
     inp.classList.remove('hidden');
     if(!inp.value)inp.value=today();
-  }else{
-    inp?.classList.add('hidden');
+  }else if(sel?.value==='rango'){
+    desde.classList.remove('hidden');hasta.classList.remove('hidden');guion.classList.remove('hidden');
+    if(!desde.value){const d=new Date();d.setDate(d.getDate()-7);desde.value=d.toISOString().slice(0,10);}
+    if(!hasta.value)hasta.value=today();
   }
   renderAnalisis();
 }
-// Combina el registro manual (VENTAS) con los datos reales del POS
-// (ventasPOS, sincronizado por kombi-sync) como respaldo cuando no hay
-// registro manual para un día — misma idea que ya se usa en el Dashboard.
-async function obtenerVentasAnalisis(periodoVal,sucId,fechaCustom){
+// Arma la lista de fechas (YYYY-MM-DD) según el período elegido en el filtro.
+function fechasParaPeriodo(periodoVal,fechaCustom,fechaDesde,fechaHasta){
   let fechas=[];
   if(periodoVal==='custom'){
     fechas=[fechaCustom||today()];
+  }else if(periodoVal==='mes'){
+    // Mes en curso: del día 1 hasta hoy
+    const hoy=new Date();
+    const primerDia=new Date(hoy.getFullYear(),hoy.getMonth(),1);
+    for(let d=new Date(primerDia);d<=hoy;d.setDate(d.getDate()+1))fechas.push(d.toISOString().slice(0,10));
+  }else if(periodoVal==='rango'){
+    const ini=fechaDesde||fechaOffsetLocal(-7),fin=fechaHasta||today();
+    for(let d=new Date(ini+'T00:00');d<=new Date(fin+'T00:00');d.setDate(d.getDate()+1))fechas.push(d.toISOString().slice(0,10));
   }else{
     const dias=parseInt(periodoVal)||30;
     for(let i=dias-1;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);fechas.push(d.toISOString().slice(0,10));}
   }
+  return aplicarDatosDesde(fechas);
+}
+function fechaOffsetLocal(dias){const d=new Date();d.setDate(d.getDate()+dias);return d.toISOString().slice(0,10);}
+
+// Combina el registro manual (VENTAS) con los datos reales del POS
+// (ventasPOS, sincronizado por kombi-sync) como respaldo cuando no hay
+// registro manual para un día — misma idea que ya se usa en el Dashboard.
+async function obtenerVentasPorFechas(fechas,sucId){
   const sucsAConsultar=sucId?SUCURSALES.filter(s=>s.id===sucId):SUCURSALES;
   const resultado=[];
   for(const fecha of fechas){
@@ -7144,11 +7274,34 @@ async function renderAnalisis(){
   const periodoVal=document.getElementById('anPeriodo')?.value||'30';
   const sucId=document.getElementById('anSucursal')?.value||'';
   const fechaCustom=document.getElementById('anFechaCustom')?.value||today();
+  const fechaDesde=document.getElementById('anFechaDesde')?.value||'';
+  const fechaHasta=document.getElementById('anFechaHasta')?.value||'';
   const sel=document.getElementById('anSucursal');
   if(sel&&sel.children.length<=1)SUCURSALES.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.nombre;sel.appendChild(o);});
-  const ventas=await obtenerVentasAnalisis(periodoVal,sucId,fechaCustom);
-  const diasLabel=periodoVal==='custom'?1:periodoVal;
+  const fechas=fechasParaPeriodo(periodoVal,fechaCustom,fechaDesde,fechaHasta);
+  const ventas=await obtenerVentasPorFechas(fechas,sucId);
+  const diasLabel=periodoVal==='custom'?1:fechas.length;
   renderAnKPIs(ventas,diasLabel);renderAnTendencia(ventas);renderAnComposicion(ventas);renderAnDiaSemana(ventas);renderAnPorMes(ventas);renderAnMetricas(ventas);
+  renderAnVsSemanaAnterior(sucId);
+}
+// Comparación fija: últimos 7 días vs. los 7 días anteriores a esos — independiente
+// del período elegido arriba, porque el pedido fue específicamente "vs. semana anterior".
+async function renderAnVsSemanaAnterior(sucId){
+  const c=document.getElementById('anVsSemana');if(!c)return;
+  c.innerHTML='<p class="fs13 text-gray">Calculando comparación semanal…</p>';
+  const semanaActual=aplicarDatosDesde(Array.from({length:7},(_,i)=>fechaOffsetLocal(-6+i)));
+  const semanaAnterior=aplicarDatosDesde(Array.from({length:7},(_,i)=>fechaOffsetLocal(-13+i)));
+  const [actual,anterior]=await Promise.all([obtenerVentasPorFechas(semanaActual,sucId),obtenerVentasPorFechas(semanaAnterior,sucId)]);
+  const totalActual=actual.reduce((a,v)=>a+v.total,0);
+  const totalAnterior=anterior.reduce((a,v)=>a+v.total,0);
+  const variacion=totalAnterior>0?Math.round((totalActual-totalAnterior)/totalAnterior*1000)/10:null;
+  c.innerHTML=`
+    <div class="ct">📆 Esta semana vs. semana anterior</div>
+    <div style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:baseline">
+      <div><div class="fs11 text-gray">Últimos 7 días</div><div class="fw7" style="font-size:1.375rem">${clp(totalActual)}</div></div>
+      <div><div class="fs11 text-gray">7 días anteriores</div><div class="fw7" style="font-size:1.125rem;color:var(--g500)">${clp(totalAnterior)}</div></div>
+      ${variacion!==null?`<div><div class="fs11 text-gray">Variación</div><div class="fw7" style="font-size:1.375rem;color:${variacion>=0?'var(--gr600)':'var(--r600)'}">${variacion>=0?'+':''}${variacion}%</div></div>`:''}
+    </div>`;
 }
 function renderAnKPIs(ventas,dias){
   const c=document.getElementById('anKPIs');if(!c)return;
@@ -7916,7 +8069,30 @@ async function notificarGerentes(turno){
   }catch(e){console.warn('Notif gerentes:',e);}
 }
 
-function renderAjustes(){const t=CFG.tienda||{};const ajN=document.getElementById('ajNombre');if(ajN)ajN.value=t.nombre||'';const ajD=document.getElementById('ajDir');if(ajD)ajD.value=t.dir||'';const sl=CFG.sisLabels||{};const ajEf=document.getElementById('ajSisLblEf');if(ajEf)ajEf.value=sl.ef||'Efectivo';const ajTj=document.getElementById('ajSisLblTarj');if(ajTj)ajTj.value=sl.tarj||'Tarjetas / POS';const ajOt=document.getElementById('ajSisLblOtros');if(ajOt)ajOt.value=sl.otros||'Amipass, Edenred, etc.';renderAjSucList();renderPosTermList();renderAjCkList('apertura');renderAjCkList('cierre');renderPrecioHist();renderDiagnosticoSync();initToggleCardPOS();initDashCustom();initTurnosConfig();if(CFG.gasUrl){const gi=document.getElementById('gasUrlInput');if(gi)gi.value=CFG.gasUrl;}}
+function renderAjustes(){const t=CFG.tienda||{};const ajN=document.getElementById('ajNombre');if(ajN)ajN.value=t.nombre||'';const ajD=document.getElementById('ajDir');if(ajD)ajD.value=t.dir||'';const sl=CFG.sisLabels||{};const ajEf=document.getElementById('ajSisLblEf');if(ajEf)ajEf.value=sl.ef||'Efectivo';const ajTj=document.getElementById('ajSisLblTarj');if(ajTj)ajTj.value=sl.tarj||'Tarjetas / POS';const ajOt=document.getElementById('ajSisLblOtros');if(ajOt)ajOt.value=sl.otros||'Amipass, Edenred, etc.';renderAjSucList();renderPosTermList();renderAjCkList('apertura');renderAjCkList('cierre');renderPrecioHist();renderDiagnosticoSync();initToggleCardPOS();initDashCustom();initTurnosConfig();if(CFG.gasUrl){const gi=document.getElementById('gasUrlInput');if(gi)gi.value=CFG.gasUrl;}initDatosDesde();}
+
+// ── "Datos desde" (solo superadmin) — fecha de corte para reportes/análisis ──
+function initDatosDesde(){
+  const card=document.getElementById('ajDatosDesdeCard');
+  if(!card)return;
+  const rolAct=CU.rolActivo||CU.rol;
+  if(rolAct!=='superadmin'){card.style.display='none';return;}
+  card.style.display='block';
+  const inp=document.getElementById('ajDatosDesde');
+  if(inp)inp.value=CFG.datosDesde||'';
+}
+async function saveDatosDesde(){
+  const val=document.getElementById('ajDatosDesde')?.value||'';
+  CFG.datosDesde=val||null;
+  await db.collection('config').doc('global').update({datosDesde: val||firebase.firestore.FieldValue.delete()});
+  toast(val?`✅ Guardado — los reportes solo mostrarán datos desde ${fdate(val)}`:'✅ Guardado — sin fecha de corte');
+  renderAnalisis();renderDash();
+}
+// Filtra un arreglo de fechas (YYYY-MM-DD) descartando las anteriores al corte configurado
+function aplicarDatosDesde(fechas){
+  if(!CFG.datosDesde)return fechas;
+  return fechas.filter(f=>f>=CFG.datosDesde);
+}
 
 /* ============ TOGGLE COMPARACIÓN POS (solo superadmin) ============ */
 function mostrarComparacionPOS(){
