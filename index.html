@@ -846,6 +846,7 @@ tr:hover td{background:var(--g50)}
               <button class="rep-tab" onclick="showInvTab('movimientos',this)">Movimientos</button>
               <button class="rep-tab" onclick="showInvTab('historial',this)">Historial Repos.</button>
               <button class="rep-tab" onclick="showInvTab('ventas',this)">Ventas por Producto</button>
+              <button class="rep-tab" onclick="showInvTab('cigarros',this)">🚬 Cigarros</button>
             </div>
           </div>
         </div>
@@ -1052,6 +1053,20 @@ tr:hover td{background:var(--g50)}
             </div>
           </div>
           <div id="invReposicionList"></div>
+        </div>
+
+        <!-- TAB CIGARROS — bodega central compartida + control por local -->
+        <div id="invTabCigarros" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">
+            <p class="fs13 text-gray" style="margin:0">Bodega central compartida entre ambos locales + venta promedio real por marca (los días sin stock no cuentan en el promedio, para no subestimar la demanda). Cobertura sugerida en días:
+              <input class="inp sm" type="number" id="cigCoberturaDias" value="7" min="1" style="width:55px;display:inline-block" onchange="renderCigarros()"/>
+              · Semanas para el promedio:
+              <input class="inp sm" type="number" id="cigSemanas" value="4" min="1" style="width:50px;display:inline-block" onchange="renderCigarros()"/>
+            </p>
+            <button class="btn btn-s sm" onclick="exportCigarrosExcel()">⬇ Excel</button>
+          </div>
+          <div id="cigResumen" class="fs12 text-gray" style="margin-bottom:.75rem"></div>
+          <div id="cigTabla"></div>
         </div>
 
         <!-- TAB VENTAS POR PRODUCTO -->
@@ -4867,7 +4882,7 @@ function filterInv(v){renderInv(v);}
 
 /* ============ INV TABS ============ */
 function showInvTab(tab,el){
-  ['inicio','general','sucursal','conteo','vencimientos','movimientos','reposicion','traspasos','historial','ventas'].forEach(t=>{
+  ['inicio','general','sucursal','conteo','vencimientos','movimientos','reposicion','traspasos','historial','ventas','cigarros'].forEach(t=>{
     const d=document.getElementById('invTab'+t.charAt(0).toUpperCase()+t.slice(1));
     if(d)d.style.display=t===tab?'block':'none';
   });
@@ -4882,6 +4897,7 @@ function showInvTab(tab,el){
   if(tab==='traspasos') initTraspasos();
   if(tab==='historial') initHistorialRep();
   if(tab==='ventas') initVentasPorProducto();
+  if(tab==='cigarros') renderCigarros();
   if(tab==='general'){_invCat='TODOS';renderInv();renderInvEstado();sincronizarCatalogoPOSAuto().then(()=>{renderInv();renderInvEstado();});}
 }
 function togglePerecible(){
@@ -7026,6 +7042,146 @@ function exportVentasPorProductoExcel(){
   const ws=XLSX.utils.aoa_to_sheet(rows);
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Ventas por Producto');
   XLSX.writeFile(wb,`ventas_por_producto_${today()}.xlsx`);
+  toast('✅ Excel descargado');
+}
+
+/* ============ CIGARROS — bodega central + control por local ============ */
+// La bodega central es UN SOLO pool compartido entre ambos locales (a
+// diferencia de stockSucursal, que es un número distinto por local). Se
+// guarda en su propia colección porque conceptualmente no pertenece a
+// ninguna sucursal en particular.
+let _cigBodegaCentral={};
+let _cigCache=[];
+
+async function renderCigarros(){
+  const cTabla=document.getElementById('cigTabla');
+  const cResumen=document.getElementById('cigResumen');
+  if(!cTabla)return;
+  cTabla.innerHTML='<p class="fs13 text-gray">Calculando…</p>';
+
+  const cigProductos=INVENTARIO.filter(i=>/cigarr/i.test(i.cat||''));
+  if(!cigProductos.length){
+    cTabla.innerHTML='<p class="fs13 text-gray">No se encontraron productos con categoría "Cigarros" en el catálogo. Revisa que el catálogo importado desde el POS tenga esa categoría bien escrita.</p>';
+    return;
+  }
+
+  const semanas=parseInt(document.getElementById('cigSemanas')?.value||4);
+  const coberturaDias=parseInt(document.getElementById('cigCoberturaDias')?.value||7);
+  const dias=semanas*7;
+  let fechas=[];
+  for(let i=0;i<dias;i++){const d=new Date();d.setDate(d.getDate()-i);fechas.push(d.toISOString().slice(0,10));}
+  fechas=aplicarDatosDesde(fechas);
+
+  // Bodega central: un doc por producto en bodegaCentralCigarros/{prodId}
+  try{
+    const snap=await db.collection('bodegaCentralCigarros').get();
+    _cigBodegaCentral={};
+    snap.docs.forEach(d=>{_cigBodegaCentral[d.id]=d.data().stock||0;});
+  }catch(e){console.warn('Bodega central cigarros:',e);}
+
+  // Stock actual por sucursal (exhibición + bodega local)
+  const stockPorSuc={};
+  for(const suc of SUCURSALES){
+    try{const s=await db.collection('stockSucursal').doc(suc.id).get();stockPorSuc[suc.id]=s.exists?s.data():{};}
+    catch(e){stockPorSuc[suc.id]={};}
+  }
+
+  // Venta por día y sucursal — se calcula UNA vez por combinación fecha+sucursal
+  // y se reutiliza para todos los productos de cigarros.
+  const ventasPorSucDia={}; // { sucId: { fecha: {nombre:cantidad} } }
+  for(const suc of SUCURSALES){
+    ventasPorSucDia[suc.id]={};
+    for(const f of fechas){
+      try{
+        const cached=await getDocCached('ventasProductoDia',f+'_'+suc.id);
+        if(!cached.exists)continue;
+        const mapa={};
+        JSON.parse(cached.data.productos||'[]').forEach(p=>{mapa[p.nombre.toLowerCase().trim()]=p.cantidad||0;});
+        ventasPorSucDia[suc.id][f]=mapa;
+      }catch(e){}
+    }
+  }
+
+  const filas=cigProductos.map(prod=>{
+    const key=prod.nombre.toLowerCase().trim();
+    const porSuc={};
+    SUCURSALES.forEach(suc=>{
+      let suma=0,diasConVenta=0;
+      fechas.forEach(f=>{
+        const cant=ventasPorSucDia[suc.id][f]?.[key];
+        if(cant>0){suma+=cant;diasConVenta++;}
+        // Si ese día no vendió nada, NO se cuenta como "0 unidades de demanda real" —
+        // puede ser que no hubo stock ese día. Por eso el promedio se saca solo
+        // sobre los días donde SÍ hubo venta, no sobre el total de días del período.
+      });
+      const promedioDiario=diasConVenta?Math.round(suma/diasConVenta*10)/10:null;
+      const d=stockPorSuc[suc.id]?.[prod.id]||{exhibicion:0,bodega:0};
+      const stockActual=(d.exhibicion||0)+(d.bodega||0);
+      const sugerido=promedioDiario!==null?Math.max(0,Math.ceil(promedioDiario*coberturaDias-stockActual)):null;
+      porSuc[suc.id]={promedioDiario,stockActual,sugerido,diasConVenta};
+    });
+    return{id:prod.id,nombre:prod.nombre,bodegaCentral:_cigBodegaCentral[prod.id]||0,porSuc};
+  });
+
+  _cigCache=filas;
+
+  const totalBodegaCentral=filas.reduce((a,f)=>a+f.bodegaCentral,0);
+  cResumen.innerHTML=`${filas.length} marcas · Bodega central: ${totalBodegaCentral} unidades · Promedio calculado sobre los últimos ${semanas} semana${semanas===1?'':'s'}, solo días con venta real`;
+
+  cTabla.innerHTML=`
+    <div style="overflow-x:auto">
+    <table class="tbl" style="width:100%">
+      <thead><tr>
+        <th>Marca</th>
+        <th style="text-align:center">Bodega central</th>
+        ${SUCURSALES.map(s=>`<th style="text-align:center" colspan="3">${s.nombre}</th>`).join('')}
+      </tr>
+      <tr style="font-size:.7rem;color:var(--g400)">
+        <th></th><th></th>
+        ${SUCURSALES.map(()=>`<th style="text-align:center">Stock</th><th style="text-align:center">Prom/día</th><th style="text-align:center">Sugerido</th>`).join('')}
+      </tr></thead>
+      <tbody>
+        ${filas.map(f=>`<tr>
+          <td class="fw6">${f.nombre}</td>
+          <td style="text-align:center">
+            <input class="inp sm" type="number" min="0" value="${f.bodegaCentral}" style="width:70px;text-align:center"
+              onchange="setBodegaCentralCigarro('${f.id}',this.value)"/>
+          </td>
+          ${SUCURSALES.map(s=>{
+            const d=f.porSuc[s.id];
+            const bajo=d.sugerido>0;
+            return `<td style="text-align:center;font-family:var(--mono)">${d.stockActual}</td>
+              <td style="text-align:center;font-family:var(--mono);color:var(--g500)">${d.promedioDiario!==null?d.promedioDiario:'—'}</td>
+              <td style="text-align:center;font-family:var(--mono);font-weight:700;color:${bajo?'var(--r600)':'var(--gr600)'}">${d.sugerido!==null?d.sugerido:'—'}</td>`;
+          }).join('')}
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    </div>
+    <p class="fs11 text-gray mt2">"Sugerido" = para llegar a ${coberturaDias} días de cobertura según el promedio real de venta (unidades faltantes sobre el stock actual del local, no descuenta la bodega central). "—" significa que no hubo ningún día con venta registrada en el período — no hay datos suficientes para proyectar.</p>`;
+}
+
+async function setBodegaCentralCigarro(prodId,val){
+  const stock=parseInt(val)||0;
+  _cigBodegaCentral[prodId]=stock;
+  try{
+    await db.collection('bodegaCentralCigarros').doc(prodId).set({stock,actualizadoEn:firebase.firestore.FieldValue.serverTimestamp()});
+    await auditLog('inventario',{accion:'ajuste_bodega_central_cigarros',productoId:prodId,stock});
+  }catch(e){toast('❌ Error guardando: '+e.message);}
+}
+
+function exportCigarrosExcel(){
+  if(!_cigCache.length){toast('Nada que exportar');return;}
+  const header=['Marca','Bodega Central',...SUCURSALES.flatMap(s=>[`${s.nombre} Stock`,`${s.nombre} Prom/día`,`${s.nombre} Sugerido`])];
+  const rows=[header];
+  _cigCache.forEach(f=>{
+    const row=[f.nombre,f.bodegaCentral];
+    SUCURSALES.forEach(s=>{const d=f.porSuc[s.id];row.push(d.stockActual,d.promedioDiario??'',d.sugerido??'');});
+    rows.push(row);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Cigarros');
+  XLSX.writeFile(wb,`cigarros_${today()}.xlsx`);
   toast('✅ Excel descargado');
 }
 
