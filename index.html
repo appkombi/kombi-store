@@ -1471,8 +1471,28 @@ tr:hover td{background:var(--g50)}
           <div class="card"><div class="ct">🏬 Sucursales</div><div class="ml" id="ajSucList" style="margin-bottom:1rem"></div><button class="btn btn-s w100" style="margin-bottom:.75rem" onclick="saveSucursales()">💾 Guardar cambios</button><div class="g2"><div class="fld"><label class="lbl">Nombre</label><input class="inp" type="text" id="ajSucNombre" placeholder="Ej: Centro"/></div><div class="fld"><label class="lbl">Dirección</label><input class="inp" type="text" id="ajSucDir" placeholder="Opcional"/></div></div><button class="btn btn-p w100" onclick="addSucursal()">+ Agregar</button></div>
           <div class="card"><div class="ct">💳 Terminales POS</div><div class="ml" id="posTermList" style="margin-bottom:1rem"></div><div style="display:flex;gap:.5rem"><input class="inp" type="text" id="newTerm" placeholder="Nombre terminal"/><button class="btn btn-p" onclick="addTerminal()">+</button></div></div>
           <div class="card"><div class="ct">🖥️ Etiquetas Sistema</div><div class="fld"><label class="lbl">Efectivo</label><input class="inp" type="text" id="ajSisLblEf"/></div><div class="fld"><label class="lbl">Tarjetas/POS</label><input class="inp" type="text" id="ajSisLblTarj"/></div><div class="fld"><label class="lbl">Otros</label><input class="inp" type="text" id="ajSisLblOtros"/></div><button class="btn btn-p" onclick="saveSisLabels()">Guardar</button></div>
-          <div class="card"><div class="ct">✅ Checklist Apertura</div><div id="ajCkApList" style="margin-bottom:1rem"></div><div style="display:flex;gap:.5rem;margin-bottom:.75rem"><input class="inp" type="text" id="ajCkApNew" placeholder="Nuevo ítem"/><button class="btn btn-p" onclick="addCkItem('apertura')">+</button></div><button class="btn btn-s w100" onclick="saveCkList('apertura')">💾 Guardar checklist apertura</button></div>
-          <div class="card"><div class="ct">📸 Checklist Cierre</div><div id="ajCkCiList" style="margin-bottom:1rem"></div><div style="display:flex;gap:.5rem;margin-bottom:.75rem"><input class="inp" type="text" id="ajCkCiNew" placeholder="Nuevo ítem"/><button class="btn btn-p" onclick="addCkItem('cierre')">+</button></div><button class="btn btn-s w100" onclick="saveCkList('cierre')">💾 Guardar checklist cierre</button></div>
+          <div class="card">
+            <div class="ct">✅ Checklist Apertura</div>
+            <p class="fs12 text-gray mb4">Cada ítem se puede prender/apagar — si está apagado, el operador no lo ve.</p>
+            <div id="ajCkApList" style="margin-bottom:1rem"></div>
+            <div style="display:flex;gap:.5rem;margin-bottom:.75rem"><input class="inp" type="text" id="ajCkApNew" placeholder="Nuevo ítem"/><button class="btn btn-p" onclick="addCkItem('apertura')">+</button></div>
+            <button class="btn btn-s w100" onclick="saveCkList('apertura')">💾 Guardar checklist apertura</button>
+          </div>
+          <div class="card">
+            <div class="ct">📸 Checklist Cierre</div>
+            <p class="fs12 text-gray mb4">Cada ítem se puede prender/apagar (si está apagado, el operador no lo ve). Tipo "Foto" pide que el operador suba una imagen; tipo "Automático" no requiere nada del operador — el sistema ya tiene ese dato (arqueo, movimientos del turno) y lo muestra solo.</p>
+            <div id="ajCkCiList" style="margin-bottom:1rem"></div>
+            <div style="display:flex;gap:.5rem;margin-bottom:.75rem;flex-wrap:wrap">
+              <input class="inp" type="text" id="ajCkCiNew" placeholder="Nuevo ítem" style="flex:1;min-width:140px"/>
+              <select class="sel sm" id="ajCkCiNewTipo">
+                <option value="foto">📷 Foto</option>
+                <option value="auto:arqueo">⚙️ Automático — Arqueo de cierre</option>
+                <option value="auto:movimientos">⚙️ Automático — Movimientos del turno</option>
+              </select>
+              <button class="btn btn-p" onclick="addCkItem('cierre')">+</button>
+            </div>
+            <button class="btn btn-s w100" onclick="saveCkList('cierre')">💾 Guardar checklist cierre</button>
+          </div>
           <div class="card">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
               <div class="ct" style="margin:0;padding:0">📈 Historial de Precios</div>
@@ -2220,10 +2240,11 @@ function apGoTo(n){
   if(n===2)renderCigCatalog('apCigCatalog','AP');if(n===3)renderApCkInline();if(n===4)renderApResumen();
 }
 function renderApCkInline(){
-  const done=CK_APERTURA.filter(i=>i.done).length,pct=CK_APERTURA.length?Math.round(done/CK_APERTURA.length*100):0;
-  document.getElementById('apCkProg').textContent=`${done}/${CK_APERTURA.length}`;document.getElementById('apCkBar').style.width=pct+'%';
+  const visibles=CK_APERTURA.filter(i=>i.activo!==false); // apagados por el admin no se muestran al operador
+  const done=visibles.filter(i=>i.done).length,pct=visibles.length?Math.round(done/visibles.length*100):0;
+  document.getElementById('apCkProg').textContent=`${done}/${visibles.length}`;document.getElementById('apCkBar').style.width=pct+'%';
   const list=document.getElementById('apCkItems');if(!list)return;
-  list.innerHTML=CK_APERTURA.map(it=>`<div class="ci ${it.done?'done':''}" onclick="toggleApCk('${it.id}')"><div class="cb">${it.done?'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg>':''}</div><span class="cl">${it.text}</span></div>`).join('');
+  list.innerHTML=visibles.map(it=>`<div class="ci ${it.done?'done':''}" onclick="toggleApCk('${it.id}')"><div class="cb">${it.done?'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg>':''}</div><span class="cl">${it.text}</span></div>`).join('');
 }
 function toggleApCk(id){const item=CK_APERTURA.find(i=>i.id===id);if(!item)return;item.done=!item.done;if(CK_APERTURA.every(i=>i.done))confetti();renderApCkInline();}
 function renderApResumen(){
@@ -3027,9 +3048,33 @@ function renderCiResumen(){
   const sec=l=>`<div style="font-size:.75rem;font-weight:700;color:var(--g400);text-transform:uppercase;letter-spacing:.06em;padding:.5rem 1rem .25rem">${l}</div>`;
   c.innerHTML=sec('Sistema')+`<div class="ar"><span class="ar-l">Efectivo sis.</span><span class="ar-v">${clp(sis.ef||0)}</span></div><div class="ar"><span class="ar-l">Tarjetas sis.</span><span class="ar-v">${clp(sis.tarj||0)}</span></div><div class="ar tot"><span class="ar-l">Total Sistema</span><span class="ar-v">${clp(sisTotal)}</span></div><div class="div"></div>`+sec('Conteo')+`<div class="ar"><span class="ar-l">💵 Efectivo</span><span class="ar-v">${clp(ef)}</span></div>${POS_TERMINALES.map(t=>`<div class="ar"><span class="ar-l">💳 ${t.name}</span><span class="ar-v">${clp(CI.pos[t.id]||0)}</span></div>`).join('')}<div class="ar tot"><span class="ar-l">Total Real</span><span class="ar-v">${clp(totalReal)}</span></div><div class="div"></div>`+sec('Cuadraturas')+`<div class="ar ${diffEf===0?'tot':diffEf>0?'dp':'dn'}"><span class="ar-l">Dif. Efectivo</span><span class="ar-v">${diffEf>=0?'+':''}${clp(diffEf)}</span></div><div class="ar ${diffSis===0?'tot':diffSis>0?'dp':'dn'}"><span class="ar-l">Dif. Sistema</span><span class="ar-v">${diffSis>=0?'+':''}${clp(diffSis)}</span></div>`+(window._ciPosTotal?`<div class="ar ${window._ciDiffPos===0?'tot':window._ciDiffPos>0?'dp':'dn'}"><span class="ar-l">🖥️ Dif. vs POS</span><span class="ar-v">${window._ciDiffPos>=0?'+':''}${clp(window._ciDiffPos)}</span></div>`:'');
 }
+// Valor mostrado para un ítem "automático" — el sistema ya tiene el dato,
+// no requiere que el operador haga nada (foto, confirmación, etc.).
+function valorAutoCk(fuente){
+  if(fuente==='arqueo'){
+    const sis=CI.sis||{};
+    const sisTotal=(sis.ef||0)+(sis.tarj||0)+(sis.otros||0);
+    return {listo:sisTotal>0,texto:sisTotal>0?`Arqueo registrado — ${clp(sisTotal)}`:'Aún sin arqueo de sistema ingresado'};
+  }
+  if(fuente==='movimientos'){
+    const n=RETIROS.filter(r=>r.fecha===today()).length;
+    return {listo:true,texto:`${n} movimiento${n===1?'':'s'} del turno registrado${n===1?'':'s'}`};
+  }
+  return {listo:true,texto:'—'};
+}
 function renderCiCheckFotos(){
   const c=document.getElementById('ciCheckFotos');if(!c)return;
-  c.innerHTML=CK_CIERRE.map((it,i)=>`<div style="margin-bottom:1.25rem;padding-bottom:1.25rem;border-bottom:1px solid var(--g100)"><div class="flex aic gap2 mb2"><div class="cb ${it.photo?'done':''}">${it.photo?'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg>':''}</div><span class="fw6">${it.text}</span></div><div class="photo-slot ${it.photo?'has-photo':''}" onclick="document.getElementById('ph${i}').click()"><input type="file" id="ph${i}" accept="image/*" capture="environment" onchange="uploadCiPhoto('${it.id}',this,${i})"/>${it.photo?`<img src="${it.photo}"/><div class="fs12" style="color:var(--gr600);margin-top:.375rem">✓ Foto subida</div>`:'<div style="font-size:2rem;margin-bottom:.375rem">📷</div><div class="fs13 text-gray">Toca para foto</div>'}</div></div>`).join('');
+  c.innerHTML=CK_CIERRE.map((it,i)=>{
+    if(it.activo===false)return ''; // apagado por el admin: el operador no lo ve
+    if(it.tipo==='auto'){
+      const v=valorAutoCk(it.fuente);
+      return `<div style="margin-bottom:1.25rem;padding-bottom:1.25rem;border-bottom:1px solid var(--g100)">
+        <div class="flex aic gap2 mb2"><div class="cb ${v.listo?'done':''}">${v.listo?'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg>':''}</div><span class="fw6">${it.text}</span></div>
+        <div class="fs13" style="color:var(--g500);padding:.5rem .75rem;background:var(--g50);border-radius:8px">⚙️ ${v.texto} — dato automático, no requiere acción</div>
+      </div>`;
+    }
+    return `<div style="margin-bottom:1.25rem;padding-bottom:1.25rem;border-bottom:1px solid var(--g100)"><div class="flex aic gap2 mb2"><div class="cb ${it.photo?'done':''}">${it.photo?'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg>':''}</div><span class="fw6">${it.text}</span></div><div class="photo-slot ${it.photo?'has-photo':''}" onclick="document.getElementById('ph${i}').click()"><input type="file" id="ph${i}" accept="image/*" capture="environment" onchange="uploadCiPhoto('${it.id}',this,${i})"/>${it.photo?`<img src="${it.photo}"/><div class="fs12" style="color:var(--gr600);margin-top:.375rem">✓ Foto subida</div>`:'<div style="font-size:2rem;margin-bottom:.375rem">📷</div><div class="fs13 text-gray">Toca para foto</div>'}</div></div>`;
+  }).join('');
   checkCierreReady();
 }
 function uploadCiPhoto(id,input,idx){
@@ -3044,7 +3089,12 @@ function uploadCiPhoto(id,input,idx){
   };
   reader.readAsDataURL(file);
 }
-function checkCierreReady(){const ok=CK_CIERRE.every(it=>it.photo);const btn=document.getElementById('ciEnviarBtn');if(btn){btn.style.opacity=ok?'1':'0.4';btn.style.pointerEvents=ok?'auto':'none';}}
+function checkCierreReady(){
+  // Solo bloquean el envío los ítems ACTIVOS de tipo foto sin foto todavía.
+  // Los apagados por el admin y los automáticos (el sistema ya trae el dato) no exigen nada.
+  const ok=CK_CIERRE.every(it=>it.activo===false||it.tipo==='auto'||it.photo);
+  const btn=document.getElementById('ciEnviarBtn');if(btn){btn.style.opacity=ok?'1':'0.4';btn.style.pointerEvents=ok?'auto':'none';}
+}
 
 async function enviarCierre(){
   CI.saved=true;CI.hora=timeNow();
@@ -8330,14 +8380,52 @@ async function delSucursal(id){if((CFG.sucursales||[]).length<=1){toast('Mínimo
 function renderPosTermList(){const c=document.getElementById('posTermList');if(!c)return;c.innerHTML=POS_TERMINALES.map(t=>`<div class="mi"><span class="fw6 fs14">💳 ${t.name}</span><button class="btn btn-d sm" onclick="deleteTerminal('${t.id}')">✕</button></div>`).join('');}
 async function addTerminal(){const n=document.getElementById('newTerm')?.value.trim();if(!n){toast('Ingresa nombre');return;}POS_TERMINALES.push({id:'t'+Date.now(),name:n});document.getElementById('newTerm').value='';await db.collection('config').doc('global').update({posTerminales:POS_TERMINALES});CFG.posTerminales=POS_TERMINALES;renderPosTermList();renderCiPosInputs();toast('✅ Terminal agregada');}
 async function deleteTerminal(id){if(POS_TERMINALES.length<=1){toast('Mínimo 1');return;}POS_TERMINALES=POS_TERMINALES.filter(t=>t.id!==id);await db.collection('config').doc('global').update({posTerminales:POS_TERMINALES});CFG.posTerminales=POS_TERMINALES;renderPosTermList();renderCiPosInputs();toast('Eliminada');}
-function renderAjCkList(cat){const id=cat==='apertura'?'ajCkApList':'ajCkCiList';const c=document.getElementById(id);if(!c)return;const items=cat==='apertura'?CK_APERTURA:CK_CIERRE;c.innerHTML=items.map((it,i)=>`<div class="mi"><input class="inp" type="text" value="${it.text}" style="flex:1;margin-right:.5rem" onchange="${cat==='apertura'?'CK_APERTURA':'CK_CIERRE'}[${i}].text=this.value"/><button class="btn btn-d sm" onclick="delCkItem('${cat}',${i})">✕</button></div>`).join('');}
+const _CK_FUENTE_LABEL={arqueo:'⚙️ Automático — Arqueo de cierre',movimientos:'⚙️ Automático — Movimientos del turno'};
+function renderAjCkList(cat){
+  const id=cat==='apertura'?'ajCkApList':'ajCkCiList';
+  const c=document.getElementById(id);if(!c)return;
+  const arrName=cat==='apertura'?'CK_APERTURA':'CK_CIERRE';
+  const items=cat==='apertura'?CK_APERTURA:CK_CIERRE;
+  c.innerHTML=items.map((it,i)=>{
+    const activo=it.activo!==false; // por retrocompatibilidad, sin el campo = activo
+    const tipoTxt=cat==='cierre'?(it.tipo==='auto'?_CK_FUENTE_LABEL[it.fuente]||'⚙️ Automático':'📷 Foto'):'';
+    return `<div class="mi" style="opacity:${activo?1:.5}">
+      <label class="fs11" style="display:flex;align-items:center;gap:.3rem;margin-right:.5rem;white-space:nowrap;cursor:pointer">
+        <input type="checkbox" ${activo?'checked':''} onchange="toggleCkActivo('${cat}',${i},this.checked)"/> ${activo?'On':'Off'}
+      </label>
+      <input class="inp" type="text" value="${it.text}" style="flex:1;margin-right:.5rem" onchange="${arrName}[${i}].text=this.value"/>
+      ${tipoTxt?`<span class="fs11 text-gray" style="margin-right:.5rem;white-space:nowrap">${tipoTxt}</span>`:''}
+      <button class="btn btn-d sm" onclick="delCkItem('${cat}',${i})">✕</button>
+    </div>`;
+  }).join('');
+}
+function toggleCkActivo(cat,i,val){
+  const arr=cat==='apertura'?CK_APERTURA:CK_CIERRE;
+  if(arr[i])arr[i].activo=val;
+  renderAjCkList(cat);
+}
 async function saveCkList(cat){
   const items=cat==='apertura'?CK_APERTURA:CK_CIERRE;
   const field=cat==='apertura'?'ckApertura':'ckCierre';
   await db.collection('config').doc('global').update({[field]:items});
   toast('✅ Checklist guardado');
 }
-async function addCkItem(cat){const inputId=cat==='apertura'?'ajCkApNew':'ajCkCiNew';const text=document.getElementById(inputId)?.value.trim();if(!text){toast('Ingresa texto');return;}const newItem={id:'u'+Date.now(),text,done:false};if(cat==='cierre')newItem.photo=null;if(cat==='apertura')CK_APERTURA.push(newItem);else CK_CIERRE.push(newItem);document.getElementById(inputId).value='';const field=cat==='apertura'?'ckApertura':'ckCierre';await db.collection('config').doc('global').update({[field]:cat==='apertura'?CK_APERTURA:CK_CIERRE});renderAjCkList(cat);toast('✅ Ítem agregado');}
+async function addCkItem(cat){
+  const inputId=cat==='apertura'?'ajCkApNew':'ajCkCiNew';
+  const text=document.getElementById(inputId)?.value.trim();
+  if(!text){toast('Ingresa texto');return;}
+  const newItem={id:'u'+Date.now(),text,done:false,activo:true};
+  if(cat==='cierre'){
+    const tipoVal=document.getElementById('ajCkCiNewTipo')?.value||'foto';
+    if(tipoVal.startsWith('auto:')){newItem.tipo='auto';newItem.fuente=tipoVal.split(':')[1];}
+    else{newItem.tipo='foto';newItem.photo=null;}
+  }
+  if(cat==='apertura')CK_APERTURA.push(newItem);else CK_CIERRE.push(newItem);
+  document.getElementById(inputId).value='';
+  const field=cat==='apertura'?'ckApertura':'ckCierre';
+  await db.collection('config').doc('global').update({[field]:cat==='apertura'?CK_APERTURA:CK_CIERRE});
+  renderAjCkList(cat);toast('✅ Ítem agregado');
+}
 async function delCkItem(cat,i){if(cat==='apertura')CK_APERTURA.splice(i,1);else CK_CIERRE.splice(i,1);const field=cat==='apertura'?'ckApertura':'ckCierre';await db.collection('config').doc('global').update({[field]:cat==='apertura'?CK_APERTURA:CK_CIERRE});renderAjCkList(cat);}
 let _precioHistFuente='todos';
 function setPrecioHistFuente(f){
